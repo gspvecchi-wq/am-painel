@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AM · Painel de Engajamento</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg: #060608;
+  --s1: #0e0e12;
+  --s2: #16161d;
+  --s3: #1e1e28;
+  --border: #252530;
+  --border2: #2e2e3e;
+  --acc: #FFD600;
+  --text: #eeeef5;
+  --sub: #888899;
+  --danger: #FF3355;
+  --warn: #FF9500;
+  --safe: #00E87A;
+  --blue: #4488FF;
+  --radius: 14px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 0;
+}
+.app { position: relative; z-index: 1; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 32px; height: 64px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(6,6,8,.95);
+  backdrop-filter: blur(12px);
+  position: sticky; top: 0; z-index: 50;
+}
+.logo-mark { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: .12em; color: var(--acc); }
+.logo-sub { font-size: 10px; color: var(--sub); letter-spacing: .15em; text-transform: uppercase; }
+.nav-tabs { display: flex; gap: 4px; background: var(--s2); border: 1px solid var(--border); padding: 4px; border-radius: 10px; }
+.nav-tab { padding: 7px 20px; border-radius: 7px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: transparent; color: var(--sub); transition: all .2s; }
+.nav-tab.active { background: var(--acc); color: #000; font-weight: 700; }
+.nav-tab:not(.active):hover { color: var(--text); background: var(--s3); }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.month-badge { font-size: 12px; color: var(--sub); background: var(--s2); border: 1px solid var(--border); padding: 6px 14px; border-radius: 8px; }
+.icon-btn { background: var(--s2); border: 1px solid var(--border); color: var(--sub); width: 36px; height: 36px; border-radius: 8px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all .2s; }
+.icon-btn:hover { color: var(--text); border-color: var(--border2); }
+
+.view { display: none; padding: 32px; padding-bottom: 60px; }
+.view.active { display: block; }
+
+.ov { position: fixed; inset: 0; background: rgba(0,0,0,.8); backdrop-filter: blur(8px); z-index: 200; display: none; align-items: center; justify-content: center; padding: 24px; }
+.ov.open { display: flex; }
+.modal-box { background: var(--s1); border: 1px solid var(--border2); border-radius: 20px; padding: 36px; width: 100%; max-width: 560px; animation: slideUp .2s ease; }
+@keyframes slideUp { from { transform: translateY(16px); opacity:0; } to { transform: translateY(0); opacity:1; } }
+.modal-box h2 { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: .08em; color: var(--acc); margin-bottom: 6px; }
+.modal-box p { font-size: 13px; color: var(--sub); margin-bottom: 28px; line-height: 1.6; }
+.field { margin-bottom: 18px; }
+.field label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--sub); margin-bottom: 7px; }
+.field input { width: 100%; background: var(--s2); border: 1px solid var(--border2); color: var(--text); padding: 12px 16px; border-radius: 10px; font-family: 'Outfit', sans-serif; font-size: 14px; outline: none; transition: border-color .2s; }
+.field input:focus { border-color: var(--acc); }
+.hint { font-size: 11px; color: var(--sub); margin-top: 5px; }
+.hint strong { color: var(--acc); }
+.btn-row { display: flex; gap: 10px; margin-top: 8px; }
+.btn-primary { flex: 1; background: var(--acc); color: #000; border: none; padding: 13px; border-radius: 10px; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; transition: opacity .2s; }
+.btn-primary:hover { opacity: .85; }
+.btn-ghost { background: transparent; color: var(--sub); border: 1px solid var(--border2); padding: 13px 20px; border-radius: 10px; font-family: 'Outfit', sans-serif; font-size: 14px; cursor: pointer; transition: all .2s; }
+.btn-ghost:hover { color: var(--text); }
+
+.notice { background: rgba(255,214,0,.07); border: 1px solid rgba(255,214,0,.2); border-radius: 10px; padding: 12px 16px; font-size: 12px; color: rgba(255,214,0,.8); margin-bottom: 24px; display: none; }
+.notice.show { display: block; }
+
+.cs-controls { display: flex; gap: 10px; align-items: center; margin-bottom: 28px; flex-wrap: wrap; }
+.cs-controls select { background: var(--s2); border: 1px solid var(--border2); color: var(--text); padding: 9px 14px; border-radius: 10px; font-family: 'Outfit', sans-serif; font-size: 13px; outline: none; cursor: pointer; }
+.reload-btn { background: var(--s2); border: 1px solid var(--border2); color: var(--sub); padding: 9px 16px; border-radius: 10px; font-size: 13px; cursor: pointer; transition: all .2s; }
+.reload-btn:hover { color: var(--text); border-color: var(--acc); }
+
+.stat-strip { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 28px; }
+@media(max-width:700px){ .stat-strip { grid-template-columns: repeat(2,1fr); } }
+.stat-card { background: var(--s1); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; position: relative; overflow: hidden; }
+.sc-acc { border-top: 2px solid var(--acc); }
+.sc-red { border-top: 2px solid var(--danger); }
+.sc-org { border-top: 2px solid var(--warn); }
+.sc-blu { border-top: 2px solid var(--blue); }
+.stat-num { font-family: 'Bebas Neue', sans-serif; font-size: 48px; line-height: 1; margin-bottom: 2px; }
+.sc-acc .stat-num { color: var(--acc); }
+.sc-red .stat-num { color: var(--danger); }
+.sc-org .stat-num { color: var(--warn); }
+.sc-blu .stat-num { color: var(--blue); }
+.stat-lbl { font-size: 12px; color: var(--sub); font-weight: 500; }
+
+.pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.pill { padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border2); background: transparent; color: var(--sub); transition: all .18s; }
+.pill:hover { color: var(--text); }
+.pill.active { background: var(--acc); color: #000; border-color: var(--acc); }
+
+.tbl-wrap { background: var(--s1); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 28px; }
+table { width: 100%; border-collapse: collapse; }
+thead th { background: var(--s2); padding: 11px 16px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--sub); font-weight: 600; }
+tbody tr { border-top: 1px solid var(--border); cursor: pointer; transition: background .12s; }
+tbody tr:hover { background: var(--s2); }
+tbody td { padding: 13px 16px; font-size: 13px; vertical-align: middle; }
+.dr-name { font-weight: 600; font-size: 14px; }
+.dr-phone { font-size: 11px; color: var(--sub); margin-top: 2px; }
+
+.badges { display: flex; gap: 5px; flex-wrap: wrap; }
+.b { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 20px; letter-spacing: .04em; white-space: nowrap; }
+.b-aus { background: rgba(255,51,85,.12); color: var(--danger); border: 1px solid rgba(255,51,85,.25); }
+.b-cam { background: rgba(255,149,0,.12); color: var(--warn); border: 1px solid rgba(255,149,0,.25); }
+.b-fb  { background: rgba(153,102,255,.12); color: #9966FF; border: 1px solid rgba(153,102,255,.25); }
+.b-vit { background: rgba(68,136,255,.12); color: var(--blue); border: 1px solid rgba(68,136,255,.25); }
+.b-4x  { background: rgba(255,51,85,.2); color: var(--danger); border: 1px solid rgba(255,51,85,.4); }
+
+.rbar { display: flex; align-items: center; gap: 8px; }
+.rbar-track { width: 56px; height: 5px; background: var(--s3); border-radius: 3px; overflow: hidden; }
+.rbar-fill { height: 100%; border-radius: 3px; }
+.rh .rbar-fill, .rh .rbar-txt { background: var(--danger); color: var(--danger); }
+.rm .rbar-fill, .rm .rbar-txt { background: var(--warn); color: var(--warn); }
+.rl .rbar-fill, .rl .rbar-txt { background: var(--safe); color: var(--safe); }
+.rbar-txt { font-size: 11px; font-weight: 700; min-width: 28px; }
+
+.dr-modal { background: var(--s1); border: 1px solid var(--border2); border-radius: 20px; width: 100%; max-width: 660px; max-height: 92vh; overflow-y: auto; padding: 32px; position: relative; animation: slideUp .2s ease; }
+.modal-x { position: absolute; top: 20px; right: 20px; background: var(--s2); border: 1px solid var(--border2); color: var(--sub); width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all .2s; }
+.modal-x:hover { color: var(--text); }
+.modal-dr { font-family: 'Bebas Neue', sans-serif; font-size: 32px; letter-spacing: .06em; margin-bottom: 2px; }
+.modal-meta { font-size: 12px; color: var(--sub); margin-bottom: 20px; }
+
+.hist-row { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+.hist-week { background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 11px; min-width: 70px; }
+.hist-week-lbl { color: var(--sub); font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .08em; }
+.hist-dots { display: flex; gap: 4px; }
+.dot { width: 16px; height: 16px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; }
+.dot-on { background: rgba(0,232,122,.2); color: var(--safe); border: 1px solid rgba(0,232,122,.3); }
+.dot-off { background: rgba(255,51,85,.1); color: rgba(255,51,85,.5); border: 1px solid rgba(255,51,85,.2); }
+.dot-na { background: var(--s3); color: var(--sub); border: 1px solid var(--border); }
+
+.mstats { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 24px; }
+.mstat { background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: center; }
+.mstat-v { font-family: 'Bebas Neue', sans-serif; font-size: 26px; line-height: 1; }
+.mstat-l { font-size: 9px; color: var(--sub); text-transform: uppercase; letter-spacing: .08em; margin-top: 2px; }
+
+.msg-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.mtab { padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; cursor: pointer; border: 1px solid var(--border2); background: transparent; color: var(--sub); transition: all .18s; text-transform: uppercase; letter-spacing: .03em; }
+.mtab:hover { color: var(--text); }
+.mtab.active { background: var(--acc); color: #000; border-color: var(--acc); }
+.msg-box { background: var(--s2); border: 1px solid var(--border2); border-radius: 12px; padding: 20px; font-size: 13px; line-height: 1.75; white-space: pre-wrap; word-break: break-word; display: none; }
+.msg-box.active { display: block; }
+.copy-btn { margin-top: 14px; background: transparent; border: 1px solid var(--acc); color: var(--acc); padding: 8px 20px; border-radius: 8px; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 11px; cursor: pointer; letter-spacing: .06em; text-transform: uppercase; transition: all .2s; }
+.copy-btn:hover { background: var(--acc); color: #000; }
+.copy-btn.copied { background: var(--safe); border-color: var(--safe); color: #000; }
+
+.gest-top { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 28px; }
+@media(max-width:800px){ .gest-top { grid-template-columns: repeat(2,1fr); } }
+.gest-kpi { background: var(--s1); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; }
+.gest-kpi-n { font-family: 'Bebas Neue', sans-serif; font-size: 52px; line-height: 1; color: var(--acc); }
+.gest-kpi-l { font-size: 12px; color: var(--sub); margin-top: 2px; font-weight: 500; }
+
+.chart-wrap { background: var(--s1); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 28px; }
+.chart-title { font-size: 11px; color: var(--sub); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 20px; font-weight: 600; }
+.chart-bars { display: flex; align-items: flex-end; gap: 14px; height: 120px; }
+.chart-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.chart-bar-wrap { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+.chart-bar { width: 100%; border-radius: 5px 5px 0 0; background: var(--acc); opacity: .85; min-height: 4px; position: relative; }
+.chart-bar:hover { opacity: 1; }
+.chart-bar-val { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 700; color: var(--acc); white-space: nowrap; }
+.chart-lbl { font-size: 10px; color: var(--sub); text-align: center; }
+
+.sec-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
+.sec-title { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: .1em; }
+.sec-sub { font-size: 12px; color: var(--sub); }
+
+.risk-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(210px,1fr)); gap: 12px; margin-bottom: 28px; }
+.risk-card { background: var(--s1); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; cursor: pointer; transition: border-color .2s, transform .15s; }
+.risk-card:hover { transform: translateY(-2px); }
+.r-h { border-left: 3px solid var(--danger); }
+.r-m { border-left: 3px solid var(--warn); }
+.r-l { border-left: 3px solid var(--safe); }
+.rc-name { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.rc-phone { font-size: 11px; color: var(--sub); margin-bottom: 8px; }
+.rc-score { font-family: 'Bebas Neue', sans-serif; font-size: 38px; line-height: 1; margin-bottom: 4px; }
+.r-h .rc-score { color: var(--danger); }
+.r-m .rc-score { color: var(--warn); }
+.r-l .rc-score { color: var(--safe); }
+.rc-detail { font-size: 11px; color: var(--sub); line-height: 1.6; }
+
+.statusbar { position: fixed; bottom: 0; left: 0; right: 0; height: 36px; background: var(--s1); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 32px; gap: 20px; font-size: 11px; color: var(--sub); z-index: 40; }
+.s-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.s-live { background: var(--safe); box-shadow: 0 0 6px var(--safe); }
+.s-off { background: var(--sub); }
+
+.center-msg { text-align: center; padding: 72px 24px; color: var(--sub); }
+.center-msg .icon { font-size: 44px; margin-bottom: 14px; }
+.center-msg h3 { font-family:'Bebas Neue',sans-serif; font-size: 22px; color: var(--text); margin-bottom: 6px; letter-spacing:.06em; }
+</style>
+</head>
+<body>
+<div class="app">
+
+<nav class="topbar">
+  <div>
+    <div class="logo-mark">Acelerador Médico</div>
+    <div class="logo-sub">Painel de Engajamento</div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchView('cs',this)">CS · Acionamento</button>
+    <button class="nav-tab" onclick="switchView('gest',this)">Gestão · Visão Geral</button>
+  </div>
+  <div class="topbar-right">
+    <div class="month-badge" id="monthBadge">—</div>
+    <button class="icon-btn" onclick="openConfig()" title="Configurações">⚙</button>
+  </div>
+</nav>
+
+<!-- CONFIG -->
+<div class="ov" id="cfgOv" onclick="ovClick(event,'cfgOv')">
+  <div class="modal-box">
+    <h2>Configurar Painel</h2>
+    <p>Preencha uma vez por mês. As configurações ficam salvas no seu navegador.</p>
+    <div class="field">
+      <label>Monday.com — API Token</label>
+      <input type="password" id="cfgToken" placeholder="eyJhbGci..." autocomplete="off"/>
+      <div class="hint">Avatar → Developers → My Access Tokens</div>
+    </div>
+    <div class="field">
+      <label>Google Sheets — ID da Planilha do Mês</label>
+      <input type="text" id="cfgSheet" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"/>
+      <div class="hint">URL: docs.google.com/spreadsheets/d/<strong>ID_AQUI</strong>/edit</div>
+    </div>
+    <div class="field">
+      <label>Mês de Referência</label>
+      <input type="month" id="cfgMonth"/>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="saveConfig()">Salvar e Carregar</button>
+      <button class="btn-ghost" onclick="closeOv('cfgOv')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CS VIEW -->
+<div class="view active" id="view-cs">
+  <div class="notice" id="csNotice">⚙ Configure a planilha e o token do Monday clicando em <strong>⚙</strong> no canto superior direito.</div>
+  <div class="cs-controls">
+    <select id="csTab" onchange="csLoad()">
+      <option value="Mentoria">Mentoria</option>
+      <option value="Hotseat">Hotseat</option>
+      <option value="Master">Master</option>
+      <option value="Especialidades">Especialidades</option>
+    </select>
+    <select id="csWeek" onchange="csLoad()">
+      <option value="1">Semana 1</option>
+      <option value="2">Semana 2</option>
+      <option value="3">Semana 3</option>
+      <option value="4">Semana 4</option>
+      <option value="5">Semana 5</option>
+    </select>
+    <button class="reload-btn" onclick="reloadAll()">↻ Atualizar tudo</button>
+  </div>
+  <div class="stat-strip" id="csStats" style="display:none">
+    <div class="stat-card sc-acc"><div class="stat-num" id="sTot">0</div><div class="stat-lbl">Total de alunos</div></div>
+    <div class="stat-card sc-red"><div class="stat-num" id="sAus">0</div><div class="stat-lbl">Ausentes</div></div>
+    <div class="stat-card sc-org"><div class="stat-num" id="sCam">0</div><div class="stat-lbl">Sem câmera</div></div>
+    <div class="stat-card sc-blu"><div class="stat-num" id="sVit">0</div><div class="stat-lbl">Sem vitória</div></div>
+  </div>
+  <div id="csMain" style="display:none">
+    <div class="pills">
+      <button class="pill active" onclick="setPill('todos',this)">Todos</button>
+      <button class="pill" onclick="setPill('ausente',this)">❌ Ausentes</button>
+      <button class="pill" onclick="setPill('camera',this)">📷 Sem câmera</button>
+      <button class="pill" onclick="setPill('feedback',this)">💬 Sem feedback</button>
+      <button class="pill" onclick="setPill('vitoria',this)">🏆 Sem vitória</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Médico</th><th>Motivos</th><th>Aus. seguidas</th><th>Risco</th></tr></thead>
+        <tbody id="csTbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="csEmpty" class="center-msg">
+    <div class="icon">📋</div>
+    <h3>Nenhum dado carregado</h3>
+    <p>Configure o painel para começar.</p>
+  </div>
+</div>
+
+<!-- GESTÃO VIEW -->
+<div class="view" id="view-gest">
+  <div class="notice" id="gestNotice">⚙ Configure o painel clicando em <strong>⚙</strong> no canto superior direito.</div>
+  <div id="gestContent" style="display:none">
+    <div class="gest-top">
+      <div class="gest-kpi"><div class="gest-kpi-n" id="gTotal">—</div><div class="gest-kpi-l">Alunos no Master</div></div>
+      <div class="gest-kpi"><div class="gest-kpi-n" id="gEng" style="color:var(--safe)">—</div><div class="gest-kpi-l">Taxa de engajamento</div></div>
+      <div class="gest-kpi"><div class="gest-kpi-n" id="gRisk" style="color:var(--danger)">—</div><div class="gest-kpi-l">Em risco alto</div></div>
+      <div class="gest-kpi"><div class="gest-kpi-n" id="gAbsent" style="color:var(--warn)">—</div><div class="gest-kpi-l">Ausentes esta semana</div></div>
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-title">Presença por Semana — Master</div>
+      <div class="chart-bars" id="gestChart"></div>
+    </div>
+    <div class="sec-head">
+      <div class="sec-title">Ranking de Risco</div>
+      <div class="sec-sub">Baseado em presença acumulada no Master</div>
+    </div>
+    <div class="risk-grid" id="gestRisk"></div>
+    <div class="sec-head"><div class="sec-title">Engajamento por Aula</div></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Aula</th><th>S1</th><th>S2</th><th>S3</th><th>S4</th><th>Tendência</th></tr></thead>
+        <tbody id="gestTabTbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="gestEmpty" class="center-msg">
+    <div class="icon">📊</div>
+    <h3>Nenhum dado carregado</h3>
+    <p>Configure o painel para ver a visão de gestão.</p>
+  </div>
+</div>
+
+<!-- DR MODAL -->
+<div class="ov" id="drOv" onclick="ovClick(event,'drOv')">
+  <div class="dr-modal">
+    <button class="modal-x" onclick="closeOv('drOv')">✕</button>
+    <div class="modal-dr" id="mName"></div>
+    <div class="modal-meta" id="mMeta"></div>
+    <div class="hist-row" id="mHist"></div>
+    <div class="mstats" id="mStats"></div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);margin-bottom:10px;font-weight:700;">Mensagens prontas</div>
+    <div class="msg-tabs" id="mTabs"></div>
+    <div id="mBoxes"></div>
+  </div>
+</div>
+
+<div class="statusbar">
+  <div class="s-dot s-off" id="sDot"></div>
+  <span id="sTxt">Sem dados carregados</span>
+  <span id="sTxt2" style="margin-left:auto"></span>
+</div>
+
+</div>
+
+<script>
+const BOARD_ID = '18365478944';
+const TABS = ['Mentoria','Hotseat','Master','Especialidades'];
+let cfg = { token:'', sheetId:'', month:'' };
+let mondayAlunos = [];
+let sheetData = {};
+let csFilter = 'todos';
+let currentTab = 'Mentoria';
+let currentWeek = 1;
+let loaded = false;
+let _doctors = [];
+
+window.addEventListener('DOMContentLoaded', () => {
+  const s = localStorage.getItem('am_cfg3');
+  if (s) {
+    cfg = JSON.parse(s);
+    if (cfg.token) document.getElementById('cfgToken').value = cfg.token;
+    if (cfg.sheetId) document.getElementById('cfgSheet').value = cfg.sheetId;
+    if (cfg.month) document.getElementById('cfgMonth').value = cfg.month;
+    updateBadge();
+    reloadAll();
+  } else {
+    document.getElementById('cfgMonth').value = new Date().toISOString().slice(0,7);
+    showNotices(true);
+  }
+});
+
+function showNotices(v) {
+  ['csNotice','gestNotice'].forEach(id => document.getElementById(id).classList.toggle('show', v));
+}
+function updateBadge() {
+  if (!cfg.month) return;
+  const [y,m] = cfg.month.split('-');
+  const lbl = new Date(y,m-1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  document.getElementById('monthBadge').textContent = lbl.charAt(0).toUpperCase()+lbl.slice(1);
+}
+function setStatus(live, txt, txt2='') {
+  document.getElementById('sDot').className = 's-dot '+(live?'s-live':'s-off');
+  document.getElementById('sTxt').textContent = txt;
+  document.getElementById('sTxt2').textContent = txt2;
+}
+
+function openConfig() { document.getElementById('cfgOv').classList.add('open'); }
+function closeOv(id) { document.getElementById(id).classList.remove('open'); }
+function ovClick(e, id) { if (e.target===document.getElementById(id)) closeOv(id); }
+
+function saveConfig() {
+  const token = document.getElementById('cfgToken').value.trim();
+  const sheetId = document.getElementById('cfgSheet').value.trim();
+  const month = document.getElementById('cfgMonth').value;
+  if (!token || !sheetId) { alert('Preencha o token do Monday e o ID da planilha.'); return; }
+  cfg = { token, sheetId, month };
+  localStorage.setItem('am_cfg3', JSON.stringify(cfg));
+  updateBadge();
+  closeOv('cfgOv');
+  showNotices(false);
+  reloadAll();
+}
+
+async function reloadAll() {
+  if (!cfg.token || !cfg.sheetId) return;
+  setStatus(false, 'Carregando Monday...');
+  loaded = false;
+
+  try {
+    mondayAlunos = await fetchMonday();
+  } catch(e) {
+    setStatus(false, 'Erro Monday: '+e.message);
+    console.error(e);
+    return;
+  }
+
+  setStatus(false, `${mondayAlunos.length} alunos · Carregando planilha...`);
+  sheetData = {};
+  const results = await Promise.allSettled(TABS.map(t => fetchSheet(t).then(d => ({tab:t, data:d}))));
+  results.forEach(r => { if (r.status==='fulfilled') sheetData[r.value.tab] = r.value.data; });
+
+  loaded = true;
+  const now = new Date().toLocaleTimeString('pt-BR');
+  setStatus(true, `${mondayAlunos.length} alunos · ${Object.keys(sheetData).length} abas`, `Atualizado ${now}`);
+  csLoad();
+  if (document.getElementById('view-gest').classList.contains('active')) renderGest();
+}
+
+async function fetchMonday() {
+  const query = `{ boards(ids: ${BOARD_ID}) { items_page(limit: 500) { items { name column_values { id text } } } } }`;
+  const res = await fetch('https://api.monday.com/v2', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'Authorization': cfg.token, 'API-Version':'2024-01' },
+    body: JSON.stringify({ query })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.errors) throw new Error(json.errors[0].message);
+  const items = json?.data?.boards?.[0]?.items_page?.items || [];
+
+  return items.map(item => {
+    const cols = {};
+    (item.column_values||[]).forEach(c => { cols[c.id] = c.text; });
+    const phone =
+      cols['phone'] || cols['telefone'] || cols['phone_1'] || cols['phone0'] ||
+      Object.values(cols).find(v => v && /^\+?[\d\s\(\)\-]{8,}$/.test((v||'').replace(/\s/g,''))) || '';
+    const entryDate =
+      cols['date4'] || cols['date'] || cols['data_de_onboarding'] || cols['data'] ||
+      Object.values(cols).find(v => v && /\d{4}-\d{2}/.test(v||'')) || '';
+    return { name: item.name.trim(), phone, entryDate };
+  }).filter(a => a.name);
+}
+
+async function fetchSheet(tab) {
+  const url = `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('fail');
+  return parseSheet(await res.text());
+}
+
+function parseSheet(csv) {
+  const rows = csvParse(csv);
+  const present = {};
+  for (let r = 2; r < rows.length; r++) {
+    const row = rows[r];
+    const name = clean(row[0]);
+    if (!name || name.toLowerCase()==='nome') continue;
+    const history = [];
+    for (let w = 0; w < 5; w++) {
+      const base = 1 + w*4;
+      // P col is not used from sheet — presence = being in the sheet for that week
+      // We detect presence by checking if row has data for that week
+      const hasData = row[base] !== undefined;
+      history.push({
+        P: hasData,
+        C: chk(row[base+1]),
+        F: chk(row[base+2]),
+        V: chk(row[base+3])
+      });
+    }
+    present[normName(name)] = { name, history };
+  }
+  return present;
+}
+
+function buildDoctors(tab, week) {
+  const sheetTab = sheetData[tab] || {};
+  const w = week - 1;
+  return mondayAlunos.map(aluno => {
+    const key = normName(aluno.name);
+    const entry = sheetTab[key] || null;
+    const history = Array.from({length:5}, (_,i) => {
+      if (entry && entry.history[i] && entry.history[i].P)
+        return { P:true, C:entry.history[i].C, F:entry.history[i].F, V:entry.history[i].V };
+      return { P:false, C:false, F:false, V:false };
+    });
+    const cur = history[w];
+    let consAbs = 0;
+    for (let i=w; i>=0; i--) { if (!history[i].P) consAbs++; else break; }
+    const motivos = [];
+    if (!cur.P) {
+      motivos.push('ausente');
+    } else {
+      if (!cur.C) motivos.push('camera');
+      if (!cur.F && tab==='Especialidades') motivos.push('feedback');
+      if (!cur.V) motivos.push('vitoria');
+    }
+    const risk = calcRisk(history, week);
+    return { ...aluno, history, cur, consAbs, motivos, risk };
+  });
+}
+
+function normName(s) {
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+}
+function calcRisk(history, upTo) {
+  const weeks = history.slice(0, Math.min(upTo,5));
+  let score = 0, consAbs = 0;
+  for (let i=weeks.length-1;i>=0;i--) { if(!weeks[i].P) consAbs++; else break; }
+  score += consAbs*18;
+  score += (weeks.filter(w=>!w.P).length/weeks.length)*35;
+  const pres = weeks.filter(w=>w.P);
+  if (pres.length) {
+    score += (pres.filter(w=>!w.C).length/pres.length)*12;
+    score += (pres.filter(w=>!w.V).length/pres.length)*8;
+  }
+  return Math.min(Math.round(score),100);
+}
+
+function csLoad() {
+  currentTab = document.getElementById('csTab').value;
+  currentWeek = parseInt(document.getElementById('csWeek').value);
+  if (!loaded) {
+    document.getElementById('csStats').style.display='none';
+    document.getElementById('csMain').style.display='none';
+    document.getElementById('csEmpty').style.display='block';
+    return;
+  }
+  _doctors = buildDoctors(currentTab, currentWeek);
+  const toAction = _doctors.filter(d=>d.motivos.length>0||d.consAbs>=4);
+  document.getElementById('sTot').textContent = mondayAlunos.length;
+  document.getElementById('sAus').textContent = _doctors.filter(d=>d.motivos.includes('ausente')).length;
+  document.getElementById('sCam').textContent = _doctors.filter(d=>d.motivos.includes('camera')).length;
+  document.getElementById('sVit').textContent = _doctors.filter(d=>d.motivos.includes('vitoria')).length;
+  document.getElementById('csStats').style.display='grid';
+  document.getElementById('csMain').style.display='block';
+  document.getElementById('csEmpty').style.display='none';
+  renderCsTable(toAction);
+}
+
+function setPill(f, el) {
+  csFilter = f;
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  renderCsTable(_doctors.filter(d=>d.motivos.length>0||d.consAbs>=4));
+}
+
+function renderCsTable(doctors) {
+  const list = csFilter==='todos' ? doctors : doctors.filter(d=>d.motivos.includes(csFilter));
+  const tbody = document.getElementById('csTbody');
+  if (!list.length) {
+    tbody.innerHTML=`<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--sub)">Nenhum médico neste filtro 🎉</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(d => {
+    const rc = d.risk>=60?'rh':d.risk>=30?'rm':'rl';
+    const rl = d.risk>=60?'ALTO':d.risk>=30?'MÉD':'BAIXO';
+    const badges = d.motivos.map(m=>`<span class="b ${bCls(m)}">${bLbl(m)}</span>`).join('');
+    const abs4 = d.consAbs>=4?`<span class="b b-4x">4+ aus.</span>`:'';
+    return `<tr onclick="openDrModal('${esc(d.name)}')">
+      <td>
+        <div class="dr-name">Dr(a). ${esc(d.name)}</div>
+        ${d.phone?`<div class="dr-phone">${esc(d.phone)}</div>`:''}
+      </td>
+      <td><div class="badges">${badges}${abs4}</div></td>
+      <td style="font-size:12px;color:${d.consAbs>=3?'var(--danger)':'var(--sub)'}">${d.consAbs}</td>
+      <td>
+        <div class="rbar ${rc}">
+          <div class="rbar-track"><div class="rbar-fill" style="width:${d.risk}%"></div></div>
+          <span class="rbar-txt">${d.risk}%</span>
+          <span style="font-size:10px;color:var(--sub);margin-left:2px">${rl}</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function bCls(m){return{ausente:'b-aus',camera:'b-cam',feedback:'b-fb',vitoria:'b-vit'}[m]||'';}
+function bLbl(m){return{ausente:'❌ Ausente',camera:'📷 Câmera',feedback:'💬 Feedback',vitoria:'🏆 Vitória'}[m]||m;}
+
+function renderGest() {
+  if (!loaded||!mondayAlunos.length) {
+    document.getElementById('gestContent').style.display='none';
+    document.getElementById('gestEmpty').style.display='block';
+    return;
+  }
+  document.getElementById('gestContent').style.display='block';
+  document.getElementById('gestEmpty').style.display='none';
+
+  const masterDocs = buildDoctors('Master', currentWeek);
+  const total = masterDocs.length;
+  const anyPresent = masterDocs.filter(d=>d.history.some(h=>h.P)).length;
+  const engRate = total?Math.round(anyPresent/total*100):0;
+  const atRisk = masterDocs.filter(d=>d.risk>=60).length;
+  const absentNow = masterDocs.filter(d=>!d.history[currentWeek-1]?.P).length;
+
+  document.getElementById('gTotal').textContent = total;
+  document.getElementById('gEng').textContent = engRate+'%';
+  document.getElementById('gRisk').textContent = atRisk;
+  document.getElementById('gAbsent').textContent = absentNow;
+
+  const bars = [];
+  for (let w=0;w<currentWeek;w++) {
+    const n = masterDocs.filter(d=>d.history[w].P).length;
+    bars.push({w:w+1, pct:total?Math.round(n/total*100):0, n});
+  }
+  const maxP = Math.max(...bars.map(b=>b.pct),1);
+  document.getElementById('gestChart').innerHTML = bars.map(b=>`
+    <div class="chart-col">
+      <div class="chart-bar-wrap">
+        <div class="chart-bar" style="height:${b.pct/maxP*100}%">
+          <span class="chart-bar-val">${b.pct}%</span>
+        </div>
+      </div>
+      <div class="chart-lbl">S${b.w}<br><span>${b.n}/${total}</span></div>
+    </div>`).join('');
+
+  const top = [...masterDocs].sort((a,b)=>b.risk-a.risk).slice(0,9);
+  document.getElementById('gestRisk').innerHTML = top.map(d=>{
+    const cls=d.risk>=60?'r-h':d.risk>=30?'r-m':'r-l';
+    return `<div class="risk-card ${cls}" onclick="openDrModal('${esc(d.name)}')">
+      <div class="rc-name">Dr(a). ${esc(d.name)}</div>
+      ${d.phone?`<div class="rc-phone">${esc(d.phone)}</div>`:''}
+      <div class="rc-score">${d.risk}%</div>
+      <div class="rc-detail">Presente ${d.history.filter(h=>h.P).length}/${currentWeek} sem. · ${d.consAbs} aus. seguidas</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('gestTabTbody').innerHTML = TABS.map(tab=>{
+    const docs = buildDoctors(tab, currentWeek);
+    const n = docs.length;
+    if(!n) return `<tr><td>${tab}</td><td colspan="5" style="color:var(--sub);font-size:12px">Sem dados</td></tr>`;
+    const wCols = [0,1,2,3].map(w=>{
+      if(w>=currentWeek) return '<td style="color:var(--sub)">—</td>';
+      const pct=Math.round(docs.filter(d=>d.history[w].P).length/n*100);
+      const color=pct>=70?'var(--safe)':pct>=40?'var(--warn)':'var(--danger)';
+      return `<td style="color:${color};font-weight:700">${pct}%</td>`;
+    }).join('');
+    const vals=[0,1,2,3].filter(w=>w<currentWeek).map(w=>docs.filter(d=>d.history[w].P).length/n*100);
+    let tend='—';
+    if(vals.length>=2){const d=vals[vals.length-1]-vals[0];tend=d>5?'📈 Subindo':d<-5?'📉 Caindo':'➡ Estável';}
+    return `<tr><td style="font-weight:600">${tab}</td>${wCols}<td style="font-size:12px">${tend}</td></tr>`;
+  }).join('');
+}
+
+function openDrModal(name) {
+  const d = _doctors.find(x=>x.name===name) || buildDoctors(currentTab,currentWeek).find(x=>x.name===name);
+  if (!d) return;
+  document.getElementById('mName').textContent = `Dr(a). ${name}`;
+  document.getElementById('mMeta').textContent =
+    `${currentTab} · Semana ${currentWeek} · Risco ${d.risk}%`+
+    (d.phone?` · ${d.phone}`:'')+
+    (d.entryDate?` · Entrou: ${d.entryDate}`:'');
+  document.getElementById('mHist').innerHTML = d.history.slice(0,5).map((h,i)=>{
+    const active=i<currentWeek;
+    const dot=(v,l)=>active?`<div class="dot ${v?'dot-on':'dot-off'}" title="${l}">${l}</div>`:`<div class="dot dot-na">·</div>`;
+    return `<div class="hist-week"><div class="hist-week-lbl">S${i+1}</div><div class="hist-dots">${dot(h.P,'P')}${dot(h.C,'C')}${dot(h.F,'F')}${dot(h.V,'V')}</div></div>`;
+  }).join('');
+  const hw=d.history.slice(0,currentWeek);
+  document.getElementById('mStats').innerHTML=`
+    <div class="mstat"><div class="mstat-v" style="color:var(--safe)">${hw.filter(h=>h.P).length}/${currentWeek}</div><div class="mstat-l">Presenças</div></div>
+    <div class="mstat"><div class="mstat-v" style="color:var(--warn)">${hw.filter(h=>h.P&&h.C).length}</div><div class="mstat-l">Câmera</div></div>
+    <div class="mstat"><div class="mstat-v" style="color:#9966FF">${hw.filter(h=>h.P&&h.F).length}</div><div class="mstat-l">Feedback</div></div>
+    <div class="mstat"><div class="mstat-v" style="color:var(--blue)">${hw.filter(h=>h.P&&h.V).length}</div><div class="mstat-l">Vitórias</div></div>`;
+  const msgs=buildMsgs({name,motivos:d.motivos,consAbs:d.consAbs,tab:currentTab});
+  document.getElementById('mTabs').innerHTML=msgs.map((m,i)=>`<button class="mtab ${i===0?'active':''}" onclick="switchMsg(${i},this)">${m.label}</button>`).join('');
+  document.getElementById('mBoxes').innerHTML=msgs.map((m,i)=>`<div class="msg-box ${i===0?'active':''}" id="mbox${i}">${escHtml(m.text)}<br><button class="copy-btn" onclick="copyMsg(${i},this)">📋 COPIAR</button></div>`).join('');
+  document.getElementById('drOv').classList.add('open');
+}
+
+function switchMsg(i,el){document.querySelectorAll('.mtab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.msg-box').forEach(b=>b.classList.remove('active'));el.classList.add('active');document.getElementById('mbox'+i).classList.add('active');}
+function copyMsg(i,btn){const text=document.getElementById('mbox'+i).innerText.replace('📋 COPIAR','').trim();navigator.clipboard.writeText(text).then(()=>{btn.textContent='✓ COPIADO';btn.classList.add('copied');setTimeout(()=>{btn.textContent='📋 COPIAR';btn.classList.remove('copied');},2000);});}
+
+function buildMsgs({name,motivos,consAbs,tab}){
+  const fn=name.split(' ')[0];const msgs=[];
+  if(consAbs>=4){msgs.push({label:'🚨 4+ Ausências',text:msg4x(name,fn)});}
+  else if(motivos.includes('ausente')){msgs.push({label:'❌ Ausente',text:msgAus(name,fn,tab)});msgs.push({label:'⏱ +4h',text:`- Dr. ${fn}?`});msgs.push({label:'⏱ +2h',text:`- Dr. ${fn}, conseguiu ver minha mensagem?`});msgs.push({label:'📞 Ligação',text:msgLig(name,fn,tab)});}
+  if(motivos.includes('camera'))msgs.push({label:'📷 Câmera',text:msgCam(name,fn)});
+  if(motivos.includes('feedback'))msgs.push({label:'💬 Feedback',text:msgFb(name,fn)});
+  if(motivos.includes('vitoria')&&!motivos.includes('ausente'))msgs.push({label:'🏆 Vitória',text:msgVit(name,fn)});
+  return msgs;
+}
+function msgAus(name,fn,tab){return `Olá, Dr(a). ${name}! Tudo bem?\n\nPercebemos que o Sr. ou a Sra. não conseguiu estar presente ontem no encontro da ${tab}.\n\nImagino que a sua rotina pode estar intensa e, muitas vezes, imprevistos acontecem.\n\nMas queremos muito garantir que o Sr. aproveite ao máximo tudo o que a mentoria pode gerar para a sua vida.\n\n- Este horário está inviável Dr. ${fn}?\n- O que podemos fazer para te ajudar a priorizar este horário?\n\nEstamos juntos e queremos muito te ver crescer!\n\nUm abraço!`;}
+function msgCam(name,fn){return `Dr(a). ${name}, tudo bem?\n\nFicamos felizes em ver você presente na mentoria!\n\nUm detalhe que sempre faz muita diferença é participar com a câmera aberta, porque isso:\n- aumenta muito a troca com o mentor e com o grupo.\n- te deixa mais focado(a).\n\nIncentivo o Dr. ${fn} a abrir a câmera nos próximos encontros, vai ser ótimo e tenho certeza que o Sr. vai tirar ainda mais proveito.\n\nConta de verdade comigo. Queremos muito te ver crescer.\n\nUm abracoooo Dr. ${fn}!`;}
+function msgFb(name,fn){return `Oláaaa Dr(a). ${name}, tudo bem?\n\nPercebemos que o Sr. participou da mentoria ontem, mas não deu feedback sobre como foi a sua semana.\n\nTe incentivamos Dr. ${fn} a nas próximas vezes assim que entrar já "levantar a mão" virtual e falar sobre suas vitórias, avanços e dúvidas.\n\nDessa forma a mentoria se torna mais transformadora na sua vida.\n\nO Dr. ${fn} acha que dá pra fazer mais isso?\n\nConta de verdade comigo. Queremos muito te ver crescer! 💪🏼\n\nUm abraçoooo Dr. ${fn}!!!`;}
+function msgVit(name,fn){return `Oláaaa Dr(a). ${name}, tudo bem?\n\nQue bom ter você presente na mentoria!\n\nQueria te incentivar a compartilhar seus avanços e vitórias nas próximas aulas — não importa o tamanho, cada passo conta.\n\nIsso energiza o grupo inteiro e faz você perceber o quanto já evoluiu, Dr. ${fn}.\n\nConta de verdade comigo. Queremos muito te ver crescer! 💪🏼`;}
+function msg4x(name,fn){return `Oláaaa Dr(a). ${name}, tudo bem?\n\nPercebemos que o Sr. ou a Sra. não conseguiu participar dos últimos 4 encontros da mentoria.\n\nImagino que a rotina médica pode ser bastante intensa e imprevistos acontecem.\n\nPorém, para manter o nível de engajamento e aproveitamento do grupo, temos uma política interna: mentorados que permanecem mais de 4 encontros consecutivos sem participação precisam de ajustes na agenda — entendemos que este horário não está sendo produtivo.\n\nNosso objetivo é garantir que todos que estejam no programa realmente aproveitem a mentoria.\n\nSempre que precisar de apoio para retomar sua participação, conte conosco.\n\nConta de verdade com a gente. Queremos muito te ver crescer.\n\nUm abraço Dr(a). ${fn}!!`;}
+function msgLig(name,fn,tab){return `[SCRIPT DE LIGAÇÃO — ${tab.toUpperCase()}]\n\n"Oláaaaaa Dr(a). ${fn}! Aqui é a [Seu Nome], sua customer experience do Master Acelerador Médico.\n\nÉ algo rápido que tenho para falar com o Sr., tem 2 minutinhos disponível?\n\nEntão, percebi que o Dr. ${fn} não conseguiu participar na última ${tab} [informar dia e horário].\n\nTe incentivamos a entrar Dr. ${fn} — um único insight de repente pode mudar seus resultados e sua vida, e nós queremos muito te ver crescer e ter retorno do seu investimento.\n\nNão só entrar, mas abrir a câmera, perguntar, pedir feedback semanal e tomar decisões Dr. ${fn}. Isto é o que te faz estar sempre com a energia alta e produzindo, vendendo, captando mais.\n\nVamos melhorar esse aproveitamento Dr. ${fn}? Posso contar com uma participação maior?\n\nPerfeito!! Excelente dia e conta de verdade comigo o tempo inteiro.\n\nUm abraço Doutorrrrr ${fn}oooo!"`;}
+
+function switchView(id,el){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.getElementById('view-'+id).classList.add('active');el.classList.add('active');if(id==='gest'&&loaded)renderGest();}
+
+function csvParse(text){const rows=[];for(const line of text.split('\n')){const cols=[];let cur='',inQ=false;for(let i=0;i<line.length;i++){if(line[i]==='"'){inQ=!inQ;}else if(line[i]===','&&!inQ){cols.push(cur.trim());cur='';}else cur+=line[i];}cols.push(cur.trim());rows.push(cols);}return rows;}
+function clean(v){return(v||'').replace(/^"|"$/g,'').trim();}
+function chk(v){const s=clean(v).toLowerCase();return['v','sim','1','true','x','✓','s'].includes(s);}
+function esc(s){return(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');}
+function escHtml(t){return(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');}
+</script>
+</body>
+</html>
