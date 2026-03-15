@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AM · Painel de Engajamento</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap');
+:root {
+  --bg:#060608;--s1:#0e0e12;--s2:#16161d;--s3:#1e1e28;
+  --border:#252530;--border2:#2e2e3e;
+  --acc:#FFD600;--text:#eeeef5;--sub:#888899;
+  --danger:#FF3355;--warn:#FF9500;--safe:#00E87A;--blue:#4488FF;
+  --radius:14px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;}
+.app{position:relative;z-index:1;}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:60px;border-bottom:1px solid var(--border);background:rgba(6,6,8,.96);backdrop-filter:blur(12px);position:sticky;top:0;z-index:50;}
+.logo-mark{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:.12em;color:var(--acc);}
+.logo-sub{font-size:9px;color:var(--sub);letter-spacing:.15em;text-transform:uppercase;}
+.nav-tabs{display:flex;gap:3px;background:var(--s2);border:1px solid var(--border);padding:3px;border-radius:10px;}
+.nav-tab{padding:6px 18px;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--sub);transition:all .2s;white-space:nowrap;}
+.nav-tab.active{background:var(--acc);color:#000;font-weight:700;}
+.nav-tab:not(.active):hover{color:var(--text);background:var(--s3);}
+.topbar-right{display:flex;align-items:center;gap:8px;}
+.month-badge{font-size:11px;color:var(--sub);background:var(--s2);border:1px solid var(--border);padding:5px 12px;border-radius:8px;}
+.icon-btn{background:var(--s2);border:1px solid var(--border);color:var(--sub);width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.icon-btn:hover{color:var(--text);border-color:var(--border2);}
+
+.view{display:none;padding:28px;padding-bottom:64px;}
+.view.active{display:block;}
+
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(8px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px;}
+.ov.open{display:flex;}
+.modal-box{background:var(--s1);border:1px solid var(--border2);border-radius:20px;padding:32px;width:100%;max-width:540px;animation:su .2s ease;}
+@keyframes su{from{transform:translateY(14px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.modal-box h2{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.08em;color:var(--acc);margin-bottom:4px;}
+.modal-box p{font-size:12px;color:var(--sub);margin-bottom:24px;line-height:1.6;}
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);margin-bottom:6px;}
+.field input{width:100%;background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:11px 14px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:13px;outline:none;transition:border-color .2s;}
+.field input:focus{border-color:var(--acc);}
+.hint{font-size:10px;color:var(--sub);margin-top:4px;}
+.hint strong{color:var(--acc);}
+.btn-row{display:flex;gap:8px;margin-top:6px;}
+.btn-primary{flex:1;background:var(--acc);color:#000;border:none;padding:12px;border-radius:9px;font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;cursor:pointer;transition:opacity .2s;}
+.btn-primary:hover{opacity:.85;}
+.btn-ghost{background:transparent;color:var(--sub);border:1px solid var(--border2);padding:12px 18px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:13px;cursor:pointer;}
+
+.notice{background:rgba(255,214,0,.07);border:1px solid rgba(255,214,0,.2);border-radius:9px;padding:11px 14px;font-size:11px;color:rgba(255,214,0,.8);margin-bottom:20px;display:none;}
+.notice.show{display:block;}
+
+.controls{display:flex;gap:8px;align-items:center;margin-bottom:24px;flex-wrap:wrap;}
+.controls select{background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:12px;outline:none;cursor:pointer;}
+.reload-btn{background:var(--s2);border:1px solid var(--border2);color:var(--sub);padding:8px 14px;border-radius:9px;font-size:12px;cursor:pointer;transition:all .2s;}
+.reload-btn:hover{color:var(--text);border-color:var(--acc);}
+
+/* STAT STRIP — 5 cards now */
+.stat-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:24px;}
+@media(max-width:800px){.stat-strip{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:500px){.stat-strip{grid-template-columns:repeat(2,1fr);}}
+.stat-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;}
+.sc-acc{border-top:2px solid var(--acc);}
+.sc-red{border-top:2px solid var(--danger);}
+.sc-org{border-top:2px solid var(--warn);}
+.sc-blu{border-top:2px solid var(--blue);}
+.sc-grn{border-top:2px solid var(--safe);}
+.stat-num{font-family:'Bebas Neue',sans-serif;font-size:40px;line-height:1;margin-bottom:2px;}
+.sc-acc .stat-num{color:var(--acc);}
+.sc-red .stat-num{color:var(--danger);}
+.sc-org .stat-num{color:var(--warn);}
+.sc-blu .stat-num{color:var(--blue);}
+.sc-grn .stat-num{color:var(--safe);}
+.stat-lbl{font-size:10px;color:var(--sub);font-weight:500;}
+
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.pill{padding:5px 14px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--sub);transition:all .18s;}
+.pill:hover{color:var(--text);}
+.pill.active{background:var(--acc);color:#000;border-color:var(--acc);}
+
+.tbl-wrap{background:var(--s1);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:24px;}
+table{width:100%;border-collapse:collapse;}
+thead th{background:var(--s2);padding:10px 14px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--sub);font-weight:600;}
+tbody tr{border-top:1px solid var(--border);cursor:pointer;transition:background .12s;}
+tbody tr:hover{background:var(--s2);}
+tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
+.dr-name{font-weight:600;font-size:13px;}
+.dr-sub{font-size:10px;color:var(--sub);margin-top:2px;}
+
+.badges{display:flex;gap:4px;flex-wrap:wrap;}
+.b{font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.04em;white-space:nowrap;}
+.b-aus{background:rgba(255,51,85,.12);color:var(--danger);border:1px solid rgba(255,51,85,.25);}
+.b-cam{background:rgba(255,149,0,.12);color:var(--warn);border:1px solid rgba(255,149,0,.25);}
+.b-fb{background:rgba(153,102,255,.12);color:#9966FF;border:1px solid rgba(153,102,255,.25);}
+.b-vit{background:rgba(68,136,255,.12);color:var(--blue);border:1px solid rgba(68,136,255,.25);}
+.b-4x{background:rgba(255,51,85,.2);color:var(--danger);border:1px solid rgba(255,51,85,.4);}
+
+.rbar{display:flex;align-items:center;gap:6px;}
+.rbar-track{width:50px;height:4px;background:var(--s3);border-radius:3px;overflow:hidden;}
+.rbar-fill{height:100%;border-radius:3px;}
+.rh .rbar-fill,.rh .rbar-txt{background:var(--danger);color:var(--danger);}
+.rm .rbar-fill,.rm .rbar-txt{background:var(--warn);color:var(--warn);}
+.rl .rbar-fill,.rl .rbar-txt{background:var(--safe);color:var(--safe);}
+.rbar-txt{font-size:10px;font-weight:700;min-width:28px;}
+
+/* GESTÃO */
+.gest-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+@media(max-width:800px){.gest-kpis{grid-template-columns:repeat(2,1fr);}}
+.gest-kpi{background:var(--s1);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+.gest-kpi-n{font-family:'Bebas Neue',sans-serif;font-size:48px;line-height:1;color:var(--acc);}
+.gest-kpi-l{font-size:11px;color:var(--sub);margin-top:2px;}
+
+/* WEEK COMPARISON CARDS */
+.week-compare{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:24px;}
+.wcard{background:var(--s1);border:1px solid var(--border);border-radius:var(--radius);padding:18px;}
+.wcard-title{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);font-weight:600;margin-bottom:12px;}
+.wcard-weeks{display:flex;gap:8px;align-items:flex-end;}
+.wweek{flex:1;text-align:center;}
+.wweek-bar-wrap{height:60px;display:flex;align-items:flex-end;justify-content:center;margin-bottom:4px;}
+.wweek-bar{width:28px;border-radius:4px 4px 0 0;min-height:3px;transition:height .3s;}
+.wweek-pct{font-family:'Bebas Neue',sans-serif;font-size:16px;line-height:1;}
+.wweek-lbl{font-size:9px;color:var(--sub);}
+.wcard-delta{margin-top:10px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;display:inline-block;}
+.delta-up{background:rgba(0,232,122,.12);color:var(--safe);}
+.delta-dn{background:rgba(255,51,85,.12);color:var(--danger);}
+.delta-eq{background:rgba(136,136,153,.1);color:var(--sub);}
+
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;}
+@media(max-width:700px){.charts-grid{grid-template-columns:1fr;}}
+.chart-wrap{background:var(--s1);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+.chart-title{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;font-weight:600;}
+.chart-bars{display:flex;align-items:flex-end;gap:10px;height:110px;}
+.chart-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;}
+.chart-bar-wrap{flex:1;width:100%;display:flex;align-items:flex-end;}
+.chart-bar{width:100%;border-radius:4px 4px 0 0;opacity:.85;min-height:4px;position:relative;}
+.chart-bar:hover{opacity:1;}
+.chart-bar-val{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;white-space:nowrap;}
+.chart-lbl{font-size:9px;color:var(--sub);text-align:center;}
+
+.sec-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;}
+.sec-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.1em;}
+.sec-sub{font-size:11px;color:var(--sub);}
+
+.risk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:24px;}
+.risk-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--radius);padding:18px;cursor:pointer;transition:border-color .2s,transform .15s;}
+.risk-card:hover{transform:translateY(-2px);}
+.r-h{border-left:3px solid var(--danger);}
+.r-m{border-left:3px solid var(--warn);}
+.r-l{border-left:3px solid var(--safe);}
+.rc-name{font-weight:600;font-size:12px;margin-bottom:3px;}
+.rc-sub{font-size:10px;color:var(--sub);margin-bottom:7px;}
+.rc-score{font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1;margin-bottom:3px;}
+.r-h .rc-score{color:var(--danger);}
+.r-m .rc-score{color:var(--warn);}
+.r-l .rc-score{color:var(--safe);}
+.rc-detail{font-size:10px;color:var(--sub);line-height:1.6;}
+
+/* ALUNO */
+.profile-search{margin-bottom:20px;}
+.profile-search input{width:100%;background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:11px 14px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:13px;outline:none;transition:border-color .2s;}
+.profile-search input:focus{border-color:var(--acc);}
+.profile-results{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;}
+.profile-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:border-color .2s;}
+.profile-card:hover{border-color:var(--acc);}
+.pc-name{font-weight:600;font-size:13px;margin-bottom:2px;}
+.pc-sub{font-size:10px;color:var(--sub);margin-bottom:8px;}
+.pc-bar{height:3px;background:var(--s3);border-radius:2px;overflow:hidden;margin-bottom:4px;}
+.pc-bar-fill{height:100%;border-radius:2px;}
+.pc-pct{font-size:10px;}
+
+/* DR MODAL */
+.dr-modal{background:var(--s1);border:1px solid var(--border2);border-radius:20px;width:100%;max-width:680px;max-height:92vh;overflow-y:auto;padding:28px;position:relative;animation:su .2s ease;}
+.modal-x{position:absolute;top:18px;right:18px;background:var(--s2);border:1px solid var(--border2);color:var(--sub);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;}
+.modal-x:hover{color:var(--text);}
+.modal-dr{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.06em;margin-bottom:2px;}
+.modal-meta{font-size:11px;color:var(--sub);margin-bottom:18px;}
+.hist-row{display:flex;gap:5px;margin-bottom:18px;flex-wrap:wrap;}
+.hist-week{background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:10px;}
+.hist-lbl{color:var(--sub);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:.08em;}
+.hist-dots{display:flex;gap:3px;}
+.dot{width:15px;height:15px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;}
+.dot-on{background:rgba(0,232,122,.2);color:var(--safe);border:1px solid rgba(0,232,122,.3);}
+.dot-off{background:rgba(255,51,85,.1);color:rgba(255,51,85,.5);border:1px solid rgba(255,51,85,.2);}
+.dot-na{background:var(--s3);color:var(--sub);border:1px solid var(--border);}
+.mstats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:20px;}
+.mstat{background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center;}
+.mstat-v{font-family:'Bebas Neue',sans-serif;font-size:24px;line-height:1;}
+.mstat-l{font-size:8px;color:var(--sub);text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
+.msg-tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px;}
+.mtab{padding:5px 12px;border-radius:20px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--sub);transition:all .18s;text-transform:uppercase;letter-spacing:.03em;}
+.mtab:hover{color:var(--text);}
+.mtab.active{background:var(--acc);color:#000;border-color:var(--acc);}
+.msg-box{background:var(--s2);border:1px solid var(--border2);border-radius:11px;padding:18px;font-size:12px;line-height:1.75;white-space:pre-wrap;word-break:break-word;display:none;}
+.msg-box.active{display:block;}
+.copy-btn{margin-top:12px;background:transparent;border:1px solid var(--acc);color:var(--acc);padding:7px 18px;border-radius:7px;font-family:'Outfit',sans-serif;font-weight:700;font-size:10px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:all .2s;}
+.copy-btn:hover{background:var(--acc);color:#000;}
+.copy-btn.copied{background:var(--safe);border-color:var(--safe);color:#000;}
+
+.statusbar{position:fixed;bottom:0;left:0;right:0;height:34px;background:var(--s1);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 28px;gap:18px;font-size:10px;color:var(--sub);z-index:40;}
+.s-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.s-live{background:var(--safe);box-shadow:0 0 5px var(--safe);}
+.s-off{background:var(--sub);}
+.center-msg{text-align:center;padding:64px 24px;color:var(--sub);}
+.center-msg .icon{font-size:40px;margin-bottom:12px;}
+.center-msg h3{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--text);margin-bottom:5px;letter-spacing:.06em;}
+.center-msg p{font-size:12px;}
+.turma-m{font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(255,214,0,.12);color:var(--acc);border:1px solid rgba(255,214,0,.25);}
+.turma-t{font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(68,136,255,.12);color:var(--blue);border:1px solid rgba(68,136,255,.25);}
+</style>
+</head>
+<body>
+<div class="app">
+
+<nav class="topbar">
+  <div>
+    <div class="logo-mark">Acelerador Médico</div>
+    <div class="logo-sub">Painel de Engajamento</div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchView('cs',this)">CS · Acionamento</button>
+    <button class="nav-tab" onclick="switchView('gest',this)">Gestão · Saúde</button>
+    <button class="nav-tab" onclick="switchView('aluno',this)">Aluno · Perfil</button>
+  </div>
+  <div class="topbar-right">
+    <div class="month-badge" id="monthBadge">—</div>
+    <button class="icon-btn" onclick="reloadAll()" title="Atualizar tudo">↻</button>
+    <button class="icon-btn" onclick="openConfig()" title="Configurações">⚙</button>
+  </div>
+</nav>
+
+<!-- CONFIG -->
+<div class="ov" id="cfgOv" onclick="ovClick(event,'cfgOv')">
+  <div class="modal-box">
+    <h2>Configurar Painel</h2>
+    <p>Preencha uma vez por mês. Fica salvo no navegador.</p>
+    <div class="field">
+      <label>Monday.com — API Token</label>
+      <input type="password" id="cfgToken" placeholder="eyJhbGci..." autocomplete="off"/>
+    </div>
+    <div class="field">
+      <label>Google Sheets — ID da Planilha do Mês</label>
+      <input type="text" id="cfgSheet" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"/>
+      <div class="hint">URL: docs.google.com/spreadsheets/d/<strong>ID_AQUI</strong>/edit</div>
+    </div>
+    <div class="field">
+      <label>Mês de Referência</label>
+      <input type="month" id="cfgMonth"/>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="saveConfig()">Salvar e Carregar</button>
+      <button class="btn-ghost" onclick="closeOv('cfgOv')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CS VIEW -->
+<div class="view active" id="view-cs">
+  <div class="notice" id="csNotice">⚙ Configure a planilha e o token do Monday clicando em <strong>⚙</strong>.</div>
+  <div class="controls">
+    <select id="csTab" onchange="csLoad()">
+      <optgroup label="Aulas Gerais">
+        <option value="Mentoria">Mentoria</option>
+        <option value="Hotseat">Hotseat</option>
+        <option value="Master">Master (exclusivo)</option>
+      </optgroup>
+      <optgroup label="Especialidades">
+        <option value="Dermato">Dermato</option>
+        <option value="Oftalmo">Oftalmo</option>
+        <option value="Ortoped">Ortoped</option>
+        <option value="Psiquiatras">Psiquiatras</option>
+        <option value="Gestores">Gestores</option>
+        <option value="Emagrecimento 1">Emagrecimento 1</option>
+        <option value="Emagrecimento 2">Emagrecimento 2</option>
+        <option value="Retomada">Retomada</option>
+      </optgroup>
+    </select>
+    <select id="csWeek" onchange="csLoad()">
+      <option value="1">Semana 1</option>
+      <option value="2">Semana 2</option>
+      <option value="3">Semana 3</option>
+      <option value="4">Semana 4</option>
+      <option value="5">Semana 5</option>
+    </select>
+    <button class="reload-btn" onclick="reloadAll()">↻ Atualizar tudo</button>
+  </div>
+  <div class="stat-strip" id="csStats" style="display:none">
+    <div class="stat-card sc-acc"><div class="stat-num" id="sTot">0</div><div class="stat-lbl">Total alunos</div></div>
+    <div class="stat-card sc-grn"><div class="stat-num" id="sPre">0</div><div class="stat-lbl">Presentes</div></div>
+    <div class="stat-card sc-red"><div class="stat-num" id="sAus">0</div><div class="stat-lbl">Ausentes</div></div>
+    <div class="stat-card sc-org"><div class="stat-num" id="sCam">0</div><div class="stat-lbl">Sem câmera</div></div>
+    <div class="stat-card sc-blu"><div class="stat-num" id="sVit">0</div><div class="stat-lbl">Sem vitória</div></div>
+  </div>
+  <div id="csMain" style="display:none">
+    <div class="pills">
+      <button class="pill active" onclick="setPill('todos',this)">Todos para acionar</button>
+      <button class="pill" onclick="setPill('ausente',this)">❌ Ausentes</button>
+      <button class="pill" onclick="setPill('camera',this)">📷 Sem câmera</button>
+      <button class="pill" onclick="setPill('feedback',this)">💬 Sem feedback</button>
+      <button class="pill" onclick="setPill('vitoria',this)">🏆 Sem vitória</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Médico</th><th>Turma</th><th>Motivos</th><th>Aus. seguidas</th><th>Risco</th></tr></thead>
+        <tbody id="csTbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="csEmpty" class="center-msg">
+    <div class="icon">📋</div><h3>Nenhum dado carregado</h3><p>Configure o painel para começar.</p>
+  </div>
+</div>
+
+<!-- GESTÃO VIEW -->
+<div class="view" id="view-gest">
+  <div class="notice" id="gestNotice">⚙ Configure o painel clicando em <strong>⚙</strong>.</div>
+  <div id="gestContent" style="display:none">
+    <div class="gest-kpis">
+      <div class="gest-kpi"><div class="gest-kpi-n" id="gTotal">—</div><div class="gest-kpi-l">Total de alunos</div></div>
+      <div class="gest-kpi"><div class="gest-kpi-n" id="gEng" style="color:var(--safe)">—</div><div class="gest-kpi-l">Engajamento geral</div></div>
+      <div class="gest-kpi"><div class="gest-kpi-n" id="gRisk" style="color:var(--danger)">—</div><div class="gest-kpi-l">Em risco alto</div></div>
+      <div class="gest-kpi"><div class="gest-kpi-n" id="gAbsent" style="color:var(--warn)">—</div><div class="gest-kpi-l">Ausentes esta semana</div></div>
+    </div>
+
+    <!-- WEEK COMPARISON CARDS -->
+    <div class="sec-head">
+      <div class="sec-title">Comparativo Semanal</div>
+      <div class="sec-sub">Presença semana a semana por turma</div>
+    </div>
+    <div class="week-compare" id="weekCompare"></div>
+
+    <div class="charts-grid">
+      <div class="chart-wrap"><div class="chart-title">Evolução — Master</div><div class="chart-bars" id="chartMaster"></div></div>
+      <div class="chart-wrap"><div class="chart-title">Evolução — Mentoria</div><div class="chart-bars" id="chartMentoria"></div></div>
+    </div>
+
+    <div class="sec-head">
+      <div class="sec-title">Ranking de Risco</div>
+      <div class="sec-sub">Score cruzado — todas as aulas</div>
+    </div>
+    <div class="risk-grid" id="gestRisk"></div>
+
+    <div class="sec-head"><div class="sec-title">Engajamento por Aula</div></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Aula</th><th>S1</th><th>S2</th><th>S3</th><th>S4</th><th>Tendência</th></tr></thead>
+        <tbody id="gestTabTbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="gestEmpty" class="center-msg">
+    <div class="icon">📊</div><h3>Nenhum dado carregado</h3><p>Configure o painel para ver a visão de gestão.</p>
+  </div>
+</div>
+
+<!-- ALUNO VIEW -->
+<div class="view" id="view-aluno">
+  <div class="notice" id="alunoNotice">⚙ Configure o painel clicando em <strong>⚙</strong>.</div>
+  <div id="alunoContent" style="display:none">
+    <div class="profile-search">
+      <input type="text" id="searchInput" placeholder="Buscar médico pelo nome..." oninput="renderProfiles()"/>
+    </div>
+    <div class="profile-results" id="profileGrid"></div>
+  </div>
+  <div id="alunoEmpty" class="center-msg">
+    <div class="icon">👤</div><h3>Nenhum dado carregado</h3><p>Configure o painel para ver os perfis.</p>
+  </div>
+</div>
+
+<!-- DR MODAL -->
+<div class="ov" id="drOv" onclick="ovClick(event,'drOv')">
+  <div class="dr-modal">
+    <button class="modal-x" onclick="closeOv('drOv')">✕</button>
+    <div class="modal-dr" id="mName"></div>
+    <div class="modal-meta" id="mMeta"></div>
+    <div class="hist-row" id="mHist"></div>
+    <div class="mstats" id="mStats"></div>
+    <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);margin-bottom:9px;font-weight:700;">Mensagens prontas</div>
+    <div class="msg-tabs" id="mTabs"></div>
+    <div id="mBoxes"></div>
+  </div>
+</div>
+
+<div class="statusbar">
+  <div class="s-dot s-off" id="sDot"></div>
+  <span id="sTxt">Sem dados</span>
+  <span id="sTxt2" style="margin-left:auto"></span>
+</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════
+const BOARDS = {
+  Master:   { id:'18365478944', tagCol:'tag_mm1cqsgs' },
+  Mentoria: { id:'18391780128', tagCol:'tag_mm1cs0hm' }
+};
+const ESPECIALIDADES = ['Dermato','Oftalmo','Ortoped','Psiquiatras','Gestores','Emagrecimento 1','Emagrecimento 2','Retomada'];
+const AULAS_GERAIS   = ['Mentoria','Hotseat','Master'];
+const ALL_TABS       = [...AULAS_GERAIS, ...ESPECIALIDADES];
+
+// ═══════════════════════════════════════════
+// GENDER — explicit list + smart heuristics
+// ═══════════════════════════════════════════
+const FEM_NAMES = new Set(`abia,abigail,adelia,adelaide,adriana,agatha,agnes,aida,ailin,ainara,aisha,
+alessandra,alessia,alexandra,alexia,alice,alicia,alina,aline,allana,amanda,amara,amelia,
+ana,anabela,analia,ananda,anelise,angela,angelica,anita,anna,anne,antonia,ariana,ariane,
+ariany,ariele,arlete,astrid,aurora,beatriz,bella,berenice,bianca,brigida,bruna,camila,
+carla,carlota,carmela,carmelita,carmen,carolina,caroline,cassandra,cassia,cecilia,celeste,
+celia,christiane,cintia,clara,clarissa,claudete,claudia,claudiane,cleonice,cleuza,conceicao,
+cristiane,cristina,daiane,dalila,damaris,daniela,daniele,danielli,danielle,debora,denise,
+diana,dominique,edna,eduarda,elaine,elane,eliana,elisa,elisabete,elizabeth,eloisa,eluiza,
+emanuele,emilia,erica,erika,eunice,eva,eveline,fabiana,fatima,fernanda,flavia,francisca,
+gabriela,gabriele,gisele,giulia,giovanna,grace,graciela,graziela,grazielle,heloisa,iara,
+ines,ingrid,irene,iris,isabel,isabela,isabella,ivana,ivone,jacqueline,jamile,janaina,
+jaqueline,jessica,joana,josefa,joyce,juliana,julieta,jurema,karina,karla,katia,lahis,
+laila,lara,larissa,laura,lavinia,leila,leticia,lidia,lilian,liliane,livia,lorena,luana,
+lucia,luciana,luisa,luiza,luzia,lydia,madalena,maisa,manuela,marcela,marcia,maria,mariana,
+marina,marisa,maristela,marta,matilde,michelle,milena,mirela,miriam,monique,nadia,natalia,
+nathalia,nathalie,nayara,neli,nelly,neuza,nicoly,nicole,nina,noemia,odete,olga,pamela,
+patricia,paula,paola,priscila,priscilla,queila,rafaela,raquel,rebeca,rejane,renata,roberta,
+rosana,rose,roseli,rosemeire,rosimeire,ruth,sabrina,samara,samira,sandra,sara,selma,sheila,
+shirley,silvia,silvana,simone,solange,sonia,soraia,stefania,suelen,sueli,suzana,talita,
+tamara,tania,tatiane,tatiana,thais,thays,thamires,valentina,valeria,vanessa,vera,veronica,
+viviane,wania,yasmin,zenaide,rhafaelly,rhafaella,rhafaela`.replace(/\s+/g,'').split(',').filter(Boolean));
+
+const MASC_NAMES = new Set(`abel,adalberto,adao,adeilson,adenilson,adilson,adriano,agostinho,alan,alberto,
+alceu,aldair,aldo,alex,alexandre,alexsandro,alfredo,alisson,allan,almir,alonso,altair,
+altamir,alvaro,amaro,anderson,andrei,andres,antonio,ariel,aristides,armando,arnaldo,artur,
+arthur,augusto,aurelio,aylton,benedito,bento,bernardo,breno,bruno,caio,carlos,cassio,celso,
+cesar,christian,ciro,claudio,cleber,cleiton,clemilson,clodoaldo,dario,david,davi,denis,
+diogo,diego,dirceu,douglas,duarte,edgar,edmar,edmundo,edson,edu,eduardo,elcio,elder,elio,
+eliseu,elvis,emerson,emilio,enio,erick,erik,ernesto,evaldo,evandro,ezequiel,fabio,felicio,
+felipe,felix,fernando,flavio,francisco,frederico,gabriel,geovani,geraldo,gilberto,gilmar,
+gilson,giovani,glauco,guilherme,gustavo,henrique,helio,heitor,hugo,igor,isaac,italo,ivan,
+jair,jairo,jamil,janio,jardel,jeferson,jefferson,jhonatan,joao,joel,jonas,jonathan,jorge,
+josimar,josue,junior,jurandir,kleber,laercio,laerte,leandro,leao,leo,leonardo,levi,lino,
+lucas,luciano,luis,luiz,marcelo,marcio,marco,marcos,mario,mateus,matheus,mauricio,mauro,
+maxwell,maycon,michel,miguel,mirko,moises,murilo,nelson,nicolas,nilson,noel,norton,odair,
+oscar,osmar,osvaldo,otavio,pablo,paulo,pedro,rafael,raimundo,ramiro,raul,regis,reinaldo,
+renan,renato,ricardo,roberto,rodrigo,rogerio,romario,romulo,ronaldo,ronei,roney,ronnie,
+rubens,rudy,samuel,saulo,sergio,silvio,silas,simon,tarcisio,tiago,thiago,tito,tomaz,toni,
+tony,valter,vando,vinicius,vitor,waldir,walter,wellington,willian,william,wilson,yago,yuri`.replace(/\s+/g,'').split(',').filter(Boolean));
+
+// Strip suffixes like "2ª cadeira", "2º Cadeira" etc from name before processing
+function cleanSuffix(name) {
+  return (name||'').replace(/\s*\d[ªº°]\s*cadeira.*/i,'').replace(/\s*\(.*\)/g,'').trim();
+}
+
+function inferGender(rawName) {
+  const name = cleanSuffix(rawName);
+  const first = name.split(' ')[0].toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+  if (FEM_NAMES.has(first)) return 'F';
+  if (MASC_NAMES.has(first)) return 'M';
+
+  // Heuristics — ordered by specificity
+  const femEndings = ['elly','ella','ela','elly','inha','iane','iani','iele','iele','ilis',
+    'ais','eis','ahis','this','hys','ays','eis','uza','iza','ice','ece','ace',
+    'ane','ene','ine','one','une','uda','ida','ada','eda','oda',
+    'ura','ira','ara','era','ora',
+    'lla','nna','ssa','tta'];
+  const mascEndings = ['son','ton','ton','ndo','aldo','ildo','oldo','uldo',
+    'erto','arto','irto','orto','urto',
+    'inho','zinho','ao','ndo','rdo','ldo','bdo',
+    'uel','ael','iel','oel',
+    'or','ar','er','ir'];
+
+  for (const e of femEndings) { if (first.endsWith(e)) return 'F'; }
+  for (const e of mascEndings) { if (first.endsWith(e)) return 'M'; }
+
+  // Terminal vowel heuristic — careful with exceptions
+  if (first.endsWith('a') && first.length > 3) return 'F';
+  if (first.endsWith('o') || first.endsWith('u')) return 'M';
+
+  return 'M'; // last resort default
+}
+
+function tit(g)  { return g==='F' ? 'Dra' : 'Dr'; }
+function sr_(g)  { return g==='F' ? 'Sra.' : 'Sr.'; }
+function foc(g)  { return g==='F' ? 'focada' : 'focado'; }
+function displayName(rawName) { return cleanSuffix(rawName); }
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let cfg = {token:'',sheetId:'',month:''};
+let allAlunos   = [];
+let sheetData   = {};
+let csFilter    = 'todos';
+let currentTab  = 'Mentoria';
+let currentWeek = 1;
+let loaded      = false;
+let _csDoctors  = [];
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  const s = localStorage.getItem('am_cfg6');
+  if (s) {
+    cfg = JSON.parse(s);
+    if (cfg.token)   document.getElementById('cfgToken').value = cfg.token;
+    if (cfg.sheetId) document.getElementById('cfgSheet').value = cfg.sheetId;
+    if (cfg.month)   document.getElementById('cfgMonth').value = cfg.month;
+    updateBadge();
+    reloadAll();
+  } else {
+    document.getElementById('cfgMonth').value = new Date().toISOString().slice(0,7);
+    showNotices(true);
+  }
+});
+
+function showNotices(v) {
+  ['csNotice','gestNotice','alunoNotice'].forEach(id=>document.getElementById(id).classList.toggle('show',v));
+}
+function updateBadge() {
+  if (!cfg.month) return;
+  const [y,m] = cfg.month.split('-');
+  const lbl = new Date(y,m-1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  document.getElementById('monthBadge').textContent = lbl.charAt(0).toUpperCase()+lbl.slice(1);
+}
+function setStatus(live,txt,txt2='') {
+  document.getElementById('sDot').className='s-dot '+(live?'s-live':'s-off');
+  document.getElementById('sTxt').textContent=txt;
+  document.getElementById('sTxt2').textContent=txt2;
+}
+
+// ═══════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════
+function openConfig() { document.getElementById('cfgOv').classList.add('open'); }
+function closeOv(id)  { document.getElementById(id).classList.remove('open'); }
+function ovClick(e,id){ if(e.target===document.getElementById(id)) closeOv(id); }
+function saveConfig() {
+  const token   = document.getElementById('cfgToken').value.trim();
+  const sheetId = document.getElementById('cfgSheet').value.trim();
+  const month   = document.getElementById('cfgMonth').value;
+  if (!token||!sheetId) { alert('Preencha o token e o ID da planilha.'); return; }
+  cfg = {token,sheetId,month};
+  localStorage.setItem('am_cfg6',JSON.stringify(cfg));
+  updateBadge(); closeOv('cfgOv'); showNotices(false); reloadAll();
+}
+
+// ═══════════════════════════════════════════
+// RELOAD
+// ═══════════════════════════════════════════
+async function reloadAll() {
+  if (!cfg.token||!cfg.sheetId) return;
+  setStatus(false,'Carregando Monday...');
+  loaded = false;
+  try {
+    const [master, mentoria] = await Promise.all([
+      fetchBoard(cfg.token, BOARDS.Master, 'Master'),
+      fetchBoard(cfg.token, BOARDS.Mentoria, 'Mentoria')
+    ]);
+    const masterNames = new Set(master.map(a=>norm(a.name)));
+    allAlunos = [...master, ...mentoria.filter(a=>!masterNames.has(norm(a.name)))];
+  } catch(e) {
+    setStatus(false,'Erro Monday: '+e.message); console.error(e); return;
+  }
+  setStatus(false,`${allAlunos.length} alunos · Carregando planilha...`);
+  sheetData = {};
+  const results = await Promise.allSettled(ALL_TABS.map(t=>fetchSheet(t).then(d=>({tab:t,data:d}))));
+  results.forEach(r=>{ if(r.status==='fulfilled') sheetData[r.value.tab]=r.value.data; });
+  loaded = true;
+  const now = new Date().toLocaleTimeString('pt-BR');
+  setStatus(true,`${allAlunos.length} alunos · ${Object.keys(sheetData).length} abas`,`Atualizado ${now}`);
+  csLoad();
+  const av = document.querySelector('.view.active').id;
+  if (av==='view-gest')  renderGest();
+  if (av==='view-aluno') renderAlunoView();
+}
+
+// ═══════════════════════════════════════════
+// MONDAY
+// ═══════════════════════════════════════════
+async function fetchBoard(token, board, turma) {
+  const query = `{
+    boards(ids: ${board.id}) {
+      items_page(limit: 500) {
+        items {
+          name
+          column_values {
+            id text
+            ... on TagsValue { tags { name } }
+          }
+        }
+      }
+    }
+  }`;
+  const res = await fetch('https://api.monday.com/v2',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':token,'API-Version':'2024-01'},
+    body:JSON.stringify({query})
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.errors) throw new Error(json.errors[0].message);
+  const items = json?.data?.boards?.[0]?.items_page?.items||[];
+  return items.map(item=>{
+    let especialidade='', phone='', entryDate='';
+    for (const col of (item.column_values||[])) {
+      if (col.id===board.tagCol) {
+        especialidade = col.tags&&col.tags.length>0 ? col.tags[0].name : (col.text||'');
+      } else if (['phone','phone_1','phone0','telefone'].includes(col.id) && col.text) {
+        phone = col.text;
+      } else if (['date4','date','data_de_onboarding','data'].includes(col.id) && col.text) {
+        entryDate = col.text;
+      }
+    }
+    const name = item.name.trim();
+    return {name, phone, entryDate, turma, especialidade, gender: inferGender(name)};
+  }).filter(a=>a.name);
+}
+
+// ═══════════════════════════════════════════
+// SHEETS
+// ═══════════════════════════════════════════
+async function fetchSheet(tab) {
+  const url=`https://docs.google.com/spreadsheets/d/${cfg.sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
+  const res=await fetch(url);
+  if (!res.ok) throw new Error('fail');
+  return parseSheet(await res.text());
+}
+function parseSheet(csv) {
+  const rows=csvParse(csv), result={};
+  for (let r=2; r<rows.length; r++) {
+    const row=rows[r];
+    const name=clean(row[0]);
+    if (!name||name.toLowerCase()==='nome') continue;
+    const history=Array.from({length:5},(_,w)=>{
+      const base=1+w*4;
+      return {
+        P: chk(row[base]),
+        C: chk(row[base+1]),
+        F: chk(row[base+2]),
+        V: chk(row[base+3])
+      };
+    });
+    result[norm(name)]={name,history};
+  }
+  return result;
+}
+
+// ═══════════════════════════════════════════
+// DOCTOR BUILDER
+// ═══════════════════════════════════════════
+function getPool(tab) {
+  if (tab==='Master') return allAlunos.filter(a=>a.turma==='Master');
+  if (ESPECIALIDADES.includes(tab)) return allAlunos.filter(a=>norm(a.especialidade)===norm(tab));
+  return allAlunos;
+}
+
+function buildDoctors(tab, week) {
+  const sheetTab = sheetData[tab]||{};
+  const pool = getPool(tab);
+  const w = week-1;
+  return pool.map(aluno=>{
+    const entry = sheetTab[norm(aluno.name)]||null;
+    const history = Array.from({length:5},(_,i)=>{
+      return entry&&entry.history[i] ? entry.history[i] : {P:false,C:false,F:false,V:false};
+    });
+    const cur = history[w];
+    let consAbs=0;
+    for (let i=w; i>=0; i--) { if (!history[i].P) consAbs++; else break; }
+    const isEsp = ESPECIALIDADES.includes(tab);
+    const motivos=[];
+    if (!cur.P) { motivos.push('ausente'); }
+    else {
+      if (!cur.C) motivos.push('camera');
+      if (!cur.F && isEsp) motivos.push('feedback');
+      if (!cur.V) motivos.push('vitoria');
+    }
+    const risk = calcRisk(history, week);
+    return {...aluno, history, cur, consAbs, motivos, risk};
+  });
+}
+
+// Used for gestão evolution charts
+// Returns array of {w, pct, attended, total} per week up to currentWeek
+function calcEvolutionByTurma(turma, upToWeek) {
+  const pool = allAlunos.filter(a=>a.turma===turma);
+  if (!pool.length) return [];
+
+  const weeks = [];
+  for (let w=0; w<upToWeek; w++) {
+    let totalSlots=0, attended=0;
+    for (const aluno of pool) {
+      // Tabs this turma attends
+      const tabs = turma==='Master'
+        ? ['Mentoria','Hotseat','Master']
+        : ['Mentoria','Hotseat'];
+      // Add their specialty if any
+      if (aluno.especialidade) {
+        const spec = ESPECIALIDADES.find(e=>norm(e)===norm(aluno.especialidade));
+        if (spec) tabs.push(spec);
+      }
+      for (const tab of tabs) {
+        const entry = (sheetData[tab]||{})[norm(aluno.name)];
+        totalSlots++;
+        if (entry&&entry.history[w]&&entry.history[w].P) attended++;
+      }
+    }
+    const pct = totalSlots ? Math.round(attended/totalSlots*100) : 0;
+    weeks.push({w:w+1, pct, attended, total:totalSlots});
+  }
+  return weeks;
+}
+
+function calcRisk(history, upTo) {
+  const weeks = history.slice(0, Math.min(upTo,5));
+  if (!weeks.length) return 0;
+  let score=0, consAbs=0;
+  for (let i=weeks.length-1; i>=0; i--) { if (!weeks[i].P) consAbs++; else break; }
+  score += consAbs*18;
+  score += (weeks.filter(w=>!w.P).length/weeks.length)*35;
+  const pres = weeks.filter(w=>w.P);
+  if (pres.length) {
+    score += (pres.filter(w=>!w.C).length/pres.length)*12;
+    score += (pres.filter(w=>!w.V).length/pres.length)*8;
+  }
+  return Math.min(Math.round(score),100);
+}
+
+function calcEngagement(aluno, week) {
+  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Master'] : ['Mentoria','Hotseat'];
+  if (aluno.especialidade) {
+    const spec = ESPECIALIDADES.find(e=>norm(e)===norm(aluno.especialidade));
+    if (spec) tabs.push(spec);
+  }
+  let total=0, attended=0;
+  for (const tab of tabs) {
+    const entry = (sheetData[tab]||{})[norm(aluno.name)];
+    for (let w=0; w<week; w++) {
+      total++;
+      if (entry&&entry.history[w]&&entry.history[w].P) attended++;
+    }
+  }
+  return total ? Math.round(attended/total*100) : 0;
+}
+
+// Presence rate for a tab on a specific week index (0-based)
+function weekPresenceRate(tab, weekIdx) {
+  const docs = buildDoctors(tab, weekIdx+1);
+  if (!docs.length) return null;
+  const present = docs.filter(d=>d.history[weekIdx].P).length;
+  return { pct: Math.round(present/docs.length*100), present, total: docs.length };
+}
+
+// ═══════════════════════════════════════════
+// CS VIEW
+// ═══════════════════════════════════════════
+function csLoad() {
+  currentTab  = document.getElementById('csTab').value;
+  currentWeek = parseInt(document.getElementById('csWeek').value);
+  if (!loaded) {
+    document.getElementById('csStats').style.display='none';
+    document.getElementById('csMain').style.display='none';
+    document.getElementById('csEmpty').style.display='block';
+    return;
+  }
+  _csDoctors = buildDoctors(currentTab, currentWeek);
+  const present = _csDoctors.filter(d=>d.cur.P).length;
+  document.getElementById('sTot').textContent = _csDoctors.length;
+  document.getElementById('sPre').textContent = present;
+  document.getElementById('sAus').textContent = _csDoctors.filter(d=>d.motivos.includes('ausente')).length;
+  document.getElementById('sCam').textContent = _csDoctors.filter(d=>d.motivos.includes('camera')).length;
+  document.getElementById('sVit').textContent = _csDoctors.filter(d=>d.motivos.includes('vitoria')).length;
+  document.getElementById('csStats').style.display='grid';
+  document.getElementById('csMain').style.display='block';
+  document.getElementById('csEmpty').style.display='none';
+  renderCsTable();
+}
+
+function setPill(f,el) {
+  csFilter=f;
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  renderCsTable();
+}
+
+function renderCsTable() {
+  const all  = _csDoctors.filter(d=>d.motivos.length>0||d.consAbs>=4);
+  const list = csFilter==='todos' ? all : all.filter(d=>d.motivos.includes(csFilter));
+  const tbody = document.getElementById('csTbody');
+  if (!list.length) {
+    tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--sub)">Nenhum médico para acionar neste filtro 🎉</td></tr>`;
+    return;
+  }
+  tbody.innerHTML=list.map(d=>{
+    const rc  = d.risk>=60?'rh':d.risk>=30?'rm':'rl';
+    const rl  = d.risk>=60?'ALTO':d.risk>=30?'MÉD':'BAIXO';
+    const badges = d.motivos.map(m=>`<span class="b ${bCls(m)}">${bLbl(m)}</span>`).join('');
+    const abs4   = d.consAbs>=4 ? `<span class="b b-4x">4+ aus.</span>` : '';
+    const turmaTag = d.turma==='Master'
+      ? `<span class="turma-m">Master</span>`
+      : `<span class="turma-t">Mentoria</span>`;
+    const dn = displayName(d.name);
+    return `<tr onclick="openDrModal('${esc(d.name)}')">
+      <td><div class="dr-name">${tit(d.gender)}. ${esc(dn)}</div>${d.phone?`<div class="dr-sub">${esc(d.phone)}</div>`:''}</td>
+      <td>${turmaTag}</td>
+      <td><div class="badges">${badges}${abs4}</div></td>
+      <td style="font-size:11px;color:${d.consAbs>=3?'var(--danger)':'var(--sub)'}">${d.consAbs}</td>
+      <td><div class="rbar ${rc}"><div class="rbar-track"><div class="rbar-fill" style="width:${d.risk}%"></div></div><span class="rbar-txt">${d.risk}%</span><span style="font-size:9px;color:var(--sub);margin-left:3px">${rl}</span></div></td>
+    </tr>`;
+  }).join('');
+}
+
+function bCls(m){return{ausente:'b-aus',camera:'b-cam',feedback:'b-fb',vitoria:'b-vit'}[m]||'';}
+function bLbl(m){return{ausente:'❌ Ausente',camera:'📷 Câmera',feedback:'💬 Feedback',vitoria:'🏆 Vitória'}[m]||m;}
+
+// ═══════════════════════════════════════════
+// GESTÃO VIEW
+// ═══════════════════════════════════════════
+function renderGest() {
+  if (!loaded||!allAlunos.length) {
+    document.getElementById('gestContent').style.display='none';
+    document.getElementById('gestEmpty').style.display='block';
+    return;
+  }
+  document.getElementById('gestContent').style.display='block';
+  document.getElementById('gestEmpty').style.display='none';
+
+  const total = allAlunos.length;
+  const engRates = allAlunos.map(a=>calcEngagement(a,currentWeek));
+  const avgEng = Math.round(engRates.reduce((a,b)=>a+b,0)/total);
+  const withRisk = allAlunos.map((a,i)=>({...a,eng:engRates[i],risk:Math.min(100,Math.round((100-engRates[i])*0.75))}));
+  const atRisk = withRisk.filter(a=>a.risk>=60).length;
+  const mentoriaDocs = buildDoctors('Mentoria', currentWeek);
+  const absentNow = mentoriaDocs.filter(d=>!d.cur.P).length;
+
+  document.getElementById('gTotal').textContent  = total;
+  document.getElementById('gEng').textContent    = avgEng+'%';
+  document.getElementById('gRisk').textContent   = atRisk;
+  document.getElementById('gAbsent').textContent = absentNow;
+
+  // ── WEEK COMPARISON CARDS ──────────────────
+  const compareTabs = ['Mentoria','Master',...ESPECIALIDADES.filter(e=>{
+    return allAlunos.some(a=>norm(a.especialidade)===norm(e));
+  })];
+  const wcEl = document.getElementById('weekCompare');
+  wcEl.innerHTML = compareTabs.map(tab=>{
+    const weeks=[];
+    for (let w=0; w<currentWeek; w++) {
+      const r = weekPresenceRate(tab,w);
+      if (r) weeks.push({w:w+1,...r});
+    }
+    if (!weeks.length) return '';
+    const maxPct = Math.max(...weeks.map(w=>w.pct),1);
+    const last  = weeks[weeks.length-1];
+    const prev  = weeks.length>=2 ? weeks[weeks.length-2] : null;
+    const delta = prev ? last.pct-prev.pct : null;
+    const deltaCls = delta===null?'delta-eq':delta>0?'delta-up':delta<0?'delta-dn':'delta-eq';
+    const deltaTxt = delta===null?'Primeira semana':delta>0?`▲ +${delta}pp vs S${last.w-1}`:delta<0?`▼ ${delta}pp vs S${last.w-1}`:`= Sem variação vs S${last.w-1}`;
+    const bars = weeks.map(wk=>{
+      const h = Math.max(Math.round(wk.pct/maxPct*60),3);
+      const color = wk.pct>=70?'var(--safe)':wk.pct>=40?'var(--warn)':'var(--danger)';
+      return `<div class="wweek">
+        <div class="wweek-bar-wrap"><div class="wweek-bar" style="height:${h}px;background:${color}"></div></div>
+        <div class="wweek-pct" style="color:${color}">${wk.pct}%</div>
+        <div class="wweek-lbl">S${wk.w}</div>
+      </div>`;
+    }).join('');
+    return `<div class="wcard">
+      <div class="wcard-title">${tab}</div>
+      <div class="wcard-weeks">${bars}</div>
+      <div class="wcard-delta ${deltaCls}">${deltaTxt}</div>
+    </div>`;
+  }).join('');
+
+  // ── CHARTS ────────────────────────────────
+  renderEvolutionChart('chartMaster',   calcEvolutionByTurma('Master',currentWeek),   'var(--acc)',  allAlunos.filter(a=>a.turma==='Master').length);
+  renderEvolutionChart('chartMentoria', calcEvolutionByTurma('Mentoria',currentWeek), 'var(--blue)', allAlunos.filter(a=>a.turma==='Mentoria').length);
+
+  // ── RISK CARDS ────────────────────────────
+  const top = [...withRisk].sort((a,b)=>b.risk-a.risk).slice(0,9);
+  document.getElementById('gestRisk').innerHTML=top.map(a=>{
+    const cls=a.risk>=60?'r-h':a.risk>=30?'r-m':'r-l';
+    const dn=displayName(a.name);
+    return `<div class="risk-card ${cls}" onclick="openDrModal('${esc(a.name)}')">
+      <div class="rc-name">${tit(a.gender)}. ${esc(dn)}</div>
+      <div class="rc-sub">${a.turma}${a.especialidade?' · '+a.especialidade:''}</div>
+      <div class="rc-score">${a.risk}%</div>
+      <div class="rc-detail">Engajamento: ${a.eng}%${a.phone?' · '+a.phone:''}</div>
+    </div>`;
+  }).join('');
+
+  // ── ENGAGEMENT TABLE ──────────────────────
+  document.getElementById('gestTabTbody').innerHTML=AULAS_GERAIS.map(tab=>{
+    const docs=buildDoctors(tab,currentWeek), n=docs.length;
+    if (!n) return `<tr><td>${tab}</td><td colspan="5" style="color:var(--sub)">—</td></tr>`;
+    const wCols=[0,1,2,3].map(w=>{
+      if (w>=currentWeek) return '<td style="color:var(--sub)">—</td>';
+      const pct=Math.round(docs.filter(d=>d.history[w].P).length/n*100);
+      const color=pct>=70?'var(--safe)':pct>=40?'var(--warn)':'var(--danger)';
+      return `<td style="color:${color};font-weight:700">${pct}%</td>`;
+    }).join('');
+    const vals=[0,1,2,3].filter(w=>w<currentWeek).map(w=>docs.filter(d=>d.history[w].P).length/n*100);
+    let tend='—';
+    if (vals.length>=2) { const d=vals[vals.length-1]-vals[0]; tend=d>5?'📈 Subindo':d<-5?'📉 Caindo':'➡ Estável'; }
+    return `<tr><td style="font-weight:600">${tab}</td>${wCols}<td style="font-size:11px">${tend}</td></tr>`;
+  }).join('');
+}
+
+function renderEvolutionChart(elId, weeks, color, totalAlunos) {
+  const el = document.getElementById(elId);
+  if (!weeks.length) { el.innerHTML=`<div style="color:var(--sub);font-size:11px;padding:20px">Sem dados</div>`; return; }
+  const maxP = Math.max(...weeks.map(b=>b.pct), 1);
+  el.innerHTML = weeks.map(b=>`
+    <div class="chart-col">
+      <div class="chart-bar-wrap">
+        <div class="chart-bar" style="height:${b.pct/maxP*100}%;background:${color}">
+          <span class="chart-bar-val" style="color:${color}">${b.pct}%</span>
+        </div>
+      </div>
+      <div class="chart-lbl">S${b.w}<br><span style="color:var(--text)">${totalAlunos}</span> alunos</div>
+    </div>`).join('');
+}
+
+
+  const el=document.getElementById(elId);
+  const n=docs.length;
+  if (!n) { el.innerHTML=`<div style="color:var(--sub);font-size:11px;padding:20px">Sem dados</div>`; return; }
+  const bars=[];
+  for (let w=0; w<week; w++) {
+    const cnt=docs.filter(d=>d.history[w].P).length;
+    bars.push({w:w+1, pct:Math.round(cnt/n*100), cnt});
+  }
+  const maxP=Math.max(...bars.map(b=>b.pct),1);
+  el.innerHTML=bars.map(b=>`
+    <div class="chart-col">
+      <div class="chart-bar-wrap">
+        <div class="chart-bar" style="height:${b.pct/maxP*100}%;background:${color}">
+          <span class="chart-bar-val" style="color:${color}">${b.pct}%</span>
+        </div>
+      </div>
+      <div class="chart-lbl">S${b.w}<br><span style="color:var(--text)">${b.cnt}</span>/${n}</div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════
+// ALUNO VIEW
+// ═══════════════════════════════════════════
+function renderAlunoView() {
+  if (!loaded||!allAlunos.length) {
+    document.getElementById('alunoContent').style.display='none';
+    document.getElementById('alunoEmpty').style.display='block';
+    return;
+  }
+  document.getElementById('alunoContent').style.display='block';
+  document.getElementById('alunoEmpty').style.display='none';
+  renderProfiles();
+}
+function renderProfiles() {
+  const q=(document.getElementById('searchInput').value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const list=allAlunos.filter(a=>!q||norm(a.name).includes(q));
+  const grid=document.getElementById('profileGrid');
+  if (!list.length) { grid.innerHTML=`<div style="color:var(--sub);font-size:12px">Nenhum resultado.</div>`; return; }
+  grid.innerHTML=list.slice(0,80).map(a=>{
+    const eng=calcEngagement(a,currentWeek);
+    const color=eng<40?'var(--danger)':eng<70?'var(--warn)':'var(--safe)';
+    const dn=displayName(a.name);
+    return `<div class="profile-card" onclick="openDrModal('${esc(a.name)}')">
+      <div class="pc-name">${tit(a.gender)}. ${esc(dn)}</div>
+      <div class="pc-sub">${a.turma}${a.especialidade?' · '+a.especialidade:''}</div>
+      <div class="pc-bar"><div class="pc-bar-fill" style="width:${eng}%;background:${color}"></div></div>
+      <div class="pc-pct" style="color:${color}">${eng}% engajamento</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════
+// DR MODAL
+// ═══════════════════════════════════════════
+function openDrModal(name) {
+  const aluno=allAlunos.find(a=>a.name===name);
+  if (!aluno) return;
+  const g=aluno.gender, dn=displayName(name);
+  const eng=calcEngagement(aluno,currentWeek);
+
+  document.getElementById('mName').textContent=`${tit(g)}. ${dn}`;
+  document.getElementById('mMeta').textContent=
+    `${aluno.turma}${aluno.especialidade?' · '+aluno.especialidade:''} · Engajamento ${eng}% · Semana ${currentWeek}`+
+    (aluno.phone?` · ${aluno.phone}`:'')+
+    (aluno.entryDate?` · Entrou: ${aluno.entryDate}`:'');
+
+  const sheetTab=sheetData[currentTab]||{};
+  const entry=sheetTab[norm(name)];
+  document.getElementById('mHist').innerHTML=Array.from({length:5},(_,i)=>{
+    const h=entry&&entry.history[i]||{P:false,C:false,F:false,V:false};
+    const active=i<currentWeek;
+    const dot=(v,l)=>active
+      ?`<div class="dot ${v?'dot-on':'dot-off'}">${l}</div>`
+      :`<div class="dot dot-na">·</div>`;
+    return `<div class="hist-week"><div class="hist-lbl">S${i+1}</div><div class="hist-dots">${dot(h.P,'P')}${dot(h.C,'C')}${dot(h.F,'F')}${dot(h.V,'V')}</div></div>`;
+  }).join('');
+
+  const hw=Array.from({length:currentWeek},(_,i)=>entry&&entry.history[i]||{P:false,C:false,F:false,V:false});
+  document.getElementById('mStats').innerHTML=`
+    <div class="mstat"><div class="mstat-v" style="color:var(--safe)">${hw.filter(h=>h.P).length}/${currentWeek}</div><div class="mstat-l">Presenças</div></div>
+    <div class="mstat"><div class="mstat-v" style="color:var(--warn)">${hw.filter(h=>h.P&&h.C).length}</div><div class="mstat-l">Câmera</div></div>
+    <div class="mstat"><div class="mstat-v" style="color:#9966FF">${hw.filter(h=>h.P&&h.F).length}</div><div class="mstat-l">Feedback</div></div>
+    <div class="mstat"><div class="mstat-v" style="color:var(--blue)">${hw.filter(h=>h.P&&h.V).length}</div><div class="mstat-l">Vitórias</div></div>`;
+
+  const d=_csDoctors.find(x=>x.name===name)||{motivos:[],consAbs:0};
+  const msgs=buildMsgs({name:dn,motivos:d.motivos,consAbs:d.consAbs,tab:currentTab,g});
+  document.getElementById('mTabs').innerHTML=msgs.map((m,i)=>`<button class="mtab ${i===0?'active':''}" onclick="switchMsg(${i},this)">${m.label}</button>`).join('');
+  document.getElementById('mBoxes').innerHTML=msgs.map((m,i)=>`<div class="msg-box ${i===0?'active':''}" id="mbox${i}">${escHtml(m.text)}<br><button class="copy-btn" onclick="copyMsg(${i},this)">📋 COPIAR</button></div>`).join('');
+  document.getElementById('drOv').classList.add('open');
+}
+
+function switchMsg(i,el){document.querySelectorAll('.mtab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.msg-box').forEach(b=>b.classList.remove('active'));el.classList.add('active');document.getElementById('mbox'+i).classList.add('active');}
+function copyMsg(i,btn){const text=document.getElementById('mbox'+i).innerText.replace('📋 COPIAR','').trim();navigator.clipboard.writeText(text).then(()=>{btn.textContent='✓ COPIADO';btn.classList.add('copied');setTimeout(()=>{btn.textContent='📋 COPIAR';btn.classList.remove('copied');},2000);});}
+
+// ═══════════════════════════════════════════
+// MESSAGES
+// ═══════════════════════════════════════════
+function buildMsgs({name,motivos,consAbs,tab,g}) {
+  const fn=name.split(' ')[0], t=tit(g), s=sr_(g), f=foc(g);
+  const msgs=[];
+  if (consAbs>=4) { msgs.push({label:'🚨 4+ Ausências', text:msg4x(name,fn,t,s)}); }
+  else if (motivos.includes('ausente')) {
+    msgs.push({label:'❌ Ausente',  text:msgAus(name,fn,t,s,tab)});
+    msgs.push({label:'⏱ +4h',      text:`- ${t}. ${fn}?`});
+    msgs.push({label:'⏱ +2h',      text:`- ${t}. ${fn}, conseguiu ver minha mensagem?`});
+    msgs.push({label:'📞 Ligação',  text:msgLig(name,fn,t,s,tab)});
+  }
+  if (motivos.includes('camera'))   msgs.push({label:'📷 Câmera',   text:msgCam(name,fn,t,s,f)});
+  if (motivos.includes('feedback')) msgs.push({label:'💬 Feedback',  text:msgFb(name,fn,t,s)});
+  if (motivos.includes('vitoria')&&!motivos.includes('ausente')) msgs.push({label:'🏆 Vitória', text:msgVit(name,fn,t)});
+  if (!msgs.length) msgs.push({label:'💬 Contato', text:`Olá, ${t}. ${fn}! Tudo bem?\n\nPassando para verificar como está sendo seu aproveitamento na mentoria. Conta comigo para o que precisar!\n\nUm abraço!`});
+  return msgs;
+}
+function msgAus(name,fn,t,s,tab){return `Olá, ${t}. ${name}! Tudo bem?\n\nPercebemos que ${s} não conseguiu estar presente ontem no encontro da ${tab}.\n\nImagino que a sua rotina pode estar intensa e, muitas vezes, imprevistos acontecem.\n\nMas queremos muito garantir que ${s} aproveite ao máximo tudo o que a mentoria pode gerar para a sua vida.\n\n- Este horário está inviável ${t}. ${fn}?\n- O que podemos fazer para te ajudar a priorizar este horário?\n\nEstamos juntos e queremos muito te ver crescer!\n\nUm abraço!`;}
+function msgCam(name,fn,t,s,f){return `${t}. ${name}, tudo bem?\n\nFicamos felizes em ver você presente na mentoria!\n\nUm detalhe que sempre faz muita diferença é participar com a câmera aberta, porque isso:\n- aumenta muito a troca com o mentor e com o grupo.\n- te deixa mais ${f}.\n\nIncentivo ${s} a abrir a câmera nos próximos encontros — tenho certeza que vai tirar ainda mais proveito.\n\nConta de verdade comigo. Queremos muito te ver crescer.\n\nUm abracoooo ${t}. ${fn}!`;}
+function msgFb(name,fn,t,s){return `Oláaaa ${t}. ${name}, tudo bem?\n\nPercebemos que ${s} participou da mentoria ontem, mas não deu feedback sobre como foi a sua semana.\n\nTe incentivamos ${t}. ${fn} a nas próximas vezes assim que entrar já "levantar a mão" virtual e falar sobre suas vitórias, avanços e dúvidas.\n\nDessa forma a mentoria se torna mais transformadora na sua vida.\n\n${t}. ${fn} acha que dá pra fazer mais isso?\n\nConta de verdade comigo. Queremos muito te ver crescer! 💪🏼\n\nUm abraçoooo ${t}. ${fn}!!!`;}
+function msgVit(name,fn,t){return `Oláaaa ${t}. ${name}, tudo bem?\n\nQue bom ter você presente na mentoria!\n\nQueria te incentivar a compartilhar seus avanços e vitórias nas próximas aulas — não importa o tamanho, cada passo conta.\n\nIsso energiza o grupo inteiro e faz você perceber o quanto já evoluiu, ${t}. ${fn}.\n\nConta de verdade comigo. Queremos muito te ver crescer! 💪🏼`;}
+function msg4x(name,fn,t,s){return `Oláaaa ${t}. ${name}, tudo bem?\n\nPercebemos que ${s} não conseguiu participar dos últimos 4 encontros da mentoria.\n\nImagino que a rotina médica pode ser bastante intensa e imprevistos acontecem.\n\nPorém, para manter o nível de engajamento e aproveitamento do grupo, temos uma política interna: mentorados que permanecem mais de 4 encontros consecutivos sem participação precisam de ajustes na agenda.\n\nNosso objetivo é garantir que todos que estejam no programa realmente aproveitem a mentoria.\n\nSempre que precisar de apoio para retomar sua participação, conte conosco.\n\nUm abraço ${t}. ${fn}!!`;}
+function msgLig(name,fn,t,s,tab){return `[SCRIPT DE LIGAÇÃO — ${tab.toUpperCase()}]\n\n"Oláaaaaa ${t}. ${fn}! Aqui é a [Seu Nome], sua customer experience do Acelerador Médico.\n\nÉ algo rápido que tenho para falar com ${s}, tem 2 minutinhos disponível?\n\nEntão, percebi que ${t}. ${fn} não conseguiu participar na última ${tab} [informar dia e horário].\n\nTe incentivamos a entrar ${t}. ${fn} — um único insight de repente pode mudar seus resultados e sua vida, e nós queremos muito te ver crescer e ter retorno do seu investimento.\n\nNão só entrar, mas abrir a câmera, perguntar, pedir feedback semanal e tomar decisões ${t}. ${fn}. Isto é o que te faz estar sempre com a energia alta e produzindo, vendendo, captando mais.\n\nVamos melhorar esse aproveitamento ${t}. ${fn}? Posso contar com uma participação maior?\n\nPerfeito!! Excelente dia e conta de verdade comigo o tempo inteiro.\n\nUm abraço ${t}. ${fn}oooo!"`;}
+
+// ═══════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════
+function switchView(id,el) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  el.classList.add('active');
+  if (id==='gest'  && loaded) renderGest();
+  if (id==='aluno' && loaded) renderAlunoView();
+}
+
+// ═══════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════
+function norm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();}
+function csvParse(text){const rows=[];for(const line of text.split('\n')){const cols=[];let cur='',inQ=false;for(let i=0;i<line.length;i++){if(line[i]==='"'){inQ=!inQ;}else if(line[i]===','&&!inQ){cols.push(cur.trim());cur='';}else cur+=line[i];}cols.push(cur.trim());rows.push(cols);}return rows;}
+function clean(v){return(v||'').replace(/^"|"$/g,'').trim();}
+function chk(v){const s=clean(v).toLowerCase();return['x','v','sim','1','true','✓','s'].includes(s);}
+function esc(s){return(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');}
+function escHtml(t){return(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');}
+</script>
+</body>
+</html>
