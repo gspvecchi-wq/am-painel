@@ -628,11 +628,24 @@ function displayName(rawName) { return cleanSuffix(rawName); }
 // ═══════════════════════════════════════════
 let allAlunos   = [];
 let sheetData   = {};
+let kvPresenca  = {}; // { tab: { normName: {P,C,F,V,name, history:[...]} } }
 let csFilter    = 'todos';
 let currentTab  = 'Mentoria';
 let currentWeek = 1;
 let loaded      = false;
 let _csDoctors  = [];
+
+// ─── especialidade helpers ───────────────────
+// aluno.especialidades is now an array (e.g. ['Dermato','Psiquiatras'])
+function hasEsp(aluno, tab) {
+  if (!aluno.especialidades || !aluno.especialidades.length) return false;
+  return aluno.especialidades.some(e => norm(e) === norm(tab));
+}
+function espLabel(aluno) {
+  if (!aluno.especialidades || !aluno.especialidades.length) return '';
+  return aluno.especialidades.join(', ');
+}
+// ─────────────────────────────────────────────
 
 // ═══════════════════════════════════════════
 // INIT
@@ -676,6 +689,12 @@ async function reloadAll() {
     allAlunos = data.allAlunos.map(a=>({...a, gender: inferGender(a.name)}));
     sheetData = data.sheetData;
 
+    // Load all KV presenca data for profile use
+    try {
+      const kvRes = await fetch(WORKER_URL.replace('/dados','/presenca/all'));
+      kvPresenca = kvRes.ok ? await kvRes.json() : {};
+    } catch(e) { kvPresenca = {}; }
+
     loaded = true;
     const now = new Date().toLocaleTimeString('pt-BR');
     setStatus(true,`${allAlunos.length} alunos · ${Object.keys(sheetData).length} abas`,`Atualizado ${now}`);
@@ -695,7 +714,7 @@ async function reloadAll() {
 // ═══════════════════════════════════════════
 function getPool(tab) {
   if (tab==='Master') return allAlunos.filter(a=>a.turma==='Master');
-  if (ESPECIALIDADES.includes(tab)) return allAlunos.filter(a=>norm(a.especialidade)===norm(tab));
+  if (ESPECIALIDADES.includes(tab)) return allAlunos.filter(a=>hasEsp(a, tab));
   return allAlunos;
 }
 
@@ -739,9 +758,11 @@ function calcEvolutionByTurma(turma, upToWeek) {
         ? ['Mentoria','Hotseat','Master']
         : ['Mentoria','Hotseat'];
       // Add their specialty if any
-      if (aluno.especialidade) {
-        const spec = ESPECIALIDADES.find(e=>norm(e)===norm(aluno.especialidade));
-        if (spec) tabs.push(spec);
+      if (aluno.especialidades && aluno.especialidades.length) {
+        for (const esp of aluno.especialidades) {
+          const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
+          if (spec) tabs.push(spec);
+        }
       }
       for (const tab of tabs) {
         const entry = (sheetData[tab]||{})[norm(aluno.name)];
@@ -759,8 +780,12 @@ function calcEvolutionByTurma(turma, upToWeek) {
 // P(40%) + C(25%) + V(25%) + F(10%) across all relevant tabs
 function calcCompositeScore(aluno, upToWeek) {
   const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Master'] : ['Mentoria','Hotseat'];
-  const isEsp = aluno.especialidade ? ESPECIALIDADES.find(e=>norm(e)===norm(aluno.especialidade)) : null;
-  if (isEsp) tabs.push(isEsp);
+  if (aluno.especialidades && aluno.especialidades.length) {
+    for (const esp of aluno.especialidades) {
+      const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
+      if (spec && !tabs.includes(spec)) tabs.push(spec);
+    }
+  }
 
   let pSlots=0,pHit=0, cSlots=0,cHit=0, vSlots=0,vHit=0, fSlots=0,fHit=0;
   for (const tab of tabs) {
@@ -813,8 +838,12 @@ function isQuedaAcelerada(aluno, upToWeek) {
 
 function calcCompositeScoreWeek(aluno, weekIdx) {
   const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Master'] : ['Mentoria','Hotseat'];
-  const isEsp = aluno.especialidade ? ESPECIALIDADES.find(e=>norm(e)===norm(aluno.especialidade)) : null;
-  if (isEsp) tabs.push(isEsp);
+  if (aluno.especialidades && aluno.especialidades.length) {
+    for (const esp of aluno.especialidades) {
+      const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
+      if (spec && !tabs.includes(spec)) tabs.push(spec);
+    }
+  }
   let pHit=0,cHit=0,vHit=0,fHit=0,fSlots=0,total=0;
   for (const tab of tabs) {
     const entry = (sheetData[tab]||{})[norm(aluno.name)];
@@ -830,9 +859,11 @@ function calcCompositeScoreWeek(aluno, weekIdx) {
 
 function calcEngagement(aluno, week) {
   const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Master'] : ['Mentoria','Hotseat'];
-  if (aluno.especialidade) {
-    const spec = ESPECIALIDADES.find(e=>norm(e)===norm(aluno.especialidade));
-    if (spec) tabs.push(spec);
+  if (aluno.especialidades && aluno.especialidades.length) {
+    for (const esp of aluno.especialidades) {
+      const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
+      if (spec && !tabs.includes(spec)) tabs.push(spec);
+    }
   }
   let total=0, attended=0;
   for (const tab of tabs) {
@@ -969,7 +1000,7 @@ function renderGest() {
 
   // ── WEEK COMPARISON CARDS ──────────────────
   const compareTabs = ['Mentoria','Master',...ESPECIALIDADES.filter(e=>
-    allAlunos.some(a=>norm(a.especialidade)===norm(e))
+    allAlunos.some(a=>hasEsp(a, e))
   )];
   const wcEl = document.getElementById('weekCompare');
 
@@ -1051,7 +1082,7 @@ function renderGest() {
       const novoBadge  = a.novo  ? `<span style="font-size:9px;color:var(--blue);font-weight:700">✦ NOVO</span>`   : '';
       return `<div class="risk-card ${cls}" onclick="openDrModal('${esc(a.name)}')">
         <div class="rc-name">${tit(a.gender)}. ${esc(dn)} ${quedaBadge}${novoBadge}</div>
-        <div class="rc-sub">${a.especialidade||'—'}</div>
+        <div class="rc-sub">${espLabel(a)||a.turma||'—'}</div>
         <div class="rc-score">${a.risk}%</div>
         <div class="rc-detail">Score qualidade: ${a.score}%${a.phone?' · '+a.phone:''}</div>
       </div>`;
@@ -1061,9 +1092,9 @@ function renderGest() {
   renderRiskGrid('gestRiskMentoria', withScores.filter(a=>a.turma==='Mentoria'));
 
   // ── ESPECIALIDADES AGGREGATE ──────────────
-  const espComActive = ESPECIALIDADES.filter(e=>allAlunos.some(a=>norm(a.especialidade)===norm(e)));
+  const espComActive = ESPECIALIDADES.filter(e=>allAlunos.some(a=>hasEsp(a, e)));
   document.getElementById('espGrid').innerHTML = espComActive.map(esp=>{
-    const pool = allAlunos.filter(a=>norm(a.especialidade)===norm(esp));
+    const pool = allAlunos.filter(a=>hasEsp(a, esp));
     if (!pool.length) return '';
     const scores = pool.map(a=>calcCompositeScore(a,refW));
     const avg = Math.round(scores.reduce((s,v)=>s+v,0)/scores.length);
@@ -1113,9 +1144,11 @@ function detectMaxWeek() {
 // Engagement for a single week index (0-based)
 function calcEngagementWeek(aluno, weekIdx) {
   const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Master'] : ['Mentoria','Hotseat'];
-  if (aluno.especialidade) {
-    const spec = ESPECIALIDADES.find(e=>norm(e)===norm(aluno.especialidade));
-    if (spec) tabs.push(spec);
+  if (aluno.especialidades && aluno.especialidades.length) {
+    for (const esp of aluno.especialidades) {
+      const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
+      if (spec && !tabs.includes(spec)) tabs.push(spec);
+    }
   }
   let total=0, attended=0;
   for (const tab of tabs) {
@@ -1168,7 +1201,7 @@ function renderProfiles() {
     const dn=displayName(a.name);
     return `<div class="profile-card" onclick="openDrModal('${esc(a.name)}')">
       <div class="pc-name">${tit(a.gender)}. ${esc(dn)}</div>
-      <div class="pc-sub">${a.turma}${a.especialidade?' · '+a.especialidade:''}</div>
+      <div class="pc-sub">${a.turma}${espLabel(a)?' · '+espLabel(a):''}</div>
       <div class="pc-bar"><div class="pc-bar-fill" style="width:${eng}%;background:${color}"></div></div>
       <div class="pc-pct" style="color:${color}">${eng}% engajamento</div>
     </div>`;
@@ -1186,14 +1219,31 @@ function openDrModal(name) {
 
   document.getElementById('mName').textContent=`${tit(g)}. ${dn}`;
   document.getElementById('mMeta').textContent=
-    `${aluno.turma}${aluno.especialidade?' · '+aluno.especialidade:''} · Engajamento ${eng}% · Semana ${currentWeek}`+
+    `${aluno.turma}${espLabel(aluno)?' · '+espLabel(aluno):''} · Engajamento ${eng}% · Semana ${currentWeek}`+
     (aluno.phone?` · ${aluno.phone}`:'')+
     (aluno.entryDate?` · Entrou: ${aluno.entryDate}`:'');
 
-  const sheetTab=sheetData[currentTab]||{};
-  const entry=sheetTab[norm(name)];
+  // Build history from KV data (all tabs this aluno attends)
+  const alunoTabs = aluno.turma==='Master'
+    ? ['Mentoria','Hotseat','Master']
+    : ['Mentoria','Hotseat'];
+  if (aluno.especialidades && aluno.especialidades.length) {
+    for (const esp of aluno.especialidades) {
+      const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
+      if (spec && !alunoTabs.includes(spec)) alunoTabs.push(spec);
+    }
+  }
+
+  // Get KV history for the currently-selected tab (for dot display)
+  function getKvEntry(tab) {
+    const kvTab = kvPresenca[tab] || {};
+    return kvTab[norm(name)] || null;
+  }
+  // Use the primary tab (currentTab) for the dot history in modal
+  const kvEntry = getKvEntry(currentTab);
+
   document.getElementById('mHist').innerHTML=Array.from({length:5},(_,i)=>{
-    const h=entry&&entry.history[i]||{P:false,C:false,F:false,V:false};
+    const h=kvEntry&&kvEntry.history&&kvEntry.history[i]||{P:false,C:false,F:false,V:false};
     const active=i<currentWeek;
     const dot=(v,l)=>active
       ?`<div class="dot ${v?'dot-on':'dot-off'}">${l}</div>`
@@ -1201,12 +1251,25 @@ function openDrModal(name) {
     return `<div class="hist-week"><div class="hist-lbl">S${i+1}</div><div class="hist-dots">${dot(h.P,'P')}${dot(h.C,'C')}${dot(h.F,'F')}${dot(h.V,'V')}</div></div>`;
   }).join('');
 
-  const hw=Array.from({length:currentWeek},(_,i)=>entry&&entry.history[i]||{P:false,C:false,F:false,V:false});
+  // Aggregate stats across ALL tabs from KV
+  let presTotal=0, camTotal=0, fbTotal=0, vitTotal=0;
+  for (let w=0; w<currentWeek; w++) {
+    for (const tab of alunoTabs) {
+      const e = getKvEntry(tab);
+      const h = e&&e.history&&e.history[w] ? e.history[w] : {P:false,C:false,F:false,V:false};
+      if(h.P) presTotal++;
+      if(h.P&&h.C) camTotal++;
+      if(h.P&&h.F) fbTotal++;
+      if(h.P&&h.V) vitTotal++;
+    }
+  }
+  const slotCount = currentWeek; // slots per tab — use one tab as reference for presences display
+  const presForDisplay = kvEntry ? Array.from({length:currentWeek},(_,i)=>kvEntry.history&&kvEntry.history[i]||{P:false}).filter(h=>h.P).length : 0;
   document.getElementById('mStats').innerHTML=`
-    <div class="mstat"><div class="mstat-v" style="color:var(--safe)">${hw.filter(h=>h.P).length}/${currentWeek}</div><div class="mstat-l">Presenças</div></div>
-    <div class="mstat"><div class="mstat-v" style="color:var(--warn)">${hw.filter(h=>h.P&&h.C).length}</div><div class="mstat-l">Câmera</div></div>
-    <div class="mstat"><div class="mstat-v" style="color:#9966FF">${hw.filter(h=>h.P&&h.F).length}</div><div class="mstat-l">Feedback</div></div>
-    <div class="mstat"><div class="mstat-v" style="color:var(--blue)">${hw.filter(h=>h.P&&h.V).length}</div><div class="mstat-l">Vitórias</div></div>`;
+    <div class="mstat"><div class="mstat-v" style="color:var(--safe)">${presForDisplay}/${currentWeek}</div><div class="mstat-l">Presenças</div></div>
+    <div class="mstat"><div class="mstat-v" style="color:var(--warn)">${camTotal}</div><div class="mstat-l">Câmera</div></div>
+    <div class="mstat"><div class="mstat-v" style="color:#9966FF">${fbTotal}</div><div class="mstat-l">Feedback</div></div>
+    <div class="mstat"><div class="mstat-v" style="color:var(--blue)">${vitTotal}</div><div class="mstat-l">Vitórias</div></div>`;
 
   const d=_csDoctors.find(x=>x.name===name)||{motivos:[],consAbs:0};
   const msgs=buildMsgs({name:dn,motivos:d.motivos,consAbs:d.consAbs,tab:currentTab,g});
@@ -1327,7 +1390,7 @@ async function loadChamada() {
 
 function getChamadaPool(tab) {
   if (tab==='Master')           return allAlunos.filter(a=>a.turma==='Master');
-  if (ESPECIALIDADES.includes(tab)) return allAlunos.filter(a=>norm(a.especialidade)===norm(tab));
+  if (ESPECIALIDADES.includes(tab)) return allAlunos.filter(a=>hasEsp(a, tab));
   return allAlunos;
 }
 
@@ -1339,7 +1402,7 @@ function renderChamadaTable(pool) {
     const r = chamadaRegistros[key]||{P:false,C:false,F:false,V:false};
     const dn = displayName(aluno.name);
     return `<tr class="chamada-row${r.P?' presente':''}" id="crow-${escId(key)}">
-      <td><div class="dr-name">${tit(aluno.gender)}. ${esc(dn)}</div>${aluno.especialidade?`<div class="dr-sub">${aluno.especialidade}</div>`:''}</td>
+      <td><div class="dr-name">${tit(aluno.gender)}. ${esc(dn)}</div>${espLabel(aluno)?`<div class="dr-sub">${espLabel(aluno)}</div>`:''}</td>
       <td><button class="pcfv-btn${r.P?' on-P':''}" onclick="togglePCFV('${escId(key)}','P')" title="Presente">P</button></td>
       <td><button class="pcfv-btn${r.C?' on-C':''}" onclick="togglePCFV('${escId(key)}','C')" title="Câmera">C</button></td>
       ${isEsp?`<td><button class="pcfv-btn${r.F?' on-F':''}" onclick="togglePCFV('${escId(key)}','F')" title="Feedback">F</button></td>`:'<td style="color:var(--sub);text-align:center;font-size:10px">—</td>'}
