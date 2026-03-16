@@ -1208,7 +1208,7 @@ function renderProfiles() {
     const eng=calcEngagement(a,currentWeek);
     const color=eng<40?'var(--danger)':eng<70?'var(--warn)':'var(--safe)';
     const dn=displayName(a.name);
-    return `<div class="profile-card" onclick="openDrModal('${esc(a.name)}', false)">`
+    return `<div class="profile-card" onclick="openDrModal('${esc(a.name)}', false)">
       <div class="pc-name">${tit(a.gender)}. ${esc(dn)}</div>
       <div class="pc-sub">${a.turma}${espLabel(a)?' · '+espLabel(a):''}</div>
       <div class="pc-bar"><div class="pc-bar-fill" style="width:${eng}%;background:${color}"></div></div>
