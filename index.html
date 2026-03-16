@@ -188,7 +188,16 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
 .dot-on{background:rgba(0,232,122,.2);color:var(--safe);border:1px solid rgba(0,232,122,.3);}
 .dot-off{background:rgba(255,51,85,.1);color:rgba(255,51,85,.5);border:1px solid rgba(255,51,85,.2);}
 .dot-na{background:var(--s3);color:var(--sub);border:1px solid var(--border);}
-.mstats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:20px;}
+/* Profile history grid */
+.ph-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;}
+.ph-row{display:flex;align-items:center;gap:10px;}
+.ph-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--sub);width:58px;flex-shrink:0;}
+.ph-dots{display:flex;gap:5px;}
+.ph-dot{width:36px;height:26px;border-radius:6px;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);}
+.ph-dot-on{color:#000;}
+.ph-dot-off{background:rgba(255,51,85,.07);color:rgba(255,51,85,.4);border-color:rgba(255,51,85,.15);}
+.ph-dot-na{background:var(--s2);color:var(--sub);}
+.mstats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:20px;}
 .mstat{background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center;}
 .mstat-v{font-family:'Bebas Neue',sans-serif;font-size:24px;line-height:1;}
 .mstat-l{font-size:8px;color:var(--sub);text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
@@ -1207,21 +1216,14 @@ function renderProfiles() {
 }
 
 // ═══════════════════════════════════════════
-// DR MODAL
+// DR MODAL — visão completa do mês
 // ═══════════════════════════════════════════
 function openDrModal(name) {
-  const aluno=allAlunos.find(a=>a.name===name);
+  const aluno = allAlunos.find(a=>a.name===name);
   if (!aluno) return;
-  const g=aluno.gender, dn=displayName(name);
-  const eng=calcEngagement(aluno,currentWeek);
+  const g = aluno.gender, dn = displayName(name);
 
-  document.getElementById('mName').textContent=`${tit(g)}. ${dn}`;
-  document.getElementById('mMeta').textContent=
-    `${aluno.turma}${espLabel(aluno)?' · '+espLabel(aluno):''} · Engajamento ${eng}% · Semana ${currentWeek}`+
-    (aluno.phone?` · ${aluno.phone}`:'')+
-    (aluno.entryDate?` · Entrou: ${aluno.entryDate}`:'');
-
-  // Build history from KV data (all tabs this aluno attends)
+  // ── Abas que este aluno frequenta ────────
   const alunoTabs = aluno.turma==='Master'
     ? ['Mentoria','Hotseat','Master']
     : ['Mentoria','Hotseat'];
@@ -1232,43 +1234,147 @@ function openDrModal(name) {
     }
   }
 
-  // Get KV history for the currently-selected tab (for dot display)
-  function getKvEntry(tab) {
-    const kvTab = kvPresenca[tab] || {};
-    return kvTab[norm(name)] || null;
+  // ── KV lookup helper ─────────────────────
+  function kvEntry(tab) {
+    return (kvPresenca[tab]||{})[norm(name)] || null;
   }
-  // Use the primary tab (currentTab) for the dot history in modal
-  const kvEntry = getKvEntry(currentTab);
 
-  document.getElementById('mHist').innerHTML=Array.from({length:5},(_,i)=>{
-    const h=kvEntry&&kvEntry.history&&kvEntry.history[i]||{P:false,C:false,F:false,V:false};
-    const active=i<currentWeek;
-    const dot=(v,l)=>active
-      ?`<div class="dot ${v?'dot-on':'dot-off'}">${l}</div>`
-      :`<div class="dot dot-na">·</div>`;
-    return `<div class="hist-week"><div class="hist-lbl">S${i+1}</div><div class="hist-dots">${dot(h.P,'P')}${dot(h.C,'C')}${dot(h.F,'F')}${dot(h.V,'V')}</div></div>`;
-  }).join('');
+  // ── Número de semanas com pelo menos 1 dado ──
+  const maxW = 5;
+  // Semanas que realmente têm dados no KV para esse aluno
+  function hasDataWeek(w) {
+    return alunoTabs.some(tab=>{
+      const e = kvEntry(tab);
+      return e && e.history && e.history[w] && (e.history[w].P || e.history[w].C || e.history[w].F || e.history[w].V);
+    });
+  }
+  // Último índice (0-based) com dado; determina alcance do mês
+  let lastWeek = 0;
+  for (let w=0; w<maxW; w++) { if (hasDataWeek(w)) lastWeek = w; }
+  const totalWeeks = lastWeek + 1; // semanas ocorridas
 
-  // Aggregate stats across ALL tabs from KV
-  let presTotal=0, camTotal=0, fbTotal=0, vitTotal=0;
-  for (let w=0; w<currentWeek; w++) {
+  // ── Agrega por semana (somando todas as abas) ──
+  // weekData[w] = { slots, P, C, F, V, espSlots, espF }
+  const weekData = Array.from({length: maxW}, (_,w) => {
+    let slots=0, P=0, C=0, F=0, V=0, espSlots=0, espF=0;
     for (const tab of alunoTabs) {
-      const e = getKvEntry(tab);
-      const h = e&&e.history&&e.history[w] ? e.history[w] : {P:false,C:false,F:false,V:false};
-      if(h.P) presTotal++;
-      if(h.P&&h.C) camTotal++;
-      if(h.P&&h.F) fbTotal++;
-      if(h.P&&h.V) vitTotal++;
+      const e = kvEntry(tab);
+      const h = e&&e.history&&e.history[w] ? e.history[w] : null;
+      if (!h && !hasDataWeek(w)) continue; // semana sem dados
+      slots++;
+      if (h) {
+        if (h.P) P++;
+        if (h.P && h.C) C++;
+        if (h.P && h.F) F++;
+        if (h.P && h.V) V++;
+      }
+      if (ESPECIALIDADES.includes(tab)) {
+        espSlots++;
+        if (h && h.P && h.F) espF++;
+      }
     }
-  }
-  const slotCount = currentWeek; // slots per tab — use one tab as reference for presences display
-  const presForDisplay = kvEntry ? Array.from({length:currentWeek},(_,i)=>kvEntry.history&&kvEntry.history[i]||{P:false}).filter(h=>h.P).length : 0;
-  document.getElementById('mStats').innerHTML=`
-    <div class="mstat"><div class="mstat-v" style="color:var(--safe)">${presForDisplay}/${currentWeek}</div><div class="mstat-l">Presenças</div></div>
-    <div class="mstat"><div class="mstat-v" style="color:var(--warn)">${camTotal}</div><div class="mstat-l">Câmera</div></div>
-    <div class="mstat"><div class="mstat-v" style="color:#9966FF">${fbTotal}</div><div class="mstat-l">Feedback</div></div>
-    <div class="mstat"><div class="mstat-v" style="color:var(--blue)">${vitTotal}</div><div class="mstat-l">Vitórias</div></div>`;
+    return { slots, P, C, F, V, espSlots, espF };
+  });
 
+  // ── KPIs totais (semanas ocorridas) ──────
+  let totSlots=0, totP=0, totC=0, totF=0, totV=0, totEspSlots=0, totEspF=0;
+  for (let w=0; w<totalWeeks; w++) {
+    const d = weekData[w];
+    totSlots  += d.slots;
+    totP      += d.P;
+    totC      += d.C;
+    totF      += d.F;
+    totV      += d.V;
+    totEspSlots += d.espSlots;
+    totEspF   += d.espF;
+  }
+
+  const presRate  = totSlots  ? Math.round(totP/totSlots*100)    : 0;
+  const camRate   = totP      ? Math.round(totC/totP*100)        : 0;
+  const vitRate   = totP      ? Math.round(totV/totP*100)        : 0;
+  const fbRate    = totEspSlots ? Math.round(totEspF/totEspSlots*100) : null;
+
+  // ── Score de engajamento composto ────────
+  // P(40%) + C(25%) + V(25%) + F(10% — só quem tem esp)
+  const pScore  = totSlots      ? totP/totSlots      : 0;
+  const cScore  = totSlots      ? totC/totSlots      : 0;
+  const vScore  = totSlots      ? totV/totSlots      : 0;
+  const fScore  = totEspSlots   ? totEspF/totEspSlots : 1;
+  const engScore = Math.round(pScore*40 + cScore*25 + vScore*25 + fScore*10);
+  const engColor = engScore>=70?'var(--safe)':engScore>=40?'var(--warn)':'var(--danger)';
+
+  // ── Tendência: compara primeira metade × segunda ──
+  let trendLabel = '➡ Estável', trendColor = 'var(--sub)';
+  if (totalWeeks >= 3) {
+    const mid = Math.floor(totalWeeks/2);
+    const firstHalf  = weekData.slice(0,mid);
+    const secondHalf = weekData.slice(mid,totalWeeks);
+    const avg = arr => {
+      const s = arr.reduce((a,d)=>a+(d.slots?d.P/d.slots:0),0);
+      return arr.length ? s/arr.length : 0;
+    };
+    const diff = avg(secondHalf) - avg(firstHalf);
+    if (diff > 0.15)       { trendLabel='📈 Subindo';  trendColor='var(--safe)'; }
+    else if (diff < -0.15) { trendLabel='📉 Caindo';   trendColor='var(--danger)'; }
+  }
+
+  // ── Mini-grid de semanas (dot por semana, por indicador) ──
+  const dotRow = (label, color, vals) => `
+    <div class="ph-row">
+      <div class="ph-lbl">${label}</div>
+      <div class="ph-dots">
+        ${Array.from({length:maxW},(_,w)=>{
+          if (w >= totalWeeks) return `<div class="ph-dot ph-dot-na">·</div>`;
+          const on = vals[w];
+          return `<div class="ph-dot ${on?'ph-dot-on':'ph-dot-off'}" style="${on?'background:'+color:''}">S${w+1}</div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  const pVals = weekData.map(d=>d.P>0);
+  const cVals = weekData.map(d=>d.C>0);
+  const vVals = weekData.map(d=>d.V>0);
+  const fVals = weekData.map(d=>d.espSlots>0 && d.F>0);
+
+  // ── Monta o modal ─────────────────────────
+  document.getElementById('mName').textContent=`${tit(g)}. ${dn}`;
+  document.getElementById('mMeta').textContent=
+    `${aluno.turma}${espLabel(aluno)?' · '+espLabel(aluno):''}${aluno.phone?' · '+aluno.phone:''}${aluno.entryDate?' · Entrou: '+aluno.entryDate:''}`;
+
+  // Substitui mHist por grid histórico
+  document.getElementById('mHist').innerHTML=`
+    <div class="ph-grid">
+      ${dotRow('Presença','var(--safe)', pVals)}
+      ${dotRow('Câmera','var(--warn)', cVals)}
+      ${dotRow('Vitória','var(--blue)', vVals)}
+      ${totEspSlots > 0 ? dotRow('Feedback','#9966FF', fVals) : ''}
+    </div>`;
+
+  // KPIs
+  document.getElementById('mStats').innerHTML=`
+    <div class="mstat">
+      <div class="mstat-v" style="color:${engColor}">${engScore}%</div>
+      <div class="mstat-l">Engajamento</div>
+    </div>
+    <div class="mstat">
+      <div class="mstat-v" style="color:var(--safe)">${totP}/${totSlots}</div>
+      <div class="mstat-l">Presenças</div>
+    </div>
+    <div class="mstat">
+      <div class="mstat-v" style="color:var(--warn)">${camRate}%</div>
+      <div class="mstat-l">Câmera</div>
+    </div>
+    <div class="mstat">
+      <div class="mstat-v" style="color:var(--blue)">${vitRate}%</div>
+      <div class="mstat-l">Vitórias</div>
+    </div>
+    ${fbRate!==null?`<div class="mstat"><div class="mstat-v" style="color:#9966FF">${fbRate}%</div><div class="mstat-l">Feedback</div></div>`:''}
+    <div class="mstat">
+      <div class="mstat-v" style="color:${trendColor};font-size:13px">${trendLabel}</div>
+      <div class="mstat-l">Tendência</div>
+    </div>`;
+
+  // Mensagens CS (mantém)
   const d=_csDoctors.find(x=>x.name===name)||{motivos:[],consAbs:0};
   const msgs=buildMsgs({name:dn,motivos:d.motivos,consAbs:d.consAbs,tab:currentTab,g});
   document.getElementById('mTabs').innerHTML=msgs.map((m,i)=>`<button class="mtab ${i===0?'active':''}" onclick="switchMsg(${i},this)">${m.label}</button>`).join('');
