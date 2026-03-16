@@ -627,7 +627,6 @@ function displayName(rawName) { return cleanSuffix(rawName); }
 // STATE
 // ═══════════════════════════════════════════
 let allAlunos   = [];
-let sheetData   = {};
 let kvPresenca  = {}; // { tab: { normName: {P,C,F,V,name, history:[...]} } }
 let csFilter    = 'todos';
 let currentTab  = 'Mentoria';
@@ -687,7 +686,6 @@ async function reloadAll() {
 
     // Worker já retorna allAlunos sem gender — inferimos no cliente
     allAlunos = data.allAlunos.map(a=>({...a, gender: inferGender(a.name)}));
-    sheetData = data.sheetData;
 
     // Load all KV presenca data for profile use
     try {
@@ -697,7 +695,7 @@ async function reloadAll() {
 
     loaded = true;
     const now = new Date().toLocaleTimeString('pt-BR');
-    setStatus(true,`${allAlunos.length} alunos · ${Object.keys(sheetData).length} abas`,`Atualizado ${now}`);
+    setStatus(true,`${allAlunos.length} alunos`,`Atualizado ${now}`);
     updateBadge();
     csLoad();
     const av = document.querySelector('.view.active').id;
@@ -719,7 +717,7 @@ function getPool(tab) {
 }
 
 function buildDoctors(tab, week) {
-  const sheetTab = sheetData[tab]||{};
+  const sheetTab = kvPresenca[tab]||{};
   const pool = getPool(tab);
   const w = week-1;
   return pool.map(aluno=>{
@@ -765,7 +763,7 @@ function calcEvolutionByTurma(turma, upToWeek) {
         }
       }
       for (const tab of tabs) {
-        const entry = (sheetData[tab]||{})[norm(aluno.name)];
+        const entry = (kvPresenca[tab]||{})[norm(aluno.name)];
         totalSlots++;
         if (entry&&entry.history[w]&&entry.history[w].P) attended++;
       }
@@ -789,7 +787,7 @@ function calcCompositeScore(aluno, upToWeek) {
 
   let pSlots=0,pHit=0, cSlots=0,cHit=0, vSlots=0,vHit=0, fSlots=0,fHit=0;
   for (const tab of tabs) {
-    const entry = (sheetData[tab]||{})[norm(aluno.name)];
+    const entry = (kvPresenca[tab]||{})[norm(aluno.name)];
     const isEspTab = ESPECIALIDADES.includes(tab);
     for (let w=0; w<upToWeek; w++) {
       const h = entry&&entry.history[w] ? entry.history[w] : {P:false,C:false,F:false,V:false};
@@ -846,7 +844,7 @@ function calcCompositeScoreWeek(aluno, weekIdx) {
   }
   let pHit=0,cHit=0,vHit=0,fHit=0,fSlots=0,total=0;
   for (const tab of tabs) {
-    const entry = (sheetData[tab]||{})[norm(aluno.name)];
+    const entry = (kvPresenca[tab]||{})[norm(aluno.name)];
     const h = entry&&entry.history[weekIdx] ? entry.history[weekIdx] : {P:false,C:false,F:false,V:false};
     const isEspTab = ESPECIALIDADES.includes(tab);
     total++;
@@ -867,7 +865,7 @@ function calcEngagement(aluno, week) {
   }
   let total=0, attended=0;
   for (const tab of tabs) {
-    const entry = (sheetData[tab]||{})[norm(aluno.name)];
+    const entry = (kvPresenca[tab]||{})[norm(aluno.name)];
     for (let w=0; w<week; w++) {
       total++;
       if (entry&&entry.history[w]&&entry.history[w].P) attended++;
@@ -978,7 +976,7 @@ function renderGest() {
     absentCount = allAlunos.filter(a=>{
       let absCount=0;
       for(let w=0;w<maxWeek;w++){
-        const entry=(sheetData['Mentoria']||{})[norm(a.name)];
+        const entry=(kvPresenca['Mentoria']||{})[norm(a.name)];
         if(!entry||!entry.history[w]||!entry.history[w].P) absCount++;
       }
       return absCount > maxWeek/2;
@@ -1131,7 +1129,7 @@ function renderGest() {
 function detectMaxWeek() {
   let max = 1;
   for (const tab of AULAS_GERAIS) {
-    const s = sheetData[tab]||{};
+    const s = kvPresenca[tab]||{};
     for (const entry of Object.values(s)) {
       for (let w=4; w>=0; w--) {
         if (entry.history[w]&&entry.history[w].P) { if(w+1>max) max=w+1; break; }
@@ -1152,7 +1150,7 @@ function calcEngagementWeek(aluno, weekIdx) {
   }
   let total=0, attended=0;
   for (const tab of tabs) {
-    const entry = (sheetData[tab]||{})[norm(aluno.name)];
+    const entry = (kvPresenca[tab]||{})[norm(aluno.name)];
     total++;
     if (entry&&entry.history[weekIdx]&&entry.history[weekIdx].P) attended++;
   }
