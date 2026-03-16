@@ -201,15 +201,6 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
 .mstat{background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center;}
 .mstat-v{font-family:'Bebas Neue',sans-serif;font-size:24px;line-height:1;}
 .mstat-l{font-size:8px;color:var(--sub);text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
-.msg-tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px;}
-.mtab{padding:5px 12px;border-radius:20px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--sub);transition:all .18s;text-transform:uppercase;letter-spacing:.03em;}
-.mtab:hover{color:var(--text);}
-.mtab.active{background:var(--acc);color:#000;border-color:var(--acc);}
-.msg-box{background:var(--s2);border:1px solid var(--border2);border-radius:11px;padding:18px;font-size:12px;line-height:1.75;white-space:pre-wrap;word-break:break-word;display:none;}
-.msg-box.active{display:block;}
-.copy-btn{margin-top:12px;background:transparent;border:1px solid var(--acc);color:var(--acc);padding:7px 18px;border-radius:7px;font-family:'Outfit',sans-serif;font-weight:700;font-size:10px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:all .2s;}
-.copy-btn:hover{background:var(--acc);color:#000;}
-.copy-btn.copied{background:var(--safe);border-color:var(--safe);color:#000;}
 
 .statusbar{position:fixed;bottom:0;left:0;right:0;height:34px;background:var(--s1);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 28px;gap:18px;font-size:10px;color:var(--sub);z-index:40;}
 .s-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
@@ -524,9 +515,6 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
     <div class="modal-meta" id="mMeta"></div>
     <div class="hist-row" id="mHist"></div>
     <div class="mstats" id="mStats"></div>
-    <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);margin-bottom:9px;font-weight:700;">Mensagens prontas</div>
-    <div class="msg-tabs" id="mTabs"></div>
-    <div id="mBoxes"></div>
   </div>
 </div>
 
@@ -1374,11 +1362,6 @@ function openDrModal(name) {
       <div class="mstat-l">Tendência</div>
     </div>`;
 
-  // Mensagens CS (mantém)
-  const d=_csDoctors.find(x=>x.name===name)||{motivos:[],consAbs:0};
-  const msgs=buildMsgs({name:dn,motivos:d.motivos,consAbs:d.consAbs,tab:currentTab,g});
-  document.getElementById('mTabs').innerHTML=msgs.map((m,i)=>`<button class="mtab ${i===0?'active':''}" onclick="switchMsg(${i},this)">${m.label}</button>`).join('');
-  document.getElementById('mBoxes').innerHTML=msgs.map((m,i)=>`<div class="msg-box ${i===0?'active':''}" id="mbox${i}">${escHtml(m.text)}<br><button class="copy-btn" onclick="copyMsg(${i},this)">📋 COPIAR</button></div>`).join('');
   document.getElementById('drOv').classList.add('open');
 }
 
