@@ -1682,10 +1682,10 @@ function renderChamadaTable(pool) {
     const dn = displayName(aluno.name);
     return `<tr class="chamada-row${r.P?' presente':''}" id="crow-${escId(key)}">
       <td><div class="dr-name">${tit(aluno.gender)}. ${esc(dn)}</div>${espLabel(aluno)?`<div class="dr-sub">${espLabel(aluno)}</div>`:''}</td>
-      <td><button class="pcfv-btn${r.P?' on-P':''}" onclick="togglePCFV('${escId(key)}','P')" title="Presente">P</button></td>
-      <td><button class="pcfv-btn${r.C?' on-C':''}" onclick="togglePCFV('${escId(key)}','C')" title="Câmera">C</button></td>
-      ${isEsp?`<td><button class="pcfv-btn${r.F?' on-F':''}" onclick="togglePCFV('${escId(key)}','F')" title="Feedback">F</button></td>`:'<td style="color:var(--sub);text-align:center;font-size:10px">—</td>'}
-      <td><button class="pcfv-btn${r.V?' on-V':''}" onclick="togglePCFV('${escId(key)}','V')" title="Vitória">V</button></td>
+      <td><button class="pcfv-btn${r.P?' on-P':''}" data-field="P" onclick="togglePCFV('${escId(key)}','P')" title="Presente">P</button></td>
+      <td><button class="pcfv-btn${r.C?' on-C':''}" data-field="C" onclick="togglePCFV('${escId(key)}','C')" title="Câmera">C</button></td>
+      ${isEsp?`<td><button class="pcfv-btn${r.F?' on-F':''}" data-field="F" onclick="togglePCFV('${escId(key)}','F')" title="Feedback">F</button></td>`:'<td style="color:var(--sub);text-align:center;font-size:10px">—</td>'}
+      <td><button class="pcfv-btn${r.V?' on-V':''}" data-field="V" onclick="togglePCFV('${escId(key)}','V')" title="Vitória">V</button></td>
     </tr>`;
   }).join('');
 }
@@ -1707,9 +1707,9 @@ function togglePCFV(keyId, field) {
   const row = document.getElementById('crow-'+keyId);
   if (!row) return;
   row.className = 'chamada-row'+(r.P?' presente':'');
-  const btns = row.querySelectorAll('.pcfv-btn');
-  ['P','C','F','V'].forEach((f,i)=>{
-    btns[i] && btns[i].classList.toggle('on-'+f, !!r[f]);
+  row.querySelectorAll('.pcfv-btn').forEach(btn => {
+    const f = btn.dataset.field;
+    if (f) btn.classList.toggle('on-'+f, !!r[f]);
   });
   updateChamadaStats(getChamadaPool(document.getElementById('chamadaTab').value));
 }
