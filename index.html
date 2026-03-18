@@ -60,7 +60,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .reload-btn:hover{color:var(--text);border-color:var(--acc);}
 
 /* STAT STRIP — 5 cards now */
-.stat-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:24px;position:sticky;top:60px;z-index:40;padding:12px 0 4px;background:var(--bg);}
+.stat-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:24px;}
 @media(max-width:800px){.stat-strip{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:500px){.stat-strip{grid-template-columns:repeat(2,1fr);}}
 .stat-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;}
@@ -419,6 +419,19 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
       <div class="sec-sub">Benchmark exclusivo Mentoria</div>
     </div>
     <div class="risk-grid" id="gestRiskMentoria"></div>
+
+    <!-- OPORTUNIDADES -->
+    <div class="sec-head" style="margin-top:32px;">
+      <div class="sec-title">🔥 Oportunidades de Renovação</div>
+      <div class="sec-sub">Alunos com maior score de renovação — janela ideal aberta</div>
+    </div>
+    <div class="risk-grid" id="gestRenovacao"></div>
+
+    <div class="sec-head" style="margin-top:32px;">
+      <div class="sec-title">⭐ Candidatos ao Master</div>
+      <div class="sec-sub">Alunos da Mentoria com engajamento e vitórias consistentes</div>
+    </div>
+    <div class="risk-grid" id="gestAscensao"></div>
 
     <div class="sec-head">
       <div class="sec-title">Saúde das Especialidades</div>
@@ -901,7 +914,46 @@ function calcAlertLevel(aluno, upToWeek) {
 }
 
 
-function calcCompositeScoreWeek(aluno, weekIdx) {
+// ── ASCENSÃO SCORE ────────────────────────────────────────
+// Candidatos ao Master: turma Mentoria + engajamento alto
+// consistente + vitórias na maioria das semanas
+// Retorna 0–100 ou null se não elegível
+function calcAscensaoScore(aluno, upToWeek) {
+  if (aluno.turma !== 'Mentoria') return null;
+  if (!upToWeek || upToWeek < 2) return null;
+
+  const kvTab = kvPresenca['Mentoria'] || {};
+  const entry = kvTab[norm(aluno.name)];
+  const history = Array.from({length: upToWeek}, (_, i) =>
+    entry?.history?.[i] || {P:false,C:false,F:false,V:false}
+  );
+
+  // Engajamento: mínimo 70% de presença
+  const presRate = history.filter(h => h.P).length / upToWeek;
+  if (presRate < 0.7) return null;
+
+  // Vitórias: pelo menos 50% das semanas presentes com vitória
+  const presWeeks = history.filter(h => h.P);
+  const vitRate = presWeeks.length
+    ? presWeeks.filter(h => h.V).length / presWeeks.length
+    : 0;
+  if (vitRate < 0.5) return null;
+
+  // Consistência: sem mais de 1 falta consecutiva
+  let maxConsAbs = 0, consAbs = 0;
+  for (const h of history) {
+    if (!h.P) { consAbs++; maxConsAbs = Math.max(maxConsAbs, consAbs); }
+    else consAbs = 0;
+  }
+  if (maxConsAbs > 1) return null;
+
+  // Score: peso em presença (50%), vitória (30%), câmera (20%)
+  const camRate = presWeeks.length
+    ? presWeeks.filter(h => h.C).length / presWeeks.length
+    : 0;
+  return Math.round(presRate * 50 + vitRate * 30 + camRate * 20);
+}
+
   const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Master'] : ['Mentoria','Hotseat'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
@@ -1163,6 +1215,51 @@ function renderGest() {
   }
   renderRiskGrid('gestRiskMaster',   withScores.filter(a=>a.turma==='Master'));
   renderRiskGrid('gestRiskMentoria', withScores.filter(a=>a.turma==='Mentoria'));
+
+  // ── RENOVAÇÃO RANKING ─────────────────────────────────────
+  const renovacaoCandidates = allAlunos
+    .map(a => ({ ...a, renScore: calcRenewalScore(a, refW) }))
+    .filter(a => a.renScore && a.renScore.daysLeft >= 0 && a.renScore.daysLeft <= 60)
+    .sort((a, b) => b.renScore.score - a.renScore.score)
+    .slice(0, 6);
+
+  document.getElementById('gestRenovacao').innerHTML = renovacaoCandidates.length
+    ? renovacaoCandidates.map(a => {
+        const dn = displayName(a.name);
+        const r = a.renScore;
+        const cls = r.score >= 70 ? 'r-l' : r.score >= 45 ? 'r-m' : 'r-h';
+        return `<div class="risk-card ${cls}" onclick="openDrModal('${esc(a.name)}', false)">
+          <div class="rc-name">${tit(a.gender)}. ${esc(dn)}</div>
+          <div class="rc-sub">${a.turma}${espLabel(a)?' · '+espLabel(a):''}</div>
+          <div style="margin:4px 0"><span style="font-size:11px;color:${r.color};font-weight:700">${r.label}</span></div>
+          <div class="rc-score" style="color:${r.color}">${r.score}%</div>
+          <div class="rc-detail">${r.daysLeft} dias restantes · Eng. ${calcCompositeScore(a,refW)}%${a.phone?' · '+a.phone:''}</div>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--sub);font-size:12px;padding:12px">Nenhum aluno na janela de renovação</div>';
+
+  // ── ASCENSÃO RANKING ──────────────────────────────────────
+  const ascensaoCandidates = allAlunos
+    .map(a => ({ ...a, ascScore: calcAscensaoScore(a, refW) }))
+    .filter(a => a.ascScore !== null)
+    .sort((a, b) => b.ascScore - a.ascScore)
+    .slice(0, 6);
+
+  document.getElementById('gestAscensao').innerHTML = ascensaoCandidates.length
+    ? ascensaoCandidates.map(a => {
+        const dn = displayName(a.name);
+        const score = a.ascScore;
+        const color = score >= 80 ? 'var(--safe)' : score >= 65 ? 'var(--warn)' : 'var(--sub)';
+        const label = score >= 80 ? '⭐ Pronto para Master' : score >= 65 ? '📈 Em evolução' : '🔍 Monitorar';
+        return `<div class="risk-card r-l" onclick="openDrModal('${esc(a.name)}', false)">
+          <div class="rc-name">${tit(a.gender)}. ${esc(dn)}</div>
+          <div class="rc-sub">${espLabel(a)||'Mentoria'}</div>
+          <div style="margin:4px 0"><span style="font-size:11px;color:${color};font-weight:700">${label}</span></div>
+          <div class="rc-score" style="color:${color}">${score}%</div>
+          <div class="rc-detail">Eng. ${calcCompositeScore(a,refW)}%${a.phone?' · '+a.phone:''}</div>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--sub);font-size:12px;padding:12px">Nenhum candidato identificado ainda</div>';
 
   // ── ESPECIALIDADES AGGREGATE ──────────────
   const espComActive = ESPECIALIDADES.filter(e=>allAlunos.some(a=>hasEsp(a, e)));
