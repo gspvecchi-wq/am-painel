@@ -684,6 +684,11 @@ function espLabel(aluno) {
 window.addEventListener('DOMContentLoaded', () => {
   updateBadge();
   reloadAll();
+
+  // Auto-refresh a cada 5 min, só quando a aba estiver visível
+  setInterval(() => {
+    if (!document.hidden) reloadAll();
+  }, 5 * 60 * 1000);
 });
 
 // ═══════════════════════════════════════════
