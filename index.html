@@ -60,7 +60,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .reload-btn:hover{color:var(--text);border-color:var(--acc);}
 
 /* STAT STRIP — 5 cards now */
-.stat-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:24px;}
+.stat-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:24px;position:sticky;top:60px;z-index:40;padding:12px 0 4px;background:var(--bg);}
 @media(max-width:800px){.stat-strip{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:500px){.stat-strip{grid-template-columns:repeat(2,1fr);}}
 .stat-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;}
@@ -289,6 +289,14 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
   #chamadaTbody td{padding:10px 8px;}
   .pcfv-btn{width:30px;height:26px;font-size:9px;}
 }
+/* CHAMADA buttons */
+.pcfv-btn{width:34px;height:28px;border-radius:7px;font-size:10px;font-weight:700;letter-spacing:.04em;cursor:pointer;border:1px solid var(--border2);background:var(--s2);color:var(--sub);transition:all .15s;}
+.pcfv-btn:hover{border-color:var(--acc);color:var(--text);}
+.pcfv-btn.on-P{background:rgba(0,232,122,.18);border-color:rgba(0,232,122,.5);color:var(--safe);}
+.pcfv-btn.on-C{background:rgba(255,149,0,.15);border-color:rgba(255,149,0,.4);color:var(--warn);}
+.pcfv-btn.on-F{background:rgba(153,102,255,.15);border-color:rgba(153,102,255,.4);color:#9966FF;}
+.pcfv-btn.on-V{background:rgba(68,136,255,.15);border-color:rgba(68,136,255,.4);color:var(--blue);}
+.pcfv-btn:disabled{opacity:.35;cursor:not-allowed;}
 </style>
 </head>
 <body>
@@ -845,6 +853,54 @@ function isQuedaAcelerada(aluno, upToWeek) {
   return (older - recent) >= 30;
 }
 
+// ── RENEWAL SCORE ─────────────────────────────────────────
+// Retorna { score, daysLeft, label, color } ou null
+function calcRenewalScore(aluno, upToWeek) {
+  if (!aluno.cycleEnd) return null;
+  const endDate = new Date(aluno.cycleEnd);
+  if (isNaN(endDate)) return null;
+  const daysLeft = Math.round((endDate - Date.now()) / (1000*60*60*24));
+  // Só candidato: ciclo ativo, dentro de 90 dias do fim
+  if (aluno.cycleStatus && /inativ/i.test(aluno.cycleStatus)) return null;
+  if (daysLeft < 0 || daysLeft > 90) return null;
+  const eng = calcCompositeScore(aluno, upToWeek);
+  // Janela ideal: 15–60 dias restantes + engajamento ≥ 55%
+  const inWindow = daysLeft >= 15 && daysLeft <= 60;
+  const score = inWindow ? Math.round(eng * 0.7 + Math.max(0, 60 - daysLeft) * 0.5) : Math.round(eng * 0.4);
+  let label, color;
+  if (inWindow && eng >= 55) { label = '🔥 Renovar agora';  color = 'var(--safe)'; }
+  else if (inWindow)          { label = '⏳ Janela aberta';  color = 'var(--warn)'; }
+  else                        { label = `📅 ${daysLeft}d restantes`; color = 'var(--sub)'; }
+  return { score, daysLeft, label, color };
+}
+
+// ── ALERT LEVEL ───────────────────────────────────────────
+// Retorna { level:'urgente'|'atencao'|'silencioso', label, color, icon } ou null
+function calcAlertLevel(aluno, upToWeek) {
+  if (!upToWeek || upToWeek < 1) return null;
+  // Pega histórico da aba principal (Mentoria)
+  const kvTab = kvPresenca['Mentoria'] || {};
+  const entry = kvTab[norm(aluno.name)];
+  const history = Array.from({length: upToWeek}, (_,i) =>
+    entry?.history?.[i] || {P:false,C:false,F:false,V:false}
+  );
+  // 3+ faltas consecutivas → urgente
+  let consAbs = 0;
+  for (let i = history.length-1; i >= 0; i--) {
+    if (!history[i].P) consAbs++; else break;
+  }
+  if (consAbs >= 3) return { level:'urgente', icon:'🔴', label:`${consAbs} faltas seguidas`, color:'var(--danger)' };
+  // Queda acelerada → atenção
+  if (isQuedaAcelerada(aluno, upToWeek))
+    return { level:'atencao', icon:'🟡', label:'Queda acelerada', color:'var(--warn)' };
+  // Presente mas câmera + vitórias zeradas → silencioso
+  const presences = history.filter(h=>h.P);
+  if (presences.length >= 2 && presences.every(h=>!h.C && !h.V))
+    return { level:'silencioso', icon:'⚪', label:'Presente, desengajado', color:'var(--sub)' };
+  return null;
+}
+
+
 function calcCompositeScoreWeek(aluno, weekIdx) {
   const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Master'] : ['Mentoria','Hotseat'];
   if (aluno.especialidades && aluno.especialidades.length) {
@@ -940,6 +996,8 @@ function renderCsTable() {
     const abs4   = d.consAbs>=4 ? `<span class="b b-4x">4+ aus.</span>` : '';
     const quedaB = isQuedaAcelerada(d,currentWeek) ? `<span class="b" style="background:rgba(255,51,85,.15);color:var(--danger);border:1px solid rgba(255,51,85,.3)">⚡ QUEDA</span>` : '';
     const novoB  = isNovo(d) ? `<span class="b" style="background:rgba(68,136,255,.12);color:var(--blue);border:1px solid rgba(68,136,255,.25)">✦ NOVO</span>` : '';
+    const alertB = (()=>{ const a=calcAlertLevel(d,currentWeek); return a?`<span class="b" style="background:rgba(255,51,85,.1);color:${a.color};border:1px solid rgba(255,51,85,.2)">${a.icon} ${a.label}</span>`:''; })();
+    const renewB = (()=>{ const r=calcRenewalScore(d,currentWeek); return (r&&r.daysLeft<=60&&r.daysLeft>=0)?`<span class="b" style="background:rgba(0,232,122,.08);color:${r.color};border:1px solid rgba(0,232,122,.2)">${r.label}</span>`:''; })();
     const turmaTag = d.turma==='Master'
       ? `<span class="turma-m">Master</span>`
       : `<span class="turma-t">Mentoria</span>`;
@@ -947,7 +1005,7 @@ function renderCsTable() {
     return `<tr onclick="openDrModal('${esc(d.name)}')">
       <td><div class="dr-name">${tit(d.gender)}. ${esc(dn)}</div>${d.phone?`<div class="dr-sub">${esc(d.phone)}</div>`:''}</td>
       <td>${turmaTag}</td>
-      <td><div class="badges">${badges}${abs4}${quedaB}${novoB}</div></td>
+      <td><div class="badges">${badges}${abs4}${quedaB}${novoB}${alertB}${renewB}</div></td>
       <td style="font-size:11px;color:${d.consAbs>=3?'var(--danger)':'var(--sub)'}">${d.consAbs}</td>
       <td><div class="rbar ${rc}"><div class="rbar-track"><div class="rbar-fill" style="width:${d.risk}%"></div></div><span class="rbar-txt">${d.risk}%</span><span style="font-size:9px;color:var(--sub);margin-left:3px">${rl}</span></div></td>
     </tr>`;
@@ -1087,11 +1145,17 @@ function renderGest() {
     document.getElementById(elId).innerHTML = top.map(a=>{
       const cls = a.risk>=60?'r-h':a.risk>=30?'r-m':'r-l';
       const dn  = displayName(a.name);
-      const quedaBadge = a.queda ? `<span style="font-size:9px;color:var(--danger);font-weight:700">⚡ QUEDA</span>` : '';
-      const novoBadge  = a.novo  ? `<span style="font-size:9px;color:var(--blue);font-weight:700">✦ NOVO</span>`   : '';
+      const quedaBadge  = a.queda ? `<span style="font-size:9px;color:var(--danger);font-weight:700">⚡ QUEDA</span>` : '';
+      const novoBadge   = a.novo  ? `<span style="font-size:9px;color:var(--blue);font-weight:700">✦ NOVO</span>`   : '';
+      const alertInfo   = calcAlertLevel(a, refW);
+      const alertBadge  = alertInfo ? `<span style="font-size:9px;color:${alertInfo.color};font-weight:700">${alertInfo.icon} ${alertInfo.label}</span>` : '';
+      const renewInfo   = calcRenewalScore(a, refW);
+      const renewBadge  = (renewInfo && renewInfo.daysLeft <= 60 && renewInfo.daysLeft >= 0)
+        ? `<span style="font-size:9px;color:${renewInfo.color};font-weight:700">${renewInfo.label}</span>` : '';
       return `<div class="risk-card ${cls}" onclick="openDrModal('${esc(a.name)}')">
         <div class="rc-name">${tit(a.gender)}. ${esc(dn)} ${quedaBadge}${novoBadge}</div>
         <div class="rc-sub">${espLabel(a)||a.turma||'—'}</div>
+        ${alertBadge||renewBadge ? `<div style="margin:4px 0;display:flex;gap:4px;flex-wrap:wrap">${alertBadge}${renewBadge}</div>` : ''}
         <div class="rc-score">${a.risk}%</div>
         <div class="rc-detail">Score qualidade: ${a.score}%${a.phone?' · '+a.phone:''}</div>
       </div>`;
