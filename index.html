@@ -959,6 +959,7 @@ function calcAscensaoScore(aluno, upToWeek) {
   return Math.round(presRate * 50 + vitRate * 30 + camRate * 20);
 }
 
+function calcCompositeScoreWeek(aluno, weekIdx) {
   const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Master'] : ['Mentoria','Hotseat'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
