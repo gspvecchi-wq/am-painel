@@ -199,6 +199,16 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
 .ph-dot-na{background:var(--s2);color:var(--sub);}
 .mstats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:20px;}
 .mstat{background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center;}
+.calls-row{display:flex;align-items:center;justify-content:space-between;background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin-bottom:8px;}
+.calls-info{flex:1;}
+.calls-name{font-size:12px;font-weight:700;color:var(--text);}
+.calls-count{font-size:11px;color:var(--sub);margin-top:2px;}
+.calls-bar-wrap{flex:1;margin:0 12px;}
+.calls-bar-track{height:5px;background:var(--s3);border-radius:3px;overflow:hidden;}
+.calls-bar-fill{height:100%;border-radius:3px;background:var(--acc);transition:width .3s;}
+.calls-btn{font-size:10px;font-weight:700;padding:5px 12px;border-radius:7px;border:1px solid var(--acc);background:transparent;color:var(--acc);cursor:pointer;white-space:nowrap;}
+.calls-btn:hover{background:var(--acc);color:#000;}
+.calls-btn:disabled{opacity:.4;cursor:not-allowed;border-color:var(--border);color:var(--sub);}
 .mstat-v{font-family:'Bebas Neue',sans-serif;font-size:24px;line-height:1;}
 .mstat-l{font-size:8px;color:var(--sub);text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
 .msg-tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px;}
@@ -545,6 +555,10 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
     <div class="modal-meta" id="mMeta"></div>
     <div class="hist-row" id="mHist"></div>
     <div class="mstats" id="mStats"></div>
+    <div id="mCallsSection" style="display:none;margin:16px 0 0;">
+      <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);margin-bottom:10px;font-weight:700;">Calls com Especialistas</div>
+      <div id="mCallsContent"></div>
+    </div>
     <div id="mMsgSection">
       <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);margin-bottom:9px;font-weight:700;">Mensagens prontas</div>
       <div class="msg-tabs" id="mTabs"></div>
@@ -1372,7 +1386,7 @@ function renderProfiles() {
   const grid=document.getElementById('profileGrid');
   if (!list.length) { grid.innerHTML=`<div style="color:var(--sub);font-size:12px">Nenhum resultado.</div>`; return; }
   grid.innerHTML=list.slice(0,80).map(a=>{
-    const eng=calcEngagement(a,currentWeek);
+    const eng=calcEngagement(a, detectMaxWeek());
     const color=eng<40?'var(--danger)':eng<70?'var(--warn)':'var(--safe)';
     const dn=displayName(a.name);
     return `<div class="profile-card" onclick="openDrModal('${esc(a.name)}', false)">
@@ -1554,11 +1568,87 @@ function openDrModal(name, showMsgs=true) {
   } else {
     msgSection.style.display = 'none';
   }
+
+  // ── Calls com Especialistas ──────────────
+  renderCallsSection(name);
+
   document.getElementById('drOv').classList.add('open');
 }
 
 function switchMsg(i,el){document.querySelectorAll('.mtab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.msg-box').forEach(b=>b.classList.remove('active'));el.classList.add('active');document.getElementById('mbox'+i).classList.add('active');}
 function copyMsg(i,btn){const text=document.getElementById('mbox'+i).innerText.replace('📋 COPIAR','').trim();navigator.clipboard.writeText(text).then(()=>{btn.textContent='✓ COPIADO';btn.classList.add('copied');setTimeout(()=>{btn.textContent='📋 COPIAR';btn.classList.remove('copied');},2000);});}
+
+// ── CALLS COM ESPECIALISTAS ──────────────────────────────
+const ESPECIALISTAS = [
+  { key: 'leonardo', nome: 'Leonardo Nunes', total: 12 },
+  { key: 'bruno',    nome: 'Bruno Guimarães', total: 1  }
+];
+
+function getCallsData(normName) {
+  // Lê do kvPresenca sob a chave especial 'calls'
+  const callsKv = kvPresenca['__calls__'] || {};
+  return callsKv[normName] || { leonardo: 0, bruno: 0 };
+}
+
+function renderCallsSection(name) {
+  const section  = document.getElementById('mCallsSection');
+  const content  = document.getElementById('mCallsContent');
+  const normName = norm(name);
+  const data     = getCallsData(normName);
+  const canEdit  = csAuthenticated;
+
+  section.style.display = 'block';
+  content.innerHTML = ESPECIALISTAS.map(esp => {
+    const used = data[esp.key] || 0;
+    const pct  = Math.round(used / esp.total * 100);
+    const barColor = used >= esp.total ? 'var(--danger)' : used > 0 ? 'var(--acc)' : 'var(--s3)';
+    const canAdd = canEdit && used < esp.total;
+    const canRemove = canEdit && used > 0;
+    return `<div class="calls-row">
+      <div class="calls-info">
+        <div class="calls-name">${esp.nome}</div>
+        <div class="calls-count">${used} de ${esp.total} call${esp.total>1?'s':''} ${used>=esp.total?'<span style="color:var(--danger)">· Esgotado</span>':''}</div>
+      </div>
+      <div class="calls-bar-wrap">
+        <div class="calls-bar-track"><div class="calls-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
+      </div>
+      ${canEdit ? `
+        <div style="display:flex;gap:6px">
+          <button class="calls-btn" style="padding:5px 8px;font-size:12px" ${!canRemove?'disabled':''} onclick="registerCall('${normName}','${esp.key}',-1)">−</button>
+          <button class="calls-btn" ${!canAdd?'disabled':''} onclick="registerCall('${normName}','${esp.key}',1)">+ Registrar</button>
+        </div>` : `<div style="font-size:12px;font-weight:700;color:${barColor}">${pct}%</div>`}
+    </div>`;
+  }).join('');
+}
+
+async function registerCall(normName, espKey, delta) {
+  const pwd = localStorage.getItem('am_cs_pwd');
+  if (!pwd) return;
+
+  // Atualiza local imediatamente
+  if (!kvPresenca['__calls__']) kvPresenca['__calls__'] = {};
+  if (!kvPresenca['__calls__'][normName]) kvPresenca['__calls__'][normName] = { leonardo: 0, bruno: 0 };
+  const cur = kvPresenca['__calls__'][normName][espKey] || 0;
+  const esp = ESPECIALISTAS.find(e => e.key === espKey);
+  kvPresenca['__calls__'][normName][espKey] = Math.max(0, Math.min(esp.total, cur + delta));
+
+  // Re-renderiza a seção
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  if (aluno) renderCallsSection(aluno.name);
+
+  // Salva no KV via Worker (reutiliza endpoint /presenca com tab='__calls__')
+  try {
+    await fetch(`${WORKER_BASE}/presenca`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd },
+      body: JSON.stringify({
+        tab: '__calls__',
+        semana: 1,
+        registros: { [normName]: kvPresenca['__calls__'][normName] }
+      })
+    });
+  } catch(e) { console.error('Erro ao salvar call:', e); }
+}
 
 // ═══════════════════════════════════════════
 // MESSAGES
