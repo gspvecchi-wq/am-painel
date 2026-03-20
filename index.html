@@ -449,14 +449,6 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
     </div>
     <div class="week-compare" id="espGrid" style="margin-bottom:24px;"></div>
 
-    <div class="sec-head"><div class="sec-title">Engajamento por Aula</div></div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>Aula</th><th>S1</th><th>S2</th><th>S3</th><th>S4</th><th>Tendência</th></tr></thead>
-        <tbody id="gestTabTbody"></tbody>
-      </table>
-    </div>
-
     <!-- WHATSAPP RESUMO -->
     <div class="sec-head" style="margin-top:32px;">
       <div class="sec-title">📲 Resumo WhatsApp</div>
@@ -1205,7 +1197,7 @@ function renderGest() {
   document.getElementById('gAbsent').textContent = absentCount;
 
   // ── WEEK COMPARISON CARDS ──────────────────
-  const compareTabs = ['Mentoria','Master',...ESPECIALIDADES.filter(e=>
+  const compareTabs = ['Mentoria','Hotseat','Master',...ESPECIALIDADES.filter(e=>
     allAlunos.some(a=>hasEsp(a, e))
   )];
   const wcEl = document.getElementById('weekCompare');
