@@ -371,6 +371,10 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
       <button class="pill" onclick="setPill('camera',this)">📷 Sem câmera</button>
       <button class="pill" onclick="setPill('feedback',this)">💬 Sem feedback</button>
       <button class="pill" onclick="setPill('vitoria',this)">🏆 Sem vitória</button>
+      <button class="pill" onclick="setPill('urgente',this)">🔴 Urgentes</button>
+      <button class="pill" onclick="setPill('queda',this)">🟡 Queda</button>
+      <button class="pill" onclick="setPill('renovacao',this)">🔥 Renovação</button>
+      <button class="pill" onclick="setPill('master',this)">⭐ Master</button>
     </div>
     <div class="tbl-wrap">
       <table>
@@ -1114,7 +1118,14 @@ function setPill(f,el) {
 
 function renderCsTable() {
   const all  = _csDoctors.filter(d=>d.motivos.length>0||d.consAbs>=4);
-  const list = csFilter==='todos' ? all : all.filter(d=>d.motivos.includes(csFilter));
+
+  let list;
+  if      (csFilter === 'todos')    list = all;
+  else if (csFilter === 'urgente')  list = all.filter(d => calcAlertLevel(d, currentWeek)?.icon === '🔴');
+  else if (csFilter === 'queda')    list = all.filter(d => isQuedaAcelerada(d, currentWeek));
+  else if (csFilter === 'renovacao') list = all.filter(d => { const r=calcRenewalScore(d,currentWeek); return r && r.daysLeft>=0 && r.daysLeft<=60; });
+  else if (csFilter === 'master')   list = all.filter(d => calcAscensaoScore(d, currentWeek) > 0);
+  else                              list = all.filter(d => d.motivos.includes(csFilter));
   const tbody = document.getElementById('csTbody');
   if (!list.length) {
     tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--sub)">Nenhum médico para acionar neste filtro 🎉</td></tr>`;
