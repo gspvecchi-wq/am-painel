@@ -915,7 +915,11 @@ function calcCompositeScore(aluno, upToWeek) {
   const cScore = cSlots  ? cHit/cSlots   : 0;
   const vScore = vSlots  ? vHit/vSlots   : 0;
   const fScore = fSlots  ? fHit/fSlots   : 1; // no esp = full score for F
-  return Math.round((pScore*40 + cScore*25 + vScore*25 + fScore*10));
+  // Calls bonus: +5 per call with specialist, max +10 (2 calls)
+  const callsData = (kvPresenca['__calls__']||{})[norm(aluno.name)] || { leonardo: 0, bruno: 0 };
+  const totalCalls = (callsData.leonardo||0) + (callsData.bruno||0);
+  const callsBonus = Math.min(totalCalls, 2) * 5;
+  return Math.round((pScore*40 + cScore*25 + vScore*25 + fScore*10) + callsBonus);
 }
 
 // Risk = inverse of composite score, weighted by consecutive absences
