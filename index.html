@@ -1371,24 +1371,6 @@ function renderGest() {
     </div>`;
   }).join('');
 
-  // ── ENGAGEMENT TABLE ──────────────────────
-  document.getElementById('gestTabTbody').innerHTML=AULAS_GERAIS.map(tab=>{
-    const docs=buildDoctors(tab, allWeeks?maxWeek:gestWeekVal), n=docs.length;
-    if (!n) return `<tr><td>${tab}</td><td colspan="5" style="color:var(--sub)">—</td></tr>`;
-    const wCols=[0,1,2,3].map(w=>{
-      const weekLimit = allWeeks?maxWeek:gestWeekVal;
-      if (w>=weekLimit) return '<td style="color:var(--sub)">—</td>';
-      const isSelected = !allWeeks && w===gestWeekVal-1;
-      const pct=Math.round(docs.filter(d=>d.history[w].P).length/n*100);
-      const color=pct>=70?'var(--safe)':pct>=40?'var(--warn)':'var(--danger)';
-      const bg = isSelected ? 'background:rgba(255,214,0,.08);' : '';
-      return `<td style="color:${color};font-weight:700;${bg}">${pct}%</td>`;
-    }).join('');
-    const vals=[0,1,2,3].filter(w=>w<(allWeeks?maxWeek:gestWeekVal)).map(w=>docs.filter(d=>d.history[w].P).length/n*100);
-    let tend='—';
-    if (vals.length>=2) { const d=vals[vals.length-1]-vals[0]; tend=d>5?'📈 Subindo':d<-5?'📉 Caindo':'➡ Estável'; }
-    return `<tr><td style="font-weight:600">${tab}</td>${wCols}<td style="font-size:11px">${tend}</td></tr>`;
-  }).join('');
 }
 
 // Detect how many weeks have any data in the sheet
