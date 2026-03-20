@@ -456,6 +456,18 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
         <tbody id="gestTabTbody"></tbody>
       </table>
     </div>
+
+    <!-- WHATSAPP RESUMO -->
+    <div class="sec-head" style="margin-top:32px;">
+      <div class="sec-title">📲 Resumo WhatsApp</div>
+      <div class="sec-sub">Envia os alertas do dia para CEO e Suporte via Z-API</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:32px;">
+      <button id="btnWpp" onclick="enviarResumoWpp()" style="background:var(--acc);color:#000;border:none;padding:10px 24px;border-radius:9px;font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">
+        📤 Enviar resumo agora
+      </button>
+      <div id="wppMsg" style="display:none;font-size:12px;font-weight:600;padding:8px 14px;border-radius:8px;"></div>
+    </div>
   </div>
   <div id="gestEmpty" class="center-msg">
     <div class="icon">📊</div><h3>Nenhum dado carregado</h3><p>Configure o painel para ver a visão de gestão.</p>
@@ -516,6 +528,9 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
         <option value="4">Semana 4</option>
         <option value="5">Semana 5</option>
       </select>
+      <input type="date" id="chamadaData"
+        style="background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:12px;outline:none;cursor:pointer;"
+        title="Data da aula"/>
       <button onclick="salvarChamada()" style="background:var(--acc);color:#000;border:none;padding:8px 20px;border-radius:9px;font-family:'Outfit',sans-serif;font-weight:700;font-size:12px;cursor:pointer;margin-left:auto;">💾 Salvar chamada</button>
     </div>
 
@@ -726,6 +741,45 @@ function ovClick(e,id){ if(e.target===document.getElementById(id)) closeOv(id); 
 // ═══════════════════════════════════════════
 // RELOAD — chama o Worker
 // ═══════════════════════════════════════════
+async function enviarResumoWpp() {
+  const pwd = localStorage.getItem('am_cs_pwd') || '';
+  if (!pwd) {
+    alert('Faça login na aba Chamada primeiro para usar esta função.');
+    return;
+  }
+  const btn = document.getElementById('btnWpp');
+  const msg = document.getElementById('wppMsg');
+  btn.disabled = true;
+  btn.textContent = '⏳ Enviando...';
+  msg.style.display = 'none';
+  try {
+    const res = await fetch(`${WORKER_BASE}/whatsapp/resumo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd }
+    });
+    if (res.ok) {
+      msg.style.display = 'block';
+      msg.style.background = 'rgba(0,232,122,.1)';
+      msg.style.color = 'var(--safe)';
+      msg.style.border = '1px solid rgba(0,232,122,.3)';
+      msg.textContent = '✓ Resumo enviado com sucesso!';
+    } else {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Erro desconhecido');
+    }
+  } catch(e) {
+    msg.style.display = 'block';
+    msg.style.background = 'rgba(255,51,85,.1)';
+    msg.style.color = 'var(--danger)';
+    msg.style.border = '1px solid rgba(255,51,85,.3)';
+    msg.textContent = `✗ ${e.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📤 Enviar resumo agora';
+    setTimeout(() => msg.style.display = 'none', 5000);
+  }
+}
+
 async function reloadAll() {
   setStatus(false,'Carregando dados...');
   loaded = false;
@@ -1744,6 +1798,10 @@ async function loadChamada() {
   const existing = res.ok ? await res.json() : {};
   chamadaRegistros = {};
 
+  // Restore saved date into picker
+  const savedDate = existing.__date__ || '';
+  document.getElementById('chamadaData').value = savedDate;
+
   // Build pool
   const pool = getChamadaPool(tab);
 
@@ -1825,13 +1883,14 @@ function updateChamadaStats(pool) {
 async function salvarChamada() {
   const tab    = document.getElementById('chamadaTab').value;
   const semana = document.getElementById('chamadaSemana').value;
+  const date   = document.getElementById('chamadaData').value || null;
   const pwd    = localStorage.getItem('am_cs_pwd')||'';
   const msg    = document.getElementById('chamadaSaveMsg');
 
   const res = await fetch(WORKER_BASE+'/presenca', {
     method: 'POST',
     headers: {'Content-Type':'application/json','X-CS-Password': pwd},
-    body: JSON.stringify({tab, semana, registros: chamadaRegistros})
+    body: JSON.stringify({tab, semana, date, registros: chamadaRegistros})
   });
 
   msg.style.display='block';
