@@ -813,8 +813,9 @@ async function reloadAll() {
     updateBadge();
     csLoad();
     const av = document.querySelector('.view.active').id;
-    if (av==='view-gest')  renderGest();
-    if (av==='view-aluno') renderAlunoView();
+    if (av==='view-gest')    renderGest();
+    if (av==='view-aluno')   renderAlunoView();
+    if (av==='view-chamada') initChamada();
   } catch(e) {
     setStatus(false,'Erro ao carregar: '+e.message);
     console.error(e);
