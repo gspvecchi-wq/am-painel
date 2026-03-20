@@ -758,11 +758,23 @@ async function enviarResumoWpp() {
       headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd }
     });
     if (res.ok) {
+      const data = await res.json();
       msg.style.display = 'block';
       msg.style.background = 'rgba(0,232,122,.1)';
       msg.style.color = 'var(--safe)';
       msg.style.border = '1px solid rgba(0,232,122,.3)';
-      msg.textContent = '✓ Resumo enviado com sucesso!';
+      if (data.info) {
+        msg.textContent = `ℹ️ ${data.info}`;
+      } else if (data.ok) {
+        msg.textContent = `✓ ${data.categorias} categoria(s) enviada(s) para ${data.destinatarios} destinatário(s)`;
+      } else {
+        // Parcialmente ok — mostra o erro da Z-API
+        const erro = data.resultados?.find(r => !r.ok);
+        msg.style.background = 'rgba(255,149,0,.1)';
+        msg.style.color = 'var(--warn)';
+        msg.style.border = '1px solid rgba(255,149,0,.3)';
+        msg.textContent = `⚠️ Z-API retornou: ${erro?.zapi || 'erro desconhecido'}`;
+      }
     } else {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Erro desconhecido');
