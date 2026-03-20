@@ -799,11 +799,7 @@ async function reloadAll() {
     if (data.error) throw new Error(data.error);
 
     // Worker já retorna allAlunos sem gender — inferimos no cliente
-    allAlunos = data.allAlunos.map(a=>({
-      ...a,
-      gender: inferGender(a.name),
-      especialidades: a.especialidade ? [a.especialidade] : (a.especialidades || [])
-    }));
+    allAlunos = data.allAlunos.map(a=>({...a, gender: inferGender(a.name), especialidades: a.especialidades || []}));
 
     // Load all KV presenca data for profile use
     try {
