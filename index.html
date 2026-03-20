@@ -765,6 +765,7 @@ async function enviarResumoWpp() {
       msg.style.border = '1px solid rgba(0,232,122,.3)';
       if (data.info) {
         msg.textContent = `ℹ️ ${data.info}`;
+        if (data.debug) console.log('WhatsApp debug:', data.debug);
       } else if (data.ok) {
         msg.textContent = `✓ ${data.categorias} categoria(s) enviada(s) para ${data.destinatarios} destinatário(s)`;
       } else {
