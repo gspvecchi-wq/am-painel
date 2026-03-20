@@ -1460,7 +1460,7 @@ function renderProfiles() {
   const grid=document.getElementById('profileGrid');
   if (!list.length) { grid.innerHTML=`<div style="color:var(--sub);font-size:12px">Nenhum resultado.</div>`; return; }
   grid.innerHTML=list.slice(0,80).map(a=>{
-    const eng=calcEngagement(a, detectMaxWeek());
+    const eng=calcCompositeScore(a, detectMaxWeek());
     const color=eng<40?'var(--danger)':eng<70?'var(--warn)':'var(--safe)';
     const dn=displayName(a.name);
     return `<div class="profile-card" onclick="openDrModal('${esc(a.name)}', false)">
