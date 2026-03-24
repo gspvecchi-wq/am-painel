@@ -447,6 +447,12 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
     </div>
     <div class="risk-grid" id="gestAscensao"></div>
 
+    <div class="sec-head" style="margin-top:32px;">
+      <div class="sec-title">🎂 Aniversariantes de hoje</div>
+      <div class="sec-sub">Alunos que fazem aniversário hoje</div>
+    </div>
+    <div class="risk-grid" id="gestAniversariantes"></div>
+
     <div class="sec-head">
       <div class="sec-title">Saúde das Especialidades</div>
       <div class="sec-sub">Média de presença por grupo</div>
@@ -1366,6 +1372,28 @@ function renderGest() {
         </div>`;
       }).join('')
     : '<div style="color:var(--sub);font-size:12px;padding:12px">Nenhum candidato identificado ainda</div>';
+
+  // ── ANIVERSARIANTES ──────────────────────
+  const hoje = new Date();
+  const diaHoje = String(hoje.getDate()).padStart(2,'0');
+  const mesHoje = String(hoje.getMonth()+1).padStart(2,'0');
+  const aniversariantes = allAlunos.filter(a => {
+    if (!a.birthday) return false;
+    const m = a.birthday.match(/(\d{1,2})[\/-](\d{1,2})/);
+    if (!m) return false;
+    return m[1].padStart(2,'0') === diaHoje && m[2].padStart(2,'0') === mesHoje;
+  });
+  document.getElementById('gestAniversariantes').innerHTML = aniversariantes.length
+    ? aniversariantes.map(a => {
+        const dn = displayName(a.name);
+        return `<div class="risk-card" onclick="openDrModal('${esc(a.name)}', false)" style="border-color:rgba(255,200,0,.3)">
+          <div style="font-size:20px;margin-bottom:4px">🎂</div>
+          <div class="rc-name">${tit(a.gender)}. ${esc(dn)}</div>
+          <div class="rc-sub">${a.turma}${espLabel(a)?' · '+espLabel(a):''}</div>
+          <div style="margin-top:8px;font-size:11px;color:var(--warn);font-weight:700">Parabéns! 🎉</div>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--sub);font-size:12px;padding:12px">Nenhum aniversariante hoje</div>';
 
   // ── ESPECIALIDADES AGGREGATE ──────────────
   const espComActive = ESPECIALIDADES.filter(e=>allAlunos.some(a=>hasEsp(a, e)));
