@@ -1234,25 +1234,35 @@ function popularCicloSelector() {
 function getSemanasByPeriod(de, ate) {
   if (!kvPresenca.__dates__) return null;
   const deTs  = new Date(de).getTime();
-  const ateTs = new Date(ate).getTime() + 86400000; // inclusivo
-  const semanas = new Set();
+  const ateTs = new Date(ate).getTime() + 86400000;
+  // Coleta ciclos e semanas dentro do período
+  // Estrutura: __dates__[tab][ciclo][sN] = dateStr
+  const resultado = []; // [{ciclo, semana}]
   for (const tab of Object.keys(kvPresenca.__dates__ || {})) {
-    for (const [sKey, dateStr] of Object.entries(kvPresenca.__dates__[tab] || {})) {
-      const ts = new Date(dateStr).getTime();
-      if (ts >= deTs && ts <= ateTs) {
-        semanas.add(parseInt(sKey.replace('s','')));
+    for (const [ciclo, semanas] of Object.entries(kvPresenca.__dates__[tab] || {})) {
+      for (const [sKey, dateStr] of Object.entries(semanas || {})) {
+        const ts = new Date(dateStr).getTime();
+        if (ts >= deTs && ts <= ateTs) {
+          const s = parseInt(sKey.replace('s',''));
+          if (!resultado.find(r => r.ciclo === ciclo && r.semana === s)) {
+            resultado.push({ ciclo, semana: s });
+          }
+        }
       }
     }
   }
-  return semanas.size > 0 ? [...semanas].sort((a,b)=>a-b) : [];
+  return resultado;
 }
 
 function renderGestByPeriod() {
   const de  = document.getElementById('gestDateDe').value;
   const ate = document.getElementById('gestDateAte').value;
   if (!de || !ate) return;
-  // Limpa seletor de semana para não conflitar
   document.getElementById('gestWeek').value = '0';
+  // Ciclo ativo = mês da data inicial do filtro
+  cicloAtivo = de.slice(0, 7);
+  const sel = document.getElementById('gestCiclo');
+  if (sel) sel.value = cicloAtivo;
   renderGest(de, ate);
 }
 
