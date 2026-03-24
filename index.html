@@ -536,16 +536,10 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
           <option value="Retomada">Retomada</option>
         </optgroup>
       </select>
-      <select id="chamadaSemana" onchange="loadChamada()">
-        <option value="1">Semana 1</option>
-        <option value="2">Semana 2</option>
-        <option value="3">Semana 3</option>
-        <option value="4">Semana 4</option>
-        <option value="5">Semana 5</option>
-      </select>
-      <input type="date" id="chamadaData"
+      <input type="date" id="chamadaData" onchange="loadChamada();atualizarSemanaBadge()"
         style="background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:12px;outline:none;cursor:pointer;"
         title="Data da aula"/>
+      <span id="semanaBadge" style="font-size:11px;font-weight:700;color:var(--acc);background:rgba(0,232,122,.1);border:1px solid rgba(0,232,122,.2);padding:4px 10px;border-radius:20px;white-space:nowrap;"></span>
       <button onclick="salvarChamada()" style="background:var(--acc);color:#000;border:none;padding:8px 20px;border-radius:9px;font-family:'Outfit',sans-serif;font-weight:700;font-size:12px;cursor:pointer;margin-left:auto;">💾 Salvar chamada</button>
     </div>
 
@@ -963,10 +957,11 @@ function calcRisk(history, upTo) {
   return Math.min(Math.round(score), 100);
 }
 
-// Detect if aluno is "new" — entry within 60 days
+// Detect if aluno is "new" — cycleStart within 60 days
 function isNovo(aluno) {
-  if (!aluno.entryDate) return false;
-  const d = new Date(aluno.entryDate);
+  const ref = aluno.cycleStart || aluno.entryDate;
+  if (!ref) return false;
+  const d = new Date(ref);
   if (isNaN(d)) return false;
   return (Date.now() - d.getTime()) < 60*24*60*60*1000;
 }
@@ -1873,16 +1868,46 @@ function initChamada() {
   if (csAuthenticated) {
     document.getElementById('chamadaLogin').style.display='none';
     document.getElementById('chamadaForm').style.display='block';
+    // Set default date to today
+    const dataEl = document.getElementById('chamadaData');
+    if (!dataEl.value) dataEl.value = new Date().toISOString().slice(0,10);
+    atualizarSemanaBadge();
     loadChamada();
   }
 }
 
+// Calcula semana do mês com base no dia: 1-7=s1, 8-14=s2, 15-21=s3, 22-28=s4, 29+=s5
+function dateToSemana(dateStr) {
+  if (!dateStr) return 1;
+  const day = new Date(dateStr + 'T12:00:00').getDate();
+  if (day <= 7)  return 1;
+  if (day <= 14) return 2;
+  if (day <= 21) return 3;
+  if (day <= 28) return 4;
+  return 5;
+}
+
+function semanaLabel(dateStr) {
+  const s = dateToSemana(dateStr);
+  const day = dateStr ? new Date(dateStr + 'T12:00:00').getDate() : null;
+  return `Semana ${s}${day ? ' (dia ' + day + ')' : ''}`;
+}
+
+function atualizarSemanaBadge() {
+  const date = document.getElementById('chamadaData')?.value;
+  const badge = document.getElementById('semanaBadge');
+  if (!badge) return;
+  if (!date) { badge.textContent = ''; return; }
+  badge.textContent = `S${dateToSemana(date)}`;
+}
+
 async function loadChamada() {
   if (!csAuthenticated||!loaded) return;
-  const tab    = document.getElementById('chamadaTab').value;
-  const semana = document.getElementById('chamadaSemana').value;
+  const tab  = document.getElementById('chamadaTab').value;
+  const date = document.getElementById('chamadaData').value || new Date().toISOString().slice(0,10);
+  const semana = dateToSemana(date);
 
-  // Limpa busca ao trocar aula/semana
+  // Limpa busca ao trocar aula/data
   const busca = document.getElementById('chamadaBusca');
   if (busca) busca.value = '';
 
@@ -1891,10 +1916,11 @@ async function loadChamada() {
   const existing = res.ok ? await res.json() : {};
   chamadaRegistros = {};
 
-  // Restore saved date into picker — default to today if none saved
+  // Set date default to today if not set
   const todayStr = new Date().toISOString().slice(0,10);
-  const savedDate = existing.__date__ || todayStr;
-  document.getElementById('chamadaData').value = savedDate;
+  if (!document.getElementById('chamadaData').value) {
+    document.getElementById('chamadaData').value = existing.__date__ || todayStr;
+  }
 
   // Build pool
   const pool = getChamadaPool(tab);
@@ -1976,10 +2002,15 @@ function updateChamadaStats(pool) {
 
 async function salvarChamada() {
   const tab    = document.getElementById('chamadaTab').value;
-  const semana = document.getElementById('chamadaSemana').value;
-  const date   = document.getElementById('chamadaData').value || null;
+  const date   = document.getElementById('chamadaData').value || new Date().toISOString().slice(0,10);
+  const semana = dateToSemana(date);
   const pwd    = localStorage.getItem('am_cs_pwd')||'';
   const msg    = document.getElementById('chamadaSaveMsg');
+
+  // Confirmação antes de salvar
+  const dataFmt = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR');
+  const ok = confirm(`Confirmar salvamento:\n\nAula: ${tab}\nData: ${dataFmt}\nSemana: ${semana}\n\nEstá correto?`);
+  if (!ok) return;
 
   const res = await fetch(WORKER_BASE+'/presenca', {
     method: 'POST',
@@ -1993,7 +2024,7 @@ async function salvarChamada() {
     msg.style.background='rgba(0,232,122,.1)';
     msg.style.color='var(--safe)';
     msg.style.border='1px solid rgba(0,232,122,.3)';
-    msg.textContent=`✓ Chamada salva! ${data.total} alunos registrados para ${tab} · Semana ${semana}`;
+    msg.textContent=`✓ Chamada salva! ${data.total} alunos registrados para ${tab} · Semana ${semana} · ${dataFmt}`;
     // Reload main data
     reloadAll();
   } else {
