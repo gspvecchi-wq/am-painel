@@ -392,6 +392,9 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
 <div class="view" id="view-gest">
   <div id="gestContent" style="display:none">
     <div class="controls" style="margin-bottom:20px;">
+      <select id="gestCiclo" onchange="cicloAtivo=this.value;renderGest()" style="background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:12px;outline:none;">
+        <option value="">Mês atual</option>
+      </select>
       <select id="gestWeek" onchange="renderGest()">
         <option value="0">Todas as semanas</option>
         <option value="1">Semana 1</option>
@@ -697,7 +700,24 @@ function displayName(rawName) { return cleanSuffix(rawName); }
 // STATE
 // ═══════════════════════════════════════════
 let allAlunos   = [];
-let kvPresenca  = {}; // { tab: { normName: {P,C,F,V,name, history:[...]} } }
+let kvPresenca  = {}; // { tab: { ciclo: { normName: { history:[...] } } } }
+let cicloAtivo = ''; // AAAA-MM do ciclo sendo visualizado
+
+// Retorna o ciclo ativo (padrão: mês atual)
+function getCicloAtivo() {
+  if (cicloAtivo) return cicloAtivo;
+  return new Date().toISOString().slice(0, 7);
+}
+
+// Acesso unificado ao kvPresenca com ciclo
+function getKvTab(tab, ciclo) {
+  const c = ciclo || getCicloAtivo();
+  return (kvPresenca[tab] || {})[c] || {};
+}
+
+function getKvEntry(tab, normName, ciclo) {
+  return getKvTab(tab, ciclo)[normName] || null;
+}
 let csFilter    = 'todos';
 let currentTab  = 'Mentoria';
 let currentWeek = 1;
@@ -825,6 +845,7 @@ async function reloadAll() {
     try {
       const kvRes = await fetch(WORKER_URL.replace('/dados','/presenca/all'));
       kvPresenca = kvRes.ok ? await kvRes.json() : {};
+      popularCicloSelector();
     } catch(e) { kvPresenca = {}; }
 
     loaded = true;
@@ -852,7 +873,7 @@ function getPool(tab) {
 }
 
 function buildDoctors(tab, week) {
-  const sheetTab = kvPresenca[tab]||{};
+  const sheetTab = getKvTab(tab);
   const pool = getPool(tab);
   const w = week-1;
   return pool.map(aluno=>{
@@ -898,7 +919,7 @@ function calcEvolutionByTurma(turma, upToWeek) {
         }
       }
       for (const tab of tabs) {
-        const entry = (kvPresenca[tab]||{})[norm(aluno.name)];
+        const entry = getKvEntry(tab, norm(aluno.name));
         totalSlots++;
         if (entry&&entry.history[w]&&entry.history[w].P) attended++;
       }
@@ -922,7 +943,7 @@ function calcCompositeScore(aluno, upToWeek) {
 
   let pSlots=0,pHit=0, cSlots=0,cHit=0, vSlots=0,vHit=0, fSlots=0,fHit=0;
   for (const tab of tabs) {
-    const entry = (kvPresenca[tab]||{})[norm(aluno.name)];
+    const entry = getKvEntry(tab, norm(aluno.name));
     const isEspTab = ESPECIALIDADES.includes(tab);
     for (let w=0; w<upToWeek; w++) {
       const h = entry&&entry.history[w] ? entry.history[w] : {P:false,C:false,F:false,V:false};
@@ -1000,7 +1021,7 @@ function calcRenewalScore(aluno, upToWeek) {
 function calcAlertLevel(aluno, upToWeek) {
   if (!upToWeek || upToWeek < 1) return null;
   // Pega histórico da aba principal (Mentoria)
-  const kvTab = kvPresenca['Mentoria'] || {};
+  const kvTab = getKvTab('Mentoria');
   const entry = kvTab[norm(aluno.name)];
   const history = Array.from({length: upToWeek}, (_,i) =>
     entry?.history?.[i] || {P:false,C:false,F:false,V:false}
@@ -1030,7 +1051,7 @@ function calcAscensaoScore(aluno, upToWeek) {
   if (aluno.turma !== 'Mentoria') return null;
   if (!upToWeek || upToWeek < 2) return null;
 
-  const kvTab = kvPresenca['Mentoria'] || {};
+  const kvTab = getKvTab('Mentoria');
   const entry = kvTab[norm(aluno.name)];
   const history = Array.from({length: upToWeek}, (_, i) =>
     entry?.history?.[i] || {P:false,C:false,F:false,V:false}
@@ -1072,7 +1093,7 @@ function calcCompositeScoreWeek(aluno, weekIdx) {
   }
   let pHit=0,cHit=0,vHit=0,fHit=0,fSlots=0,total=0;
   for (const tab of tabs) {
-    const entry = (kvPresenca[tab]||{})[norm(aluno.name)];
+    const entry = getKvEntry(tab, norm(aluno.name));
     const h = entry&&entry.history[weekIdx] ? entry.history[weekIdx] : {P:false,C:false,F:false,V:false};
     const isEspTab = ESPECIALIDADES.includes(tab);
     total++;
@@ -1093,7 +1114,7 @@ function calcEngagement(aluno, week) {
   }
   let total=0, attended=0;
   for (const tab of tabs) {
-    const entry = (kvPresenca[tab]||{})[norm(aluno.name)];
+    const entry = getKvEntry(tab, norm(aluno.name));
     for (let w=0; w<week; w++) {
       total++;
       if (entry&&entry.history[w]&&entry.history[w].P) attended++;
@@ -1183,6 +1204,28 @@ function renderCsTable() {
 function bCls(m){return{ausente:'b-aus',camera:'b-cam',feedback:'b-fb',vitoria:'b-vit'}[m]||'';}
 function bLbl(m){return{ausente:'❌ Ausente',camera:'📷 Câmera',feedback:'💬 Feedback',vitoria:'🏆 Vitória'}[m]||m;}
 
+function popularCicloSelector() {
+  const sel = document.getElementById('gestCiclo');
+  if (!sel) return;
+  // Coleta todos os ciclos disponíveis no KV
+  const ciclos = new Set();
+  for (const tab of Object.keys(kvPresenca)) {
+    if (tab === '__calls__' || tab === '__dates__') continue;
+    for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
+      if (/^\d{4}-\d{2}$/.test(ciclo) || ciclo === 'legacy') ciclos.add(ciclo);
+    }
+  }
+  const sorted = [...ciclos].filter(c => c !== 'legacy').sort().reverse();
+  const mesAtual = new Date().toISOString().slice(0, 7);
+  sel.innerHTML = '<option value="">Mês atual</option>';
+  for (const c of sorted) {
+    const [ano, mes] = c.split('-');
+    const label = new Date(c + '-15').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    sel.innerHTML += `<option value="${c}" ${c === mesAtual ? 'selected' : ''}>${label}</option>`;
+  }
+  cicloAtivo = sel.value || mesAtual;
+}
+
 // ═══════════════════════════════════════════
 // GESTÃO VIEW
 // ═══════════════════════════════════════════
@@ -1255,7 +1298,7 @@ function renderGest(periodoDe, periodoAte) {
     absentCount = allAlunos.filter(a=>{
       let absCount=0;
       for(let w=0;w<maxWeek;w++){
-        const entry=(kvPresenca['Mentoria']||{})[norm(a.name)];
+        const entry=getKvEntry('Mentoria', norm(a.name));
         if(!entry||!entry.history[w]||!entry.history[w].P) absCount++;
       }
       return absCount > maxWeek/2;
@@ -1463,7 +1506,7 @@ function renderGest(periodoDe, periodoAte) {
 function detectMaxWeek() {
   let max = 1;
   for (const tab of AULAS_GERAIS) {
-    const s = kvPresenca[tab]||{};
+    const s = getKvTab(tab);
     for (const entry of Object.values(s)) {
       for (let w=4; w>=0; w--) {
         if (entry.history[w]&&entry.history[w].P) { if(w+1>max) max=w+1; break; }
@@ -1484,7 +1527,7 @@ function calcEngagementWeek(aluno, weekIdx) {
   }
   let total=0, attended=0;
   for (const tab of tabs) {
-    const entry = (kvPresenca[tab]||{})[norm(aluno.name)];
+    const entry = getKvEntry(tab, norm(aluno.name));
     total++;
     if (entry&&entry.history[weekIdx]&&entry.history[weekIdx].P) attended++;
   }
@@ -1561,7 +1604,7 @@ function openDrModal(name, showMsgs=true) {
 
   // ── KV lookup helper ─────────────────────
   function kvEntry(tab) {
-    return (kvPresenca[tab]||{})[norm(name)] || null;
+    return getKvEntry(tab, norm(name));
   }
 
   // ── Número de semanas com pelo menos 1 dado ──
