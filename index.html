@@ -1911,8 +1911,9 @@ async function loadChamada() {
   const busca = document.getElementById('chamadaBusca');
   if (busca) busca.value = '';
 
-  // Load existing KV data for this tab/semana
-  const res = await fetch(`${WORKER_BASE}/presenca?tab=${encodeURIComponent(tab)}&semana=${semana}`);
+  // Load existing KV data for this tab/semana/ciclo
+  const ciclo = date.slice(0, 7); // AAAA-MM
+  const res = await fetch(`${WORKER_BASE}/presenca?tab=${encodeURIComponent(tab)}&semana=${semana}&ciclo=${ciclo}`);
   const existing = res.ok ? await res.json() : {};
   chamadaRegistros = {};
 
