@@ -335,6 +335,7 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
       <optgroup label="Aulas Gerais">
         <option value="Mentoria">Mentoria</option>
         <option value="Hotseat">Hotseat</option>
+        <option value="Hotseat Simultâneo">Hotseat Simultâneo</option>
         <option value="Master">Master (exclusivo)</option>
       </optgroup>
       <optgroup label="Especialidades">
@@ -526,6 +527,7 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
         <optgroup label="Aulas Gerais">
           <option value="Mentoria">Mentoria</option>
           <option value="Hotseat">Hotseat</option>
+          <option value="Hotseat Simultâneo">Hotseat Simultâneo</option>
           <option value="Master">Master</option>
         </optgroup>
         <optgroup label="Especialidades">
@@ -610,7 +612,7 @@ const BOARDS = {
   Mentoria: { id:'18391780128', tagCol:'tag_mm1cs0hm' }
 };
 const ESPECIALIDADES = ['Dermato','Oftalmo','Ortoped','Psiquiatras','Gestores','Emagrecimento1','Emagrecimento2','Retomada'];
-const AULAS_GERAIS   = ['Mentoria','Hotseat','Master'];
+const AULAS_GERAIS   = ['Mentoria','Hotseat','Hotseat Simultâneo','Master'];
 const ALL_TABS       = [...AULAS_GERAIS, ...ESPECIALIDADES];
 
 // ═══════════════════════════════════════════
@@ -909,7 +911,7 @@ function calcEvolutionByTurma(turma, upToWeek) {
     for (const aluno of pool) {
       // Tabs this turma attends
       const tabs = turma==='Master'
-        ? ['Mentoria','Hotseat','Master']
+        ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master']
         : ['Mentoria','Hotseat'];
       // Add their specialty if any
       if (aluno.especialidades && aluno.especialidades.length) {
@@ -933,7 +935,7 @@ function calcEvolutionByTurma(turma, upToWeek) {
 // ── COMPOSITE QUALITY SCORE ──────────────────
 // P(40%) + C(25%) + V(25%) + F(10%) across all relevant tabs
 function calcCompositeScore(aluno, upToWeek) {
-  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Master'] : ['Mentoria','Hotseat'];
+  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -1084,7 +1086,7 @@ function calcAscensaoScore(aluno, upToWeek) {
 }
 
 function calcCompositeScoreWeek(aluno, weekIdx) {
-  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Master'] : ['Mentoria','Hotseat'];
+  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -1105,7 +1107,7 @@ function calcCompositeScoreWeek(aluno, weekIdx) {
 }
 
 function calcEngagement(aluno, week) {
-  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Master'] : ['Mentoria','Hotseat'];
+  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -1329,7 +1331,7 @@ function renderGest(periodoDe, periodoAte) {
   document.getElementById('gAbsent').textContent = absentCount;
 
   // ── WEEK COMPARISON CARDS ──────────────────
-  const compareTabs = ['Mentoria','Hotseat','Master',...ESPECIALIDADES.filter(e=>
+  const compareTabs = ['Mentoria','Hotseat','Hotseat Simultâneo','Master',...ESPECIALIDADES.filter(e=>
     allAlunos.some(a=>hasEsp(a, e))
   )];
   const wcEl = document.getElementById('weekCompare');
@@ -1528,7 +1530,7 @@ function detectMaxWeek() {
 
 // Engagement for a single week index (0-based)
 function calcEngagementWeek(aluno, weekIdx) {
-  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Master'] : ['Mentoria','Hotseat'];
+  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -1603,7 +1605,7 @@ function openDrModal(name, showMsgs=true) {
 
   // ── Abas que este aluno frequenta ────────
   const alunoTabs = aluno.turma==='Master'
-    ? ['Mentoria','Hotseat','Master']
+    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master']
     : ['Mentoria','Hotseat'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
@@ -1996,18 +1998,21 @@ function getChamadaPool(tab) {
 }
 
 function renderChamadaTable(pool) {
-  const isEsp = ESPECIALIDADES.includes(document.getElementById('chamadaTab').value);
+  const tab = document.getElementById('chamadaTab').value;
+  const isEsp = ESPECIALIDADES.includes(tab);
+  const isSoP = tab === 'Hotseat Simultâneo'; // só P visível
   const tbody = document.getElementById('chamadaTbody');
   tbody.innerHTML = pool.map(aluno=>{
     const key = norm(aluno.name);
     const r = chamadaRegistros[key]||{P:false,C:false,F:false,V:false};
     const dn = displayName(aluno.name);
+    const dash = '<td style="color:var(--sub);text-align:center;font-size:10px">—</td>';
     return `<tr class="chamada-row${r.P?' presente':''}" id="crow-${escId(key)}">
       <td><div class="dr-name">${tit(aluno.gender)}. ${esc(dn)}</div>${espLabel(aluno)?`<div class="dr-sub">${espLabel(aluno)}</div>`:''}</td>
       <td><button class="pcfv-btn${r.P?' on-P':''}" data-field="P" onclick="togglePCFV('${escId(key)}','P')" title="Presente">P</button></td>
-      <td><button class="pcfv-btn${r.C?' on-C':''}" data-field="C" onclick="togglePCFV('${escId(key)}','C')" title="Câmera">C</button></td>
-      ${isEsp?`<td><button class="pcfv-btn${r.F?' on-F':''}" data-field="F" onclick="togglePCFV('${escId(key)}','F')" title="Feedback">F</button></td>`:'<td style="color:var(--sub);text-align:center;font-size:10px">—</td>'}
-      <td><button class="pcfv-btn${r.V?' on-V':''}" data-field="V" onclick="togglePCFV('${escId(key)}','V')" title="Vitória">V</button></td>
+      ${isSoP ? dash : `<td><button class="pcfv-btn${r.C?' on-C':''}" data-field="C" onclick="togglePCFV('${escId(key)}','C')" title="Câmera">C</button></td>`}
+      ${isSoP ? dash : (isEsp?`<td><button class="pcfv-btn${r.F?' on-F':''}" data-field="F" onclick="togglePCFV('${escId(key)}','F')" title="Feedback">F</button></td>`:dash)}
+      ${isSoP ? dash : `<td><button class="pcfv-btn${r.V?' on-V':''}" data-field="V" onclick="togglePCFV('${escId(key)}','V')" title="Vitória">V</button></td>`}
     </tr>`;
   }).join('');
 }
