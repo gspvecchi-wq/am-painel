@@ -747,7 +747,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Auto-refresh a cada 5 min, só quando a aba estiver visível
   setInterval(() => {
-    if (!document.hidden) reloadAll();
+    if (document.hidden) return;
+    // Não recarrega se há presença marcada não salva na chamada
+    const temNaoSalvo = Object.values(chamadaRegistros).some(r => r.P || r.C || r.F || r.V);
+    if (temNaoSalvo) return;
+    reloadAll();
   }, 5 * 60 * 1000);
 });
 
