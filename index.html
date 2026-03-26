@@ -1486,7 +1486,12 @@ function renderGest(periodoDe, periodoAte) {
 
   // ── RESULTADO × ENGAJAMENTO ─────────────
   const parseF = v => v ? parseFloat(String(v).replace(/[^0-9.,]/g,'').replace(',','.')) : null;
-  const fmtRk = v => v >= 1000 ? 'R$ '+(v/1000).toFixed(0)+'k' : v > 0 ? 'R$ '+v.toFixed(0) : null;
+  const fmtRk = v => {
+    if (!v || v <= 0) return null;
+    if (v >= 1000000) return 'R$ ' + (v/1000000).toFixed(1).replace('.0','') + 'M';
+    if (v >= 1000)    return 'R$ ' + (v/1000).toFixed(0) + 'k';
+    return 'R$ ' + v.toFixed(0);
+  };
   const roiCandidates = allAlunos
     .map(a => {
       const ini = parseF(a.fatInicial);
@@ -1778,7 +1783,11 @@ function openDrModal(name, showMsgs=true) {
   const fatAtu = aluno.fatAtual   ? parseFloat(String(aluno.fatAtual).replace(/[^0-9.,]/g,'').replace(',','.'))   : null;
   const fatDelta = (fatIni && fatAtu && fatIni > 0) ? Math.round(((fatAtu - fatIni) / fatIni) * 100) : null;
   const fatDeltaR = (fatIni && fatAtu) ? fatAtu - fatIni : null;
-  const fmtR = v => v >= 1000 ? 'R$ ' + (v/1000).toFixed(0) + 'k' : 'R$ ' + v.toFixed(0);
+  const fmtR = v => {
+    if (v >= 1000000) return 'R$ ' + (v/1000000).toFixed(1).replace('.0','') + 'M';
+    if (v >= 1000)    return 'R$ ' + (v/1000).toFixed(0) + 'k';
+    return 'R$ ' + v.toFixed(0);
+  };
   const fatColor = fatDelta === null ? 'var(--sub)' : fatDelta >= 0 ? 'var(--safe)' : 'var(--danger)';
 
   document.getElementById('mStats').innerHTML=`
