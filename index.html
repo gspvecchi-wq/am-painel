@@ -461,6 +461,12 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
     <div class="risk-grid" id="gestAscensao"></div>
 
     <div class="sec-head" style="margin-top:32px;">
+      <div class="sec-title">📈 Resultado × Engajamento</div>
+      <div class="sec-sub">Alunos com maior crescimento de faturamento no ciclo</div>
+    </div>
+    <div class="risk-grid" id="gestROI"></div>
+
+    <div class="sec-head" style="margin-top:32px;">
       <div class="sec-title">🎂 Aniversariantes de hoje</div>
       <div class="sec-sub">Alunos que fazem aniversário hoje</div>
     </div>
@@ -1478,6 +1484,38 @@ function renderGest(periodoDe, periodoAte) {
       }).join('')
     : '<div style="color:var(--sub);font-size:12px;padding:12px">Nenhum candidato identificado ainda</div>';
 
+  // ── RESULTADO × ENGAJAMENTO ─────────────
+  const parseF = v => v ? parseFloat(String(v).replace(/[^0-9.,]/g,'').replace(',','.')) : null;
+  const fmtRk = v => v >= 1000 ? 'R$ '+(v/1000).toFixed(0)+'k' : v > 0 ? 'R$ '+v.toFixed(0) : null;
+  const roiCandidates = allAlunos
+    .map(a => {
+      const ini = parseF(a.fatInicial);
+      const atu = parseF(a.fatAtual);
+      const delta = (ini && atu && ini > 0) ? Math.round(((atu - ini) / ini) * 100) : null;
+      const eng = calcCompositeScore(a, refW);
+      return { ...a, fatIni: ini, fatAtu: atu, delta, eng };
+    })
+    .filter(a => a.delta !== null)
+    .sort((a,b) => b.delta - a.delta)
+    .slice(0, 12);
+
+  document.getElementById('gestROI').innerHTML = roiCandidates.length
+    ? roiCandidates.map(a => {
+        const dn = displayName(a.name);
+        const color = a.delta >= 50 ? 'var(--safe)' : a.delta >= 0 ? 'var(--warn)' : 'var(--danger)';
+        const engColor = a.eng >= 70 ? 'var(--safe)' : a.eng >= 40 ? 'var(--warn)' : 'var(--danger)';
+        return `<div class="risk-card" onclick="openDrModal('${esc(a.name)}', false)">
+          <div class="rc-name">${tit(a.gender)}. ${esc(dn)}</div>
+          <div class="rc-sub">${a.turma}</div>
+          <div class="rc-score" style="color:${color}">${a.delta >= 0 ? '+' : ''}${a.delta}%</div>
+          <div class="rc-detail" style="margin-top:4px">
+            ${fmtRk(a.fatIni) ? fmtRk(a.fatIni) + ' → ' + (fmtRk(a.fatAtu)||'—') : '—'}
+          </div>
+          <div class="rc-detail">Eng. <span style="color:${engColor}">${a.eng}%</span></div>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--sub);font-size:12px;padding:12px">Nenhum dado de faturamento cadastrado</div>';
+
   // ── ANIVERSARIANTES ──────────────────────
   const hoje = new Date();
   const diaHoje = String(hoje.getDate()).padStart(2,'0');
@@ -1735,6 +1773,14 @@ function openDrModal(name, showMsgs=true) {
     </div>`;
 
   // KPIs
+  // Faturamento
+  const fatIni = aluno.fatInicial ? parseFloat(String(aluno.fatInicial).replace(/[^0-9.,]/g,'').replace(',','.')) : null;
+  const fatAtu = aluno.fatAtual   ? parseFloat(String(aluno.fatAtual).replace(/[^0-9.,]/g,'').replace(',','.'))   : null;
+  const fatDelta = (fatIni && fatAtu && fatIni > 0) ? Math.round(((fatAtu - fatIni) / fatIni) * 100) : null;
+  const fatDeltaR = (fatIni && fatAtu) ? fatAtu - fatIni : null;
+  const fmtR = v => v >= 1000 ? 'R$ ' + (v/1000).toFixed(0) + 'k' : 'R$ ' + v.toFixed(0);
+  const fatColor = fatDelta === null ? 'var(--sub)' : fatDelta >= 0 ? 'var(--safe)' : 'var(--danger)';
+
   document.getElementById('mStats').innerHTML=`
     <div class="mstat">
       <div class="mstat-v" style="color:${engColor}">${engScore}%</div>
@@ -1756,7 +1802,10 @@ function openDrModal(name, showMsgs=true) {
     <div class="mstat">
       <div class="mstat-v" style="color:${trendColor};font-size:13px">${trendLabel}</div>
       <div class="mstat-l">Tendência</div>
-    </div>`;
+    </div>
+    ${fatIni ? `<div class="mstat"><div class="mstat-v" style="color:var(--sub);font-size:13px">${fmtR(fatIni)}</div><div class="mstat-l">Fat. inicial</div></div>` : ''}
+    ${fatAtu ? `<div class="mstat"><div class="mstat-v" style="color:var(--sub);font-size:13px">${fmtR(fatAtu)}</div><div class="mstat-l">Fat. atual</div></div>` : ''}
+    ${fatDelta !== null ? `<div class="mstat"><div class="mstat-v" style="color:${fatColor};font-size:13px">${fatDelta >= 0 ? '+' : ''}${fatDelta}%${fatDeltaR ? ' · ' + (fatDeltaR >= 0 ? '+' : '') + fmtR(fatDeltaR) : ''}</div><div class="mstat-l">Crescimento</div></div>` : ''}`;
 
   // Mensagens — só no CS/Gestão, não no Perfil
   const msgSection = document.getElementById('mMsgSection');
