@@ -148,6 +148,7 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
 .sec-sub{font-size:11px;color:var(--sub);}
 
 .risk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:24px;}
+.renovacao-carousel::-webkit-scrollbar{display:none;}
 .risk-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--radius);padding:18px;cursor:pointer;transition:border-color .2s,transform .15s;}
 .risk-card:hover{transform:translateY(-2px);}
 .r-h{border-left:3px solid var(--danger);}
@@ -452,7 +453,11 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
       <div class="sec-title">🔥 Oportunidades de Renovação</div>
       <div class="sec-sub">Alunos com maior score de renovação — janela ideal aberta</div>
     </div>
-    <div class="risk-grid" id="gestRenovacao"></div>
+    <div style="position:relative;">
+      <div id="gestRenovacao" style="display:flex;gap:12px;overflow-x:auto;padding:4px 2px 12px;scroll-behavior:smooth;scrollbar-width:none;-ms-overflow-style:none;" class="renovacao-carousel"></div>
+      <button onclick="scrollRenovacao(-1)" id="btnRenLeft" style="position:absolute;left:-14px;top:50%;transform:translateY(-50%);background:var(--s2);border:1px solid var(--border2);color:var(--text);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;opacity:0.8;">‹</button>
+      <button onclick="scrollRenovacao(1)"  id="btnRenRight" style="position:absolute;right:-14px;top:50%;transform:translateY(-50%);background:var(--s2);border:1px solid var(--border2);color:var(--text);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;opacity:0.8;">›</button>
+    </div>
 
     <div class="sec-head" style="margin-top:32px;">
       <div class="sec-title">⭐ Candidatos ao Master</div>
@@ -1238,6 +1243,12 @@ function popularCicloSelector() {
   cicloAtivo = sel.value || mesAtual;
 }
 
+function scrollRenovacao(dir) {
+  const el = document.getElementById('gestRenovacao');
+  if (!el) return;
+  el.scrollBy({ left: dir * 220, behavior: 'smooth' });
+}
+
 // ═══════════════════════════════════════════
 // GESTÃO VIEW
 // ═══════════════════════════════════════════
@@ -1442,24 +1453,27 @@ function renderGest(periodoDe, periodoAte) {
   // ── RENOVAÇÃO RANKING ─────────────────────────────────────
   const renovacaoCandidates = allAlunos
     .map(a => ({ ...a, renScore: calcRenewalScore(a, refW) }))
-    .filter(a => a.renScore && a.renScore.daysLeft >= 0 && a.renScore.daysLeft <= 60)
-    .sort((a, b) => b.renScore.score - a.renScore.score)
-    .slice(0, 6);
+    .filter(a => a.renScore && a.renScore.daysLeft >= 0 && a.renScore.daysLeft <= 90)
+    .sort((a, b) => a.renScore.daysLeft - b.renScore.daysLeft);
 
-  document.getElementById('gestRenovacao').innerHTML = renovacaoCandidates.length
+  const renovEl = document.getElementById('gestRenovacao');
+  renovEl.innerHTML = renovacaoCandidates.length
     ? renovacaoCandidates.map(a => {
         const dn = displayName(a.name);
         const r = a.renScore;
         const cls = r.score >= 70 ? 'r-l' : r.score >= 45 ? 'r-m' : 'r-h';
-        return `<div class="risk-card ${cls}" onclick="openDrModal('${esc(a.name)}', false)">
+        return `<div class="risk-card ${cls}" onclick="openDrModal('${esc(a.name)}', false)" style="min-width:190px;flex-shrink:0;">
           <div class="rc-name">${tit(a.gender)}. ${esc(dn)}</div>
           <div class="rc-sub">${a.turma}${espLabel(a)?' · '+espLabel(a):''}</div>
           <div style="margin:4px 0"><span style="font-size:11px;color:${r.color};font-weight:700">${r.label}</span></div>
           <div class="rc-score" style="color:${r.color}">${r.score}%</div>
-          <div class="rc-detail">${r.daysLeft} dias restantes · Eng. ${calcCompositeScore(a,refW)}%${a.phone?' · '+a.phone:''}</div>
+          <div class="rc-detail">${r.daysLeft} dias restantes · Eng. ${calcCompositeScore(a,refW)}%</div>
         </div>`;
       }).join('')
     : '<div style="color:var(--sub);font-size:12px;padding:12px">Nenhum aluno na janela de renovação</div>';
+  // Atualiza visibilidade dos botões
+  document.getElementById('btnRenLeft').style.display  = renovacaoCandidates.length > 3 ? 'flex' : 'none';
+  document.getElementById('btnRenRight').style.display = renovacaoCandidates.length > 3 ? 'flex' : 'none';
 
   // ── ASCENSÃO RANKING ──────────────────────────────────────
   const ascensaoCandidates = allAlunos
