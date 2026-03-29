@@ -534,15 +534,11 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
     <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.08em;color:var(--acc);margin-bottom:4px;">Registro de Presença</div>
     <div style="font-size:12px;color:var(--sub);margin-bottom:24px;">Acesso restrito à equipe de CS.</div>
     <div class="field">
-      <label>Seu nome</label>
-      <input type="text" id="csLoginNome" placeholder="Ex: Leonardo" onkeydown="if(event.key==='Enter')document.getElementById('csLoginPwd').focus()"/>
-    </div>
-    <div class="field">
       <label>Senha</label>
       <input type="password" id="csLoginPwd" placeholder="••••••" onkeydown="if(event.key==='Enter')csLogin()"/>
     </div>
     <button class="btn-primary" onclick="csLogin()" style="width:100%">Entrar</button>
-    <div id="csLoginErr" style="color:var(--danger);font-size:11px;margin-top:8px;display:none">Nome ou senha incorretos.</div>
+    <div id="csLoginErr" style="color:var(--danger);font-size:11px;margin-top:8px;display:none">Senha incorreta.</div>
   </div>
 
   <!-- CHAMADA FORM -->
@@ -2187,29 +2183,20 @@ let csNomeAtual = ''; // nome do CS logado
 let chamadaRegistros = {}; // normName → {P,C,F,V,name}
 
 function csLogin() {
-  const pwd  = document.getElementById('csLoginPwd').value.trim();
-  const nome = document.getElementById('csLoginNome').value.trim();
-  if (!pwd || !nome) {
-    document.getElementById('csLoginErr').style.display='block';
-    document.getElementById('csLoginErr').textContent = 'Preencha seu nome e senha.';
-    return;
-  }
+  const pwd = document.getElementById('csLoginPwd').value.trim();
+  if (!pwd) return;
   fetch(WORKER_BASE+'/auth', {
     method: 'POST',
-    headers: {'Content-Type':'application/json','X-CS-Password': pwd, 'X-CS-Nome': nome}
-  }).then(async r=>{
+    headers: {'Content-Type':'application/json','X-CS-Password': pwd}
+  }).then(r=>{
     if (r.ok) {
-      const data = await r.json();
       csAuthenticated = true;
-      csNomeAtual = data.nome || nome;
       localStorage.setItem('am_cs_pwd', pwd);
-      localStorage.setItem('am_cs_nome', csNomeAtual);
       document.getElementById('chamadaLogin').style.display='none';
       document.getElementById('chamadaForm').style.display='block';
       loadChamada();
     } else {
       document.getElementById('csLoginErr').style.display='block';
-      document.getElementById('csLoginErr').textContent = 'Nome ou senha incorretos.';
     }
   }).catch(()=>{ document.getElementById('csLoginErr').style.display='block'; });
 }
@@ -2217,13 +2204,10 @@ function csLogin() {
 function initChamada() {
   if (!loaded) return;
   // Check saved password
-  const saved     = localStorage.getItem('am_cs_pwd');
-  const savedNome = localStorage.getItem('am_cs_nome');
-  if (saved && savedNome && !csAuthenticated) {
+  const saved = localStorage.getItem('am_cs_pwd');
+  if (saved && !csAuthenticated) {
     csAuthenticated = true;
-    csNomeAtual = savedNome;
     document.getElementById('csLoginPwd').value = saved;
-    document.getElementById('csLoginNome').value = savedNome;
   }
   if (csAuthenticated) {
     document.getElementById('chamadaLogin').style.display='none';
