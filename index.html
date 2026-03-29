@@ -393,27 +393,37 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
 <!-- GESTÃO VIEW -->
 <div class="view" id="view-gest">
   <div id="gestContent" style="display:none">
-    <div class="controls" style="margin-bottom:20px;">
-      <select id="gestCiclo" onchange="cicloAtivo=this.value;renderGest()" style="background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:12px;outline:none;">
-        <option value="">Mês atual</option>
-      </select>
-      <select id="gestWeek" onchange="renderGest()">
-        <option value="0">Todas as semanas</option>
-        <option value="1">Semana 1</option>
-        <option value="2">Semana 2</option>
-        <option value="3">Semana 3</option>
-        <option value="4">Semana 4</option>
-        <option value="5">Semana 5</option>
-      </select>
-      <span style="color:var(--sub);font-size:12px;">ou filtrar por período:</span>
-      <input type="date" id="gestDateDe" onchange="renderGestByPeriod()"
-        style="background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:12px;outline:none;"
-        title="De"/>
-      <span style="color:var(--sub);font-size:12px;">até</span>
-      <input type="date" id="gestDateAte" onchange="renderGestByPeriod()"
-        style="background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:12px;outline:none;"
-        title="Até"/>
-      <button onclick="limparFiltroPeriodo()" style="background:var(--s2);border:1px solid var(--border2);color:var(--sub);padding:7px 14px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:12px;cursor:pointer;">✕ Limpar</button>
+    <!-- FILTROS GESTÃO -->
+    <div style="margin-bottom:20px;">
+      <!-- Linha 1: filtro principal -->
+      <div class="controls" style="margin-bottom:8px;">
+        <select id="gestCiclo" onchange="onGestCicloChange()" style="background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:12px;outline:none;">
+          <option value="">Mês atual</option>
+        </select>
+        <select id="gestWeek" onchange="renderGest()">
+          <option value="0">Todas as semanas</option>
+          <option value="1">Semana 1</option>
+          <option value="2">Semana 2</option>
+          <option value="3">Semana 3</option>
+          <option value="4">Semana 4</option>
+          <option value="5">Semana 5</option>
+        </select>
+        <button id="btnComparar" onclick="toggleModoComparacao()" style="background:transparent;border:1px solid var(--acc);color:var(--acc);padding:7px 14px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;cursor:pointer;margin-left:auto;">⚖️ Comparar períodos</button>
+      </div>
+      <!-- Linha 2: modo comparação (oculto por padrão) -->
+      <div id="gestComparacaoBar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(255,214,0,.05);border:1px solid rgba(255,214,0,.2);border-radius:9px;padding:10px 14px;">
+        <span style="font-size:11px;color:var(--acc);font-weight:700;">⚖️ COMPARAÇÃO</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;color:var(--sub)">Período A:</span>
+          <select id="gestCicloA" onchange="renderGest()" style="background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:7px;font-family:'Outfit',sans-serif;font-size:11px;outline:none;"></select>
+        </div>
+        <span style="color:var(--sub);font-size:16px;">vs</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;color:var(--sub)">Período B:</span>
+          <select id="gestCicloB" onchange="renderGest()" style="background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:7px;font-family:'Outfit',sans-serif;font-size:11px;outline:none;"></select>
+        </div>
+        <button onclick="toggleModoComparacao()" style="background:transparent;border:1px solid var(--border2);color:var(--sub);padding:6px 12px;border-radius:7px;font-family:'Outfit',sans-serif;font-size:11px;cursor:pointer;margin-left:auto;">✕ Fechar</button>
+      </div>
     </div>
     <div class="gest-kpis">
       <div class="gest-kpi"><div class="gest-kpi-n" id="gTotal">—</div><div class="gest-kpi-l">Total de alunos</div></div>
@@ -524,11 +534,15 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
     <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.08em;color:var(--acc);margin-bottom:4px;">Registro de Presença</div>
     <div style="font-size:12px;color:var(--sub);margin-bottom:24px;">Acesso restrito à equipe de CS.</div>
     <div class="field">
+      <label>Seu nome</label>
+      <input type="text" id="csLoginNome" placeholder="Ex: Leonardo" onkeydown="if(event.key==='Enter')document.getElementById('csLoginPwd').focus()"/>
+    </div>
+    <div class="field">
       <label>Senha</label>
       <input type="password" id="csLoginPwd" placeholder="••••••" onkeydown="if(event.key==='Enter')csLogin()"/>
     </div>
     <button class="btn-primary" onclick="csLogin()" style="width:100%">Entrar</button>
-    <div id="csLoginErr" style="color:var(--danger);font-size:11px;margin-top:8px;display:none">Senha incorreta.</div>
+    <div id="csLoginErr" style="color:var(--danger);font-size:11px;margin-top:8px;display:none">Nome ou senha incorretos.</div>
   </div>
 
   <!-- CHAMADA FORM -->
@@ -598,6 +612,27 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
     <div id="mCallsSection" style="display:none;margin:16px 0 0;">
       <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);margin-bottom:10px;font-weight:700;">Calls com Especialistas</div>
       <div id="mCallsContent"></div>
+    </div>
+    <div id="mAISection" style="display:none;margin-bottom:20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);font-weight:700;">🤖 Inteligência Artificial</div>
+        <div style="display:flex;gap:6px;">
+          <button id="btnAIDiag" onclick="gerarDiagnostico()" style="background:transparent;border:1px solid var(--acc);color:var(--acc);padding:5px 12px;border-radius:7px;font-family:'Outfit',sans-serif;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.04em;">📋 DIAGNÓSTICO</button>
+          <button id="btnAIMsg" onclick="gerarAcionamentoIA()" style="background:transparent;border:1px solid var(--blue);color:var(--blue);padding:5px 12px;border-radius:7px;font-family:'Outfit',sans-serif;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.04em;">✉️ MENSAGEM IA</button>
+        </div>
+      </div>
+      <div id="aiOutput" style="display:none;">
+        <textarea id="aiOutputText" style="width:100%;background:var(--s2);border:1px solid var(--border2);color:var(--text);border-radius:11px;padding:14px;font-size:12px;line-height:1.75;font-family:'Outfit',sans-serif;resize:vertical;min-height:140px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--acc)'" onblur="this.style.borderColor='var(--border2)'"></textarea>
+        <div id="aiPhoneWarn" style="display:none;font-size:11px;color:var(--warn);margin:6px 0;">⚠️ Número não cadastrado — o envio será registrado como copiado manualmente.</div>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+          <button onclick="copyAI()" style="background:transparent;border:1px solid var(--border2);color:var(--sub);padding:6px 14px;border-radius:7px;font-family:'Outfit',sans-serif;font-weight:700;font-size:10px;cursor:pointer;letter-spacing:.04em;">📋 COPIAR</button>
+          <button id="btnEnviarWpp" onclick="enviarAcionamento()" style="background:var(--safe);color:#000;border:none;padding:6px 16px;border-radius:7px;font-family:'Outfit',sans-serif;font-weight:700;font-size:10px;cursor:pointer;letter-spacing:.04em;margin-left:auto;">📤 ENVIAR WHATSAPP</button>
+        </div>
+        <div id="aiEnvioStatus" style="display:none;margin-top:8px;font-size:11px;font-weight:600;padding:6px 12px;border-radius:7px;"></div>
+      </div>
+      <div id="aiLoading" style="display:none;padding:12px;font-size:12px;color:var(--sub);text-align:center;">
+        <span id="aiLoadingDots">🤖 Gerando análise</span>
+      </div>
     </div>
     <div id="mMsgSection">
       <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);margin-bottom:9px;font-weight:700;">Mensagens prontas</div>
@@ -1222,25 +1257,30 @@ function bCls(m){return{ausente:'b-aus',camera:'b-cam',feedback:'b-fb',vitoria:'
 function bLbl(m){return{ausente:'❌ Ausente',camera:'📷 Câmera',feedback:'💬 Feedback',vitoria:'🏆 Vitória'}[m]||m;}
 
 function popularCicloSelector() {
-  const sel = document.getElementById('gestCiclo');
-  if (!sel) return;
   // Coleta todos os ciclos disponíveis no KV
-  const ciclos = new Set();
+  const ciclosSet = new Set();
   for (const tab of Object.keys(kvPresenca)) {
     if (tab === '__calls__' || tab === '__dates__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
-      if (/^\d{4}-\d{2}$/.test(ciclo) || ciclo === 'legacy') ciclos.add(ciclo);
+      if (/^\d{4}-\d{2}$/.test(ciclo)) ciclosSet.add(ciclo);
     }
   }
-  const sorted = [...ciclos].filter(c => c !== 'legacy').sort().reverse();
+  const sorted  = [...ciclosSet].sort().reverse();
   const mesAtual = new Date().toISOString().slice(0, 7);
-  sel.innerHTML = '<option value="">Mês atual</option>';
-  for (const c of sorted) {
-    const [ano, mes] = c.split('-');
-    const label = new Date(c + '-15').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-    sel.innerHTML += `<option value="${c}" ${c === mesAtual ? 'selected' : ''}>${label}</option>`;
+
+  // Popula dropdown principal
+  const sel = document.getElementById('gestCiclo');
+  if (sel) {
+    sel.innerHTML = '<option value="">Mês atual</option>';
+    for (const c of sorted) {
+      const label = new Date(c + '-15').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      sel.innerHTML += `<option value="${c}" ${c === mesAtual ? 'selected' : ''}>${label}</option>`;
+    }
+    cicloAtivo = sel.value || mesAtual;
   }
-  cicloAtivo = sel.value || mesAtual;
+
+  // Popula selects do modo comparação se existirem
+  if (modoComparacao) popularCicloSelectComparacao();
 }
 
 function scrollRenovacao(dir) {
@@ -1254,48 +1294,208 @@ function scrollRenovacao(dir) {
 // ═══════════════════════════════════════════
 
 // Converte datas das semanas em semanas filtradas por período
-function getSemanasByPeriod(de, ate) {
-  if (!kvPresenca.__dates__) return null;
-  const deTs  = new Date(de).getTime();
-  const ateTs = new Date(ate).getTime() + 86400000;
-  // Coleta ciclos e semanas dentro do período
-  // Estrutura: __dates__[tab][ciclo][sN] = dateStr
-  const resultado = []; // [{ciclo, semana}]
-  for (const tab of Object.keys(kvPresenca.__dates__ || {})) {
-    for (const [ciclo, semanas] of Object.entries(kvPresenca.__dates__[tab] || {})) {
-      for (const [sKey, dateStr] of Object.entries(semanas || {})) {
-        const ts = new Date(dateStr).getTime();
-        if (ts >= deTs && ts <= ateTs) {
-          const s = parseInt(sKey.replace('s',''));
-          if (!resultado.find(r => r.ciclo === ciclo && r.semana === s)) {
-            resultado.push({ ciclo, semana: s });
-          }
-        }
-      }
-    }
+// Modo comparação
+let modoComparacao = false;
+
+function toggleModoComparacao() {
+  modoComparacao = !modoComparacao;
+  const bar = document.getElementById('gestComparacaoBar');
+  const btn = document.getElementById('btnComparar');
+  if (modoComparacao) {
+    bar.style.display = 'flex';
+    btn.style.display = 'none';
+    // Popula os selects de comparação com os ciclos disponíveis
+    popularCicloSelectComparacao();
+  } else {
+    bar.style.display = 'none';
+    btn.style.display = 'block';
   }
-  return resultado;
-}
-
-function renderGestByPeriod() {
-  const de  = document.getElementById('gestDateDe').value;
-  const ate = document.getElementById('gestDateAte').value;
-  if (!de || !ate) return;
-  document.getElementById('gestWeek').value = '0';
-  // Ciclo ativo = mês da data inicial do filtro
-  cicloAtivo = de.slice(0, 7);
-  const sel = document.getElementById('gestCiclo');
-  if (sel) sel.value = cicloAtivo;
-  renderGest(de, ate);
-}
-
-function limparFiltroPeriodo() {
-  document.getElementById('gestDateDe').value  = '';
-  document.getElementById('gestDateAte').value = '';
   renderGest();
 }
 
-function renderGest(periodoDe, periodoAte) {
+function popularCicloSelectComparacao() {
+  const ciclos = [];
+  for (const tab of Object.keys(kvPresenca)) {
+    if (tab === '__calls__' || tab === '__dates__') continue;
+    for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
+      if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
+    }
+  }
+  ciclos.sort().reverse();
+  const mesAtual = new Date().toISOString().slice(0, 7);
+  const mesAnterior = ciclos.find(c => c < mesAtual) || ciclos[1] || ciclos[0] || mesAtual;
+
+  ['gestCicloA','gestCicloB'].forEach((id, idx) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = ciclos.map(c => {
+      const label = new Date(c + '-15').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      const selected = (idx === 0 ? c === mesAnterior : c === mesAtual) ? 'selected' : '';
+      return `<option value="${c}" ${selected}>${label}</option>`;
+    }).join('');
+  });
+}
+
+function onGestCicloChange() {
+  cicloAtivo = document.getElementById('gestCiclo').value || new Date().toISOString().slice(0,7);
+  renderGest();
+}
+
+// ── MODO COMPARAÇÃO ─────────────────────────────────────────
+function renderGestComparacao() {
+  const cicloA = document.getElementById('gestCicloA')?.value;
+  const cicloB = document.getElementById('gestCicloB')?.value;
+  if (!cicloA || !cicloB) return;
+
+  const maxA = detectMaxWeekForCiclo(cicloA);
+  const maxB = detectMaxWeekForCiclo(cicloB);
+
+  const labelA = new Date(cicloA + '-15').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const labelB = new Date(cicloB + '-15').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+  // Função auxiliar: calcula score médio para um ciclo
+  function avgScoreForCiclo(ciclo, maxW) {
+    const prevCiclo = getCicloAtivo();
+    cicloAtivo = ciclo;
+    const scores = allAlunos.map(a => calcCompositeScore(a, maxW));
+    cicloAtivo = prevCiclo;
+    return scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+  }
+
+  // Temporarily switch ciclo context for each period
+  const origCiclo = cicloAtivo;
+
+  cicloAtivo = cicloA;
+  const engA = avgScoreForCiclo(cicloA, maxA);
+  const quedaA = allAlunos.filter(a => isQuedaAcelerada(a, maxA)).length;
+  const novosA = allAlunos.filter(a => isNovo(a)).length;
+
+  cicloAtivo = cicloB;
+  const engB = avgScoreForCiclo(cicloB, maxB);
+  const quedaB = allAlunos.filter(a => isQuedaAcelerada(a, maxB)).length;
+  const novosB = allAlunos.filter(a => isNovo(a)).length;
+
+  cicloAtivo = origCiclo;
+
+  // Delta helpers
+  const delta = (a, b) => {
+    const d = b - a;
+    const color = d > 0 ? 'var(--safe)' : d < 0 ? 'var(--danger)' : 'var(--sub)';
+    const sign  = d > 0 ? '+' : '';
+    return `<span style="font-size:11px;color:${color};font-weight:700">${sign}${d}</span>`;
+  };
+
+  // KPIs comparação
+  document.getElementById('gTotal').textContent = allAlunos.length;
+  document.getElementById('gEngLbl').textContent = 'Score qualidade';
+  document.getElementById('gAbsentLbl').textContent = 'Queda acelerada';
+
+  document.getElementById('gEng').innerHTML =
+    `<span style="color:var(--sub);font-size:20px">${engA}%</span>
+     <span style="color:var(--sub);font-size:12px;margin:0 4px">→</span>
+     <span style="color:var(--safe);font-size:28px">${engB}%</span>
+     ${delta(engA, engB)}pp`;
+
+  document.getElementById('gAbsent').innerHTML =
+    `<span style="color:var(--sub);font-size:20px">${quedaA}</span>
+     <span style="color:var(--sub);font-size:12px;margin:0 4px">→</span>
+     <span style="color:var(--warn);font-size:28px">${quedaB}</span>
+     ${delta(quedaA, quedaB)}`;
+
+  document.getElementById('gRisk').innerHTML = '—';
+  document.getElementById('gQueda').innerHTML = '—';
+  document.getElementById('gNovos').innerHTML = '—';
+
+  // Título dos comparativos
+  document.getElementById('gestCompareSub').textContent =
+    `${labelA} (A) vs ${labelB} (B) — presença por turma`;
+
+  // Gráfico comparativo por turma
+  const compareTabs = ['Mentoria','Hotseat','Master'];
+  const wcEl = document.getElementById('weekCompare');
+  wcEl.innerHTML = compareTabs.map(tab => {
+    cicloAtivo = cicloA;
+    const rA = weekPresenceRate(tab, maxA - 1) || { pct: 0 };
+    cicloAtivo = cicloB;
+    const rB = weekPresenceRate(tab, maxB - 1) || { pct: 0 };
+    cicloAtivo = origCiclo;
+
+    const colorA = rA.pct >= 70 ? 'var(--safe)' : rA.pct >= 40 ? 'var(--warn)' : 'var(--danger)';
+    const colorB = rB.pct >= 70 ? 'var(--safe)' : rB.pct >= 40 ? 'var(--warn)' : 'var(--danger)';
+    const d = rB.pct - rA.pct;
+    const dColor = d > 0 ? 'var(--safe)' : d < 0 ? 'var(--danger)' : 'var(--sub)';
+    const dTxt = d > 0 ? '▲ +'+d+'pp' : d < 0 ? '▼ '+d+'pp' : '= Sem variação';
+
+    return `<div class="wcard">
+      <div class="wcard-title">${tab}</div>
+      <div style="display:flex;gap:12px;align-items:flex-end;margin:8px 0;">
+        <div style="text-align:center;flex:1">
+          <div style="font-size:9px;color:var(--sub);margin-bottom:4px">A · ${labelA.split(' ')[0]}</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:${colorA};line-height:1">${rA.pct}%</div>
+        </div>
+        <div style="font-size:18px;color:var(--sub)">→</div>
+        <div style="text-align:center;flex:1">
+          <div style="font-size:9px;color:var(--sub);margin-bottom:4px">B · ${labelB.split(' ')[0]}</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:${colorB};line-height:1">${rB.pct}%</div>
+        </div>
+      </div>
+      <div class="wcard-delta" style="color:${dColor};background:transparent;border:1px solid ${dColor}">${dTxt}</div>
+    </div>`;
+  }).join('');
+
+  // Gráficos de evolução comparativos
+  renderEvolutionChartComparacao('chartMaster',   cicloA, cicloB, maxA, maxB, labelA, labelB, 'Master');
+  renderEvolutionChartComparacao('chartMentoria', cicloA, cicloB, maxA, maxB, labelA, labelB, 'Mentoria');
+
+  // Oculta seções que não fazem sentido em modo comparação
+  document.getElementById('gestRiskMaster').innerHTML =
+    '<div style="color:var(--sub);font-size:12px;padding:12px">Desative o modo comparação para ver o ranking de risco.</div>';
+  document.getElementById('gestRiskMentoria').innerHTML = '';
+}
+
+function renderEvolutionChartComparacao(elId, cicloA, cicloB, maxA, maxB, labelA, labelB, turma) {
+  const origCiclo = cicloAtivo;
+  const el = document.getElementById(elId);
+
+  cicloAtivo = cicloA;
+  const weeksA = calcEvolutionByTurma(turma, maxA);
+  cicloAtivo = cicloB;
+  const weeksB = calcEvolutionByTurma(turma, maxB);
+  cicloAtivo = origCiclo;
+
+  if (!weeksA.length && !weeksB.length) {
+    el.innerHTML = '<div style="color:var(--sub);font-size:11px;padding:20px">Sem dados</div>';
+    return;
+  }
+
+  const allPcts = [...weeksA.map(w=>w.pct), ...weeksB.map(w=>w.pct), 1];
+  const maxP = Math.max(...allPcts);
+
+  const makeBar = (weeks, color, label) => weeks.map(b => `
+    <div class="chart-col">
+      <div class="chart-bar-wrap">
+        <div class="chart-bar" style="height:${b.pct/maxP*100}%;background:${color};opacity:0.85">
+          <span class="chart-bar-val" style="color:${color}">${b.pct}%</span>
+        </div>
+      </div>
+      <div class="chart-lbl">S${b.w}</div>
+    </div>`).join('');
+
+  el.innerHTML = `
+    <div style="width:100%">
+      <div style="display:flex;gap:8px;margin-bottom:8px;font-size:10px;">
+        <span style="color:var(--sub)">■ <span style="color:#FFD600">${labelA.split(' ')[0]}</span></span>
+        <span style="color:var(--sub)">■ <span style="color:var(--blue)">${labelB.split(' ')[0]}</span></span>
+      </div>
+      <div style="display:flex;gap:16px;align-items:flex-end;height:110px;">
+        <div style="display:flex;gap:6px;align-items:flex-end;flex:1">${makeBar(weeksA,'var(--acc)',labelA)}</div>
+        <div style="width:1px;background:var(--border2);height:80%;align-self:flex-end"></div>
+        <div style="display:flex;gap:6px;align-items:flex-end;flex:1">${makeBar(weeksB,'var(--blue)',labelB)}</div>
+      </div>
+    </div>`;
+}
+
+function renderGest() {
   if (!loaded||!allAlunos.length) {
     document.getElementById('gestContent').style.display='none';
     document.getElementById('gestEmpty').style.display='block';
@@ -1304,20 +1504,16 @@ function renderGest(periodoDe, periodoAte) {
   document.getElementById('gestContent').style.display='block';
   document.getElementById('gestEmpty').style.display='none';
 
+  // Se modo comparação ativo, delega
+  if (modoComparacao) {
+    renderGestComparacao();
+    return;
+  }
+
   const gestWeekVal = parseInt(document.getElementById('gestWeek').value);
   const allWeeks    = gestWeekVal === 0;
-  const maxWeek     = detectMaxWeek();
-
-  // Filtro por período — se ativo, determina quais semanas incluir
-  const semanasFiltradas = (periodoDe && periodoAte)
-    ? getSemanasByPeriod(periodoDe, periodoAte)
-    : null;
-  const usandoPeriodo = semanasFiltradas !== null;
-
-  // refWeek: semana mais alta do filtro ou do seletor normal
-  const refWeek = usandoPeriodo
-    ? (semanasFiltradas.length > 0 ? Math.max(...semanasFiltradas) : maxWeek)
-    : (allWeeks ? maxWeek : gestWeekVal);
+  const maxWeek     = detectMaxWeekForCiclo(getCicloAtivo());
+  const refWeek     = allWeeks ? maxWeek : gestWeekVal;
 
   // ── KPIs ──────────────────────────────────
   const total = allAlunos.length;
@@ -1575,11 +1771,11 @@ function renderGest(periodoDe, periodoAte) {
 
 }
 
-// Detect how many weeks have any data in the sheet
-function detectMaxWeek() {
+// Detect how many weeks have any data in the sheet for a given ciclo
+function detectMaxWeekForCiclo(ciclo) {
   let max = 1;
   for (const tab of AULAS_GERAIS) {
-    const s = getKvTab(tab);
+    const s = getKvTab(tab, ciclo);
     for (const entry of Object.values(s)) {
       for (let w=4; w>=0; w--) {
         if (entry.history[w]&&entry.history[w].P) { if(w+1>max) max=w+1; break; }
@@ -1587,6 +1783,11 @@ function detectMaxWeek() {
     }
   }
   return Math.min(max, 5);
+}
+
+// Backward compat
+function detectMaxWeek() {
+  return detectMaxWeekForCiclo(getCicloAtivo());
 }
 
 // Engagement for a single week index (0-based)
@@ -1830,6 +2031,21 @@ function openDrModal(name, showMsgs=true) {
     ${fatAtu ? `<div class="mstat"><div class="mstat-v" style="color:var(--sub);font-size:13px">${fmtR(fatAtu)}</div><div class="mstat-l">Fat. atual</div></div>` : ''}
     ${fatDelta !== null ? `<div class="mstat"><div class="mstat-v" style="color:${fatColor};font-size:13px">${fatDelta >= 0 ? '+' : ''}${fatDelta}%${fatDeltaR ? ' · ' + (fatDeltaR >= 0 ? '+' : '') + fmtR(fatDeltaR) : ''}</div><div class="mstat-l">Crescimento</div></div>` : ''}`;
 
+  // Seção IA — visível sempre que autenticado
+  const aiSection = document.getElementById('mAISection');
+  if (aiSection) {
+    aiSection.style.display = csAuthenticated ? 'block' : 'none';
+    // Limpa output anterior
+    document.getElementById('aiOutput').style.display = 'none';
+    document.getElementById('aiLoading').style.display = 'none';
+  }
+  // Guarda dados do aluno aberto para uso pelas funções de IA
+  window._aiAlunoAtual = aluno;
+  window._aiAlunoWeekData = weekData;
+  window._aiAlunoTotalWeeks = totalWeeks;
+  window._aiAlunoScore = engScore;
+  window._aiAlunoTrend = trendLabel;
+
   // Mensagens — só no CS/Gestão, não no Perfil
   const msgSection = document.getElementById('mMsgSection');
   if (showMsgs) {
@@ -1967,23 +2183,33 @@ function switchView(id,el) {
 // ═══════════════════════════════════════════
 const WORKER_BASE = WORKER_URL.replace('/dados','');
 let csAuthenticated = false;
+let csNomeAtual = ''; // nome do CS logado
 let chamadaRegistros = {}; // normName → {P,C,F,V,name}
 
 function csLogin() {
-  const pwd = document.getElementById('csLoginPwd').value.trim();
-  if (!pwd) return;
+  const pwd  = document.getElementById('csLoginPwd').value.trim();
+  const nome = document.getElementById('csLoginNome').value.trim();
+  if (!pwd || !nome) {
+    document.getElementById('csLoginErr').style.display='block';
+    document.getElementById('csLoginErr').textContent = 'Preencha seu nome e senha.';
+    return;
+  }
   fetch(WORKER_BASE+'/auth', {
     method: 'POST',
-    headers: {'Content-Type':'application/json','X-CS-Password': pwd}
-  }).then(r=>{
+    headers: {'Content-Type':'application/json','X-CS-Password': pwd, 'X-CS-Nome': nome}
+  }).then(async r=>{
     if (r.ok) {
+      const data = await r.json();
       csAuthenticated = true;
+      csNomeAtual = data.nome || nome;
       localStorage.setItem('am_cs_pwd', pwd);
+      localStorage.setItem('am_cs_nome', csNomeAtual);
       document.getElementById('chamadaLogin').style.display='none';
       document.getElementById('chamadaForm').style.display='block';
       loadChamada();
     } else {
       document.getElementById('csLoginErr').style.display='block';
+      document.getElementById('csLoginErr').textContent = 'Nome ou senha incorretos.';
     }
   }).catch(()=>{ document.getElementById('csLoginErr').style.display='block'; });
 }
@@ -1991,10 +2217,13 @@ function csLogin() {
 function initChamada() {
   if (!loaded) return;
   // Check saved password
-  const saved = localStorage.getItem('am_cs_pwd');
-  if (saved && !csAuthenticated) {
+  const saved     = localStorage.getItem('am_cs_pwd');
+  const savedNome = localStorage.getItem('am_cs_nome');
+  if (saved && savedNome && !csAuthenticated) {
     csAuthenticated = true;
+    csNomeAtual = savedNome;
     document.getElementById('csLoginPwd').value = saved;
+    document.getElementById('csLoginNome').value = savedNome;
   }
   if (csAuthenticated) {
     document.getElementById('chamadaLogin').style.display='none';
@@ -2181,6 +2410,225 @@ function filtrarChamada() {
     const name = norm(row.querySelector('.dr-name')?.textContent || '');
     row.style.display = (!q || name.includes(q)) ? '' : 'none';
   });
+}
+
+// ═══════════════════════════════════════════
+// IA — funções de frontend
+// ═══════════════════════════════════════════
+let _aiLoadingInterval = null;
+
+function aiLoadingStart() {
+  document.getElementById('aiLoading').style.display = 'block';
+  document.getElementById('aiOutput').style.display = 'none';
+  let dots = 0;
+  const labels = ['🤖 Gerando análise', '🤖 Gerando análise.', '🤖 Gerando análise..', '🤖 Gerando análise...'];
+  _aiLoadingInterval = setInterval(() => {
+    dots = (dots + 1) % labels.length;
+    const el = document.getElementById('aiLoadingDots');
+    if (el) el.textContent = labels[dots];
+  }, 400);
+}
+
+function aiLoadingStop() {
+  clearInterval(_aiLoadingInterval);
+  document.getElementById('aiLoading').style.display = 'none';
+}
+
+function aiShowOutput(texto) {
+  document.getElementById('aiOutputText').value = texto;
+  document.getElementById('aiOutput').style.display = 'block';
+  document.getElementById('aiEnvioStatus').style.display = 'none';
+  // Aviso de número
+  const aluno = window._aiAlunoAtual;
+  const phone = (aluno?.phone || '').replace(/\D/g,'');
+  const phoneValido = phone.length >= 10;
+  const warn = document.getElementById('aiPhoneWarn');
+  if (warn) warn.style.display = phoneValido ? 'none' : 'block';
+  // Texto do botão
+  const btnEnviar = document.getElementById('btnEnviarWpp');
+  if (btnEnviar) {
+    btnEnviar.textContent = phoneValido ? '📤 ENVIAR WHATSAPP' : '📋 REGISTRAR (sem número)';
+    btnEnviar.style.background = phoneValido ? 'var(--safe)' : 'var(--warn)';
+  }
+}
+
+function copyAI() {
+  const texto = document.getElementById('aiOutputText').value;
+  navigator.clipboard.writeText(texto).then(() => {
+    const btn = document.querySelector('#aiOutput button');
+    if (btn) { btn.textContent = '✓ COPIADO'; setTimeout(() => btn.textContent = '📋 COPIAR', 2000); }
+  });
+}
+
+async function enviarAcionamento() {
+  const aluno    = window._aiAlunoAtual;
+  const mensagem = document.getElementById('aiOutputText').value.trim();
+  if (!aluno || !mensagem) return;
+
+  const pwd  = localStorage.getItem('am_cs_pwd') || '';
+  const nome = localStorage.getItem('am_cs_nome') || csNomeAtual || 'CS';
+  const motivos = (_csDoctors.find(x => x.name === aluno.name)?.motivos || []);
+  const phone = (aluno.phone || '').replace(/\D/g,'');
+  const phoneValido = phone.length >= 10;
+
+  const statusEl = document.getElementById('aiEnvioStatus');
+  const btnEnviar = document.getElementById('btnEnviarWpp');
+  btnEnviar.disabled = true;
+  btnEnviar.textContent = '⏳ Enviando...';
+  statusEl.style.display = 'none';
+
+  try {
+    const res = await fetch(WORKER_BASE + '/ai/enviar', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CS-Password': pwd,
+        'X-CS-Nome': nome
+      },
+      body: JSON.stringify({
+        alunoNome:  aluno.name,
+        alunoPhone: phone,
+        mensagem,
+        motivos
+      })
+    });
+    const data = await res.json();
+    statusEl.style.display = 'block';
+    if (data.enviadoWhatsapp) {
+      statusEl.style.background = 'rgba(0,232,122,.1)';
+      statusEl.style.color = 'var(--safe)';
+      statusEl.style.border = '1px solid rgba(0,232,122,.3)';
+      const hora = new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+      statusEl.textContent = '✓ Enviado para ' + tit(aluno.gender) + '. ' + displayName(aluno.name) + ' · ' + hora;
+    } else if (data.ok) {
+      statusEl.style.background = 'rgba(255,149,0,.1)';
+      statusEl.style.color = 'var(--warn)';
+      statusEl.style.border = '1px solid rgba(255,149,0,.3)';
+      statusEl.textContent = phoneValido
+        ? '⚠️ Registrado, mas houve erro no WhatsApp: ' + (data.zapiError || 'erro desconhecido')
+        : '📋 Registrado como acionamento manual (sem número).';
+    } else {
+      throw new Error(data.error || 'Erro desconhecido');
+    }
+    btnEnviar.textContent = '✓ Concluído';
+  } catch(e) {
+    statusEl.style.display = 'block';
+    statusEl.style.background = 'rgba(255,51,85,.1)';
+    statusEl.style.color = 'var(--danger)';
+    statusEl.style.border = '1px solid rgba(255,51,85,.3)';
+    statusEl.textContent = '✗ Erro: ' + e.message;
+    btnEnviar.disabled = false;
+    btnEnviar.textContent = '📤 ENVIAR WHATSAPP';
+  }
+}
+
+function buildAlunoPayload() {
+  const aluno = window._aiAlunoAtual;
+  if (!aluno) return null;
+  const weekData = window._aiAlunoWeekData || [];
+  const totalWeeks = window._aiAlunoTotalWeeks || 1;
+
+  const totSlots = weekData.slice(0, totalWeeks).reduce((s, d) => s + d.slots, 0);
+  const totP     = weekData.slice(0, totalWeeks).reduce((s, d) => s + d.P, 0);
+  const totC     = weekData.slice(0, totalWeeks).reduce((s, d) => s + d.C, 0);
+  const totV     = weekData.slice(0, totalWeeks).reduce((s, d) => s + d.V, 0);
+  const camera   = totP ? Math.round(totC / totP * 100) : 0;
+  const vitorias = totP ? Math.round(totV / totP * 100) : 0;
+
+  // Faltas consecutivas
+  let faltasConsecutivas = 0;
+  for (let i = totalWeeks - 1; i >= 0; i--) {
+    if (!weekData[i]?.P) faltasConsecutivas++;
+    else break;
+  }
+
+  // Dias restantes
+  let diasRestantes = null;
+  if (aluno.cycleEnd) {
+    diasRestantes = Math.round((new Date(aluno.cycleEnd) - Date.now()) / (1000 * 60 * 60 * 24));
+  }
+
+  // Faturamento formatado
+  const fmtFat = v => {
+    if (!v) return null;
+    const n = parseFloat(String(v).replace(/[^0-9.,]/g, '').replace(',', '.'));
+    if (!n) return null;
+    if (n >= 1000000) return 'R$ ' + (n/1000000).toFixed(1).replace('.0','') + 'M';
+    if (n >= 1000)    return 'R$ ' + (n/1000).toFixed(0) + 'k';
+    return 'R$ ' + n.toFixed(0);
+  };
+
+  const firstName = aluno.name.split(' ')[0];
+  const tratamento = aluno.gender === 'F' ? 'Dra.' : 'Dr.';
+
+  return {
+    nome: aluno.name,
+    firstName,
+    tratamento,
+    turma: aluno.turma,
+    score: window._aiAlunoScore || 0,
+    presencas: totP,
+    totalSlots: totSlots,
+    camera,
+    vitorias,
+    faltasConsecutivas,
+    tendencia: window._aiAlunoTrend || '—',
+    diasRestantes,
+    fatInicial: fmtFat(aluno.fatInicial),
+    fatAtual:   fmtFat(aluno.fatAtual),
+    novo: isNovo(aluno),
+    motivos: (_csDoctors.find(x => x.name === aluno.name)?.motivos || [])
+  };
+}
+
+async function gerarDiagnostico() {
+  const payload = buildAlunoPayload();
+  if (!payload) return;
+  const pwd = localStorage.getItem('am_cs_pwd') || '';
+
+  aiLoadingStart();
+  try {
+    const res = await fetch(WORKER_BASE + '/ai/diagnostico', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd },
+      body: JSON.stringify({ aluno: payload })
+    });
+    const data = await res.json();
+    aiLoadingStop();
+    if (data.ok) {
+      aiShowOutput(data.texto);
+    } else {
+      aiShowOutput('Erro: ' + (data.error || 'Falha ao gerar diagnóstico'));
+    }
+  } catch(e) {
+    aiLoadingStop();
+    aiShowOutput('Erro de conexão: ' + e.message);
+  }
+}
+
+async function gerarAcionamentoIA() {
+  const payload = buildAlunoPayload();
+  if (!payload) return;
+  const pwd = localStorage.getItem('am_cs_pwd') || '';
+
+  aiLoadingStart();
+  try {
+    const res = await fetch(WORKER_BASE + '/ai/acionamento', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd },
+      body: JSON.stringify({ aluno: payload })
+    });
+    const data = await res.json();
+    aiLoadingStop();
+    if (data.ok) {
+      aiShowOutput(data.texto);
+    } else {
+      aiShowOutput('Erro: ' + (data.error || 'Falha ao gerar mensagem'));
+    }
+  } catch(e) {
+    aiLoadingStop();
+    aiShowOutput('Erro de conexão: ' + e.message);
+  }
 }
 
 // ═══════════════════════════════════════════
