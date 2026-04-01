@@ -563,6 +563,7 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
           <option value="Emagrecimento1">Emagrecimento1</option>
           <option value="Emagrecimento2">Emagrecimento2</option>
           <option value="Retomada">Retomada</option>
+          <option value="Cirurgiões">Cirurgiões</option>
         </optgroup>
       </select>
       <input type="date" id="chamadaData" onchange="loadChamada();atualizarSemanaBadge()"
@@ -919,7 +920,8 @@ async function reloadAll() {
 // DOCTOR BUILDER
 // ═══════════════════════════════════════════
 function getPool(tab) {
-  if (tab==='Master') return allAlunos.filter(a=>a.turma==='Master');
+  if (tab==='Master')           return allAlunos.filter(a=>a.turma==='Master');
+  if (tab==='Winners Encontro') return allAlunos.filter(a=>a.turma==='Winners');
   if (ESPECIALIDADES.includes(tab)) return allAlunos.filter(a=>hasEsp(a, tab));
   return allAlunos;
 }
