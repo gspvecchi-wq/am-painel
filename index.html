@@ -550,6 +550,7 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
           <option value="Hotseat">Hotseat</option>
           <option value="Hotseat Simultâneo">Hotseat Simultâneo</option>
           <option value="Master">Master</option>
+          <option value="Winners Encontro">Winners Encontro</option>
         </optgroup>
         <optgroup label="Especialidades">
           <option value="Dermato">Dermato</option>
@@ -655,7 +656,8 @@ const BOARDS = {
 };
 const ESPECIALIDADES = ['Dermato','Oftalmo','Ortoped','Psiquiatras','Gestores','Emagrecimento1','Emagrecimento2','Retomada'];
 const AULAS_GERAIS   = ['Mentoria','Hotseat','Hotseat Simultâneo','Master'];
-const ALL_TABS       = [...AULAS_GERAIS, ...ESPECIALIDADES];
+const AULAS_WINNERS  = ['Winners Encontro'];
+const ALL_TABS       = [...AULAS_GERAIS, ...ESPECIALIDADES, ...AULAS_WINNERS];
 
 // ═══════════════════════════════════════════
 // GENDER — explicit list + smart heuristics
@@ -957,7 +959,7 @@ function calcEvolutionByTurma(turma, upToWeek) {
     for (const aluno of pool) {
       // Tabs this turma attends
       const tabs = turma==='Master'
-        ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master']
+        ? (aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Winners Encontro'] : ['Mentoria','Hotseat','Hotseat Simultâneo','Master'])
         : ['Mentoria','Hotseat'];
       // Add their specialty if any
       if (aluno.especialidades && aluno.especialidades.length) {
