@@ -550,7 +550,7 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
           <option value="Hotseat">Hotseat</option>
           <option value="Hotseat Simultâneo">Hotseat Simultâneo</option>
           <option value="Master">Master</option>
-          <option value="Winners Encontro">Winners Encontro</option>
+          <option value="Winners Encontro">Winners</option>
         </optgroup>
         <optgroup label="Especialidades">
           <option value="Dermato">Dermato</option>
@@ -983,7 +983,7 @@ function calcEvolutionByTurma(turma, upToWeek) {
 // ── COMPOSITE QUALITY SCORE ──────────────────
 // P(40%) + C(25%) + V(25%) + F(10%) across all relevant tabs
 function calcCompositeScore(aluno, upToWeek) {
-  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Winners Encontro'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -1134,7 +1134,7 @@ function calcAscensaoScore(aluno, upToWeek) {
 }
 
 function calcCompositeScoreWeek(aluno, weekIdx) {
-  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Winners Encontro'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -1155,7 +1155,7 @@ function calcCompositeScoreWeek(aluno, weekIdx) {
 }
 
 function calcEngagement(aluno, week) {
-  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Winners Encontro'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -1790,7 +1790,7 @@ function detectMaxWeek() {
 
 // Engagement for a single week index (0-based)
 function calcEngagementWeek(aluno, weekIdx) {
-  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Winners Encontro'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -2283,8 +2283,9 @@ async function loadChamada() {
 }
 
 function getChamadaPool(tab) {
-  if (tab==='Master')           return allAlunos.filter(a=>a.turma==='Master');
-  if (ESPECIALIDADES.includes(tab)) return allAlunos.filter(a=>hasEsp(a, tab));
+  if (tab==='Master')                return allAlunos.filter(a=>a.turma==='Master');
+  if (tab==='Winners Encontro')      return allAlunos.filter(a=>a.turma==='Winners');
+  if (ESPECIALIDADES.includes(tab))  return allAlunos.filter(a=>hasEsp(a, tab));
   return allAlunos;
 }
 
