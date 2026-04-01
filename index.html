@@ -338,6 +338,7 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
         <option value="Hotseat">Hotseat</option>
         <option value="Hotseat Simultâneo">Hotseat Simultâneo</option>
         <option value="Master">Master (exclusivo)</option>
+        <option value="Winners Encontro">Winners Encontro (exclusivo)</option>
       </optgroup>
       <optgroup label="Especialidades">
         <option value="Dermato">Dermato</option>
@@ -348,6 +349,7 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
         <option value="Emagrecimento1">Emagrecimento1</option>
         <option value="Emagrecimento2">Emagrecimento2</option>
         <option value="Retomada">Retomada</option>
+        <option value="Cirurgiões">Cirurgiões</option>
       </optgroup>
     </select>
     <select id="csWeek" onchange="csLoad()">
@@ -654,7 +656,7 @@ const BOARDS = {
   Master:   { id:'18365478944', tagCol:'tag_mm1cqsgs' },
   Mentoria: { id:'18391780128', tagCol:'tag_mm1cs0hm' }
 };
-const ESPECIALIDADES = ['Dermato','Oftalmo','Ortoped','Psiquiatras','Gestores','Emagrecimento1','Emagrecimento2','Retomada'];
+const ESPECIALIDADES = ['Dermato','Oftalmo','Ortoped','Psiquiatras','Gestores','Emagrecimento1','Emagrecimento2','Retomada','Cirurgiões'];
 const AULAS_GERAIS   = ['Mentoria','Hotseat','Hotseat Simultâneo','Master'];
 const AULAS_WINNERS  = ['Winners Encontro'];
 const ALL_TABS       = [...AULAS_GERAIS, ...ESPECIALIDADES, ...AULAS_WINNERS];
@@ -1239,6 +1241,8 @@ function renderCsTable() {
     const renewB = (()=>{ const r=calcRenewalScore(d,currentWeek); return (r&&r.daysLeft<=60&&r.daysLeft>=0)?`<span class="b" style="background:rgba(0,232,122,.08);color:${r.color};border:1px solid rgba(0,232,122,.2)">${r.label}</span>`:''; })();
     const turmaTag = d.turma==='Master'
       ? `<span class="turma-m">Master</span>`
+      : d.turma==='Winners'
+      ? `<span class="turma-m" style="background:rgba(77,166,255,.12);color:var(--blue);border-color:rgba(77,166,255,.25)">Winners</span>`
       : `<span class="turma-t">Mentoria</span>`;
     const dn = displayName(d.name);
     return `<tr onclick="openDrModal('${esc(d.name)}')">
@@ -1866,6 +1870,8 @@ function openDrModal(name, showMsgs=true) {
   // ── Abas que este aluno frequenta ────────
   const alunoTabs = aluno.turma==='Master'
     ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master']
+    : aluno.turma==='Winners'
+    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Winners Encontro']
     : ['Mentoria','Hotseat'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
@@ -1978,8 +1984,13 @@ function openDrModal(name, showMsgs=true) {
 
   // ── Monta o modal ─────────────────────────
   document.getElementById('mName').textContent=`${tit(g)}. ${dn}`;
+  // Monta label de turma — Winners podem ser também do Master
+  const turmaLabel = aluno.turma==='Winners'
+    ? 'Master · Winners'
+    : aluno.turma;
+  const espLbl = espLabel(aluno);
   document.getElementById('mMeta').textContent=
-    `${aluno.turma}${espLabel(aluno)?' · '+espLabel(aluno):''}${aluno.phone?' · '+aluno.phone:''}${aluno.entryDate?' · Entrou: '+aluno.entryDate:''}`;
+    `${turmaLabel}${espLbl?' · '+espLbl:''}${aluno.phone?' · '+aluno.phone:''}${aluno.entryDate?' · Entrou: '+aluno.entryDate:''}`;
 
   // Substitui mHist por grid histórico
   document.getElementById('mHist').innerHTML=`
