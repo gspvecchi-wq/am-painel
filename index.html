@@ -463,7 +463,7 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
     <!-- WINNERS SECTION -->
     <div id="gestWinnersSection" style="display:none">
       <div class="sec-head" style="margin-top:32px;border-top:1px solid rgba(77,166,255,.15);padding-top:20px;">
-        <div class="sec-title" style="color:var(--blue)">⭐ Winners Clube</div>
+        <div class="sec-title">⭐ Winners Clube</div>
         <div class="sec-sub">Acompanhamento exclusivo da turma Winners</div>
       </div>
       <div class="charts-grid">
@@ -2363,7 +2363,7 @@ function renderChamadaTable(pool) {
       <td><div class="dr-name">${tit(aluno.gender)}. ${esc(dn)}</div>${espLabel(aluno)?`<div class="dr-sub">${espLabel(aluno)}</div>`:''}</td>
       <td><button class="pcfv-btn${r.P?' on-P':''}" data-field="P" onclick="togglePCFV('${escId(key)}','P')" title="Presente">P</button></td>
       ${isSoP ? dash : `<td><button class="pcfv-btn${r.C?' on-C':''}" data-field="C" onclick="togglePCFV('${escId(key)}','C')" title="Câmera">C</button></td>`}
-      ${isSoP ? dash : (isEsp?`<td><button class="pcfv-btn${r.F?' on-F':''}" data-field="F" onclick="togglePCFV('${escId(key)}','F')" title="Feedback">F</button></td>`:dash)}
+      ${isSoP ? dash : (isEsp||tab==='Winners Encontro'?`<td><button class="pcfv-btn${r.F?' on-F':''}" data-field="F" onclick="togglePCFV('${escId(key)}','F')" title="Feedback">F</button></td>`:dash)}
       ${isSoP ? dash : `<td><button class="pcfv-btn${r.V?' on-V':''}" data-field="V" onclick="togglePCFV('${escId(key)}','V')" title="Vitória">V</button></td>`}
     </tr>`;
   }).join('');
