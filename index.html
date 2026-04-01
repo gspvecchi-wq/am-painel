@@ -460,6 +460,22 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
     </div>
     <div class="risk-grid" id="gestRiskMentoria"></div>
 
+    <!-- WINNERS SECTION -->
+    <div id="gestWinnersSection" style="display:none">
+      <div class="sec-head" style="margin-top:32px;border-top:1px solid rgba(77,166,255,.15);padding-top:20px;">
+        <div class="sec-title" style="color:var(--blue)">⭐ Winners Clube</div>
+        <div class="sec-sub">Acompanhamento exclusivo da turma Winners</div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-wrap"><div class="chart-title">Evolução — Winners Encontro</div><div class="chart-bars" id="chartWinners"></div></div>
+      </div>
+      <div class="sec-head">
+        <div class="sec-title">Ranking de Risco — Winners</div>
+        <div class="sec-sub">Benchmark exclusivo Winners</div>
+      </div>
+      <div class="risk-grid" id="gestRiskWinners"></div>
+    </div>
+
     <!-- OPORTUNIDADES -->
     <div class="sec-head" style="margin-top:32px;">
       <div class="sec-title">🔥 Oportunidades de Renovação</div>
@@ -1244,7 +1260,7 @@ function renderCsTable() {
     const turmaTag = d.turma==='Master'
       ? `<span class="turma-m">Master</span>`
       : d.turma==='Winners'
-      ? `<span class="turma-m" style="background:rgba(77,166,255,.12);color:var(--blue);border-color:rgba(77,166,255,.25)">Winners</span>`
+      ? `<span class="turma-m">Winners</span>`
       : `<span class="turma-t">Mentoria</span>`;
     const dn = displayName(d.name);
     return `<tr onclick="openDrModal('${esc(d.name)}')">
@@ -1650,6 +1666,19 @@ function renderGest() {
   renderRiskGrid('gestRiskMaster',   withScores.filter(a=>a.turma==='Master'));
   renderRiskGrid('gestRiskMentoria', withScores.filter(a=>a.turma==='Mentoria'));
 
+  // ── WINNERS SECTION ───────────────────────
+  const winnersAlunos = allAlunos.filter(a=>a.turma==='Winners');
+  const gestWinnersSection = document.getElementById('gestWinnersSection');
+  if (gestWinnersSection) {
+    if (winnersAlunos.length > 0) {
+      gestWinnersSection.style.display = 'block';
+      renderEvolutionChart('chartWinners', calcEvolutionByTurmaTab('Winners Encontro', chartWeeks), 'var(--blue)', winnersAlunos.length);
+      renderRiskGrid('gestRiskWinners', withScores.filter(a=>a.turma==='Winners'));
+    } else {
+      gestWinnersSection.style.display = 'none';
+    }
+  }
+
   // ── RENOVAÇÃO RANKING ─────────────────────────────────────
   const renovacaoCandidates = allAlunos
     .map(a => ({ ...a, renScore: calcRenewalScore(a, refW) }))
@@ -1810,6 +1839,23 @@ function calcEngagementWeek(aluno, weekIdx) {
     if (entry&&entry.history[weekIdx]&&entry.history[weekIdx].P) attended++;
   }
   return total ? Math.round(attended/total*100) : 0;
+}
+
+// calcEvolutionByTurmaTab — evolução de presença por tab específica (ex: 'Winners Encontro')
+function calcEvolutionByTurmaTab(tab, upToWeek) {
+  const pool = getPool(tab);
+  if (!pool.length) return [];
+  const weeks = [];
+  for (let w=0; w<upToWeek; w++) {
+    let total=0, attended=0;
+    for (const aluno of pool) {
+      const entry = getKvEntry(tab, norm(aluno.name));
+      total++;
+      if (entry && entry.history[w] && entry.history[w].P) attended++;
+    }
+    if (total > 0) weeks.push({ w: w+1, pct: Math.round(attended/total*100), attended, total });
+  }
+  return weeks;
 }
 
 function renderEvolutionChart(elId, weeks, color, totalAlunos) {
@@ -1986,13 +2032,14 @@ function openDrModal(name, showMsgs=true) {
 
   // ── Monta o modal ─────────────────────────
   document.getElementById('mName').textContent=`${tit(g)}. ${dn}`;
-  // Monta label de turma — Winners podem ser também do Master
-  const turmaLabel = aluno.turma==='Winners'
-    ? 'Master · Winners'
-    : aluno.turma;
+  // Monta label de turma — pode ter múltiplas (Master, Winners, especialidades)
+  const turmasAluno = [];
+  if (aluno.turma === 'Winners') { turmasAluno.push('Master'); turmasAluno.push('Winners'); }
+  else { turmasAluno.push(aluno.turma); }
   const espLbl = espLabel(aluno);
+  if (espLbl) turmasAluno.push(...espLbl.split(', '));
   document.getElementById('mMeta').textContent=
-    `${turmaLabel}${espLbl?' · '+espLbl:''}${aluno.phone?' · '+aluno.phone:''}${aluno.entryDate?' · Entrou: '+aluno.entryDate:''}`;
+    `${turmasAluno.join(' · ')}${aluno.phone?' · '+aluno.phone:''}${aluno.entryDate?' · Entrou: '+aluno.entryDate:''}`;
 
   // Substitui mHist por grid histórico
   document.getElementById('mHist').innerHTML=`
