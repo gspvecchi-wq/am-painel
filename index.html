@@ -1568,9 +1568,12 @@ function renderGest() {
   document.getElementById('gAbsent').textContent = absentCount;
 
   // ── WEEK COMPARISON CARDS ──────────────────
-  const compareTabs = ['Mentoria','Hotseat','Hotseat Simultâneo','Master',...ESPECIALIDADES.filter(e=>
-    allAlunos.some(a=>hasEsp(a, e))
-  )];
+  const hasWinners = allAlunos.some(a=>a.turma==='Winners');
+  const compareTabs = [
+    'Mentoria','Hotseat','Hotseat Simultâneo','Master',
+    ...(hasWinners ? ['Winners Encontro'] : []),
+    ...ESPECIALIDADES.filter(e=>allAlunos.some(a=>hasEsp(a, e)))
+  ];
   const wcEl = document.getElementById('weekCompare');
 
   if (allWeeks) {
