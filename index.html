@@ -936,9 +936,14 @@ async function reloadAll() {
 // DOCTOR BUILDER
 // ═══════════════════════════════════════════
 function getPool(tab) {
-  if (tab==='Master')           return allAlunos.filter(a=>a.turma==='Master');
-  if (tab==='Winners Encontro') return allAlunos.filter(a=>a.turma==='Winners');
-  if (ESPECIALIDADES.includes(tab)) return allAlunos.filter(a=>hasEsp(a, tab));
+  if (tab==='Mentoria' || tab==='Hotseat' || tab==='Hotseat Simultâneo')
+    return allAlunos;
+  if (tab==='Master')
+    return allAlunos.filter(a=>a.turma==='Master' || a.turma==='Winners');
+  if (tab==='Winners Encontro')
+    return allAlunos.filter(a=>a.turma==='Winners');
+  if (ESPECIALIDADES.includes(tab))
+    return allAlunos.filter(a=>hasEsp(a, tab));
   return allAlunos;
 }
 
@@ -970,7 +975,9 @@ function buildDoctors(tab, week) {
 // Used for gestão evolution charts
 // Returns array of {w, pct, attended, total} per week up to currentWeek
 function calcEvolutionByTurma(turma, upToWeek) {
-  const pool = allAlunos.filter(a=>a.turma===turma);
+  const pool = turma==='Master'
+    ? allAlunos.filter(a=>a.turma==='Master'||a.turma==='Winners')
+    : allAlunos.filter(a=>a.turma===turma);
   if (!pool.length) return [];
 
   const weeks = [];
@@ -979,8 +986,8 @@ function calcEvolutionByTurma(turma, upToWeek) {
     for (const aluno of pool) {
       // Tabs this turma attends
       const tabs = turma==='Master'
-        ? (aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Winners Encontro'] : ['Mentoria','Hotseat','Hotseat Simultâneo','Master'])
-        : ['Mentoria','Hotseat'];
+        ? (aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro'] : ['Mentoria','Hotseat','Hotseat Simultâneo','Master'])
+        : ['Mentoria','Hotseat','Hotseat Simultâneo'];
       // Add their specialty if any
       if (aluno.especialidades && aluno.especialidades.length) {
         for (const esp of aluno.especialidades) {
@@ -1003,7 +1010,7 @@ function calcEvolutionByTurma(turma, upToWeek) {
 // ── COMPOSITE QUALITY SCORE ──────────────────
 // P(40%) + C(25%) + V(25%) + F(10%) across all relevant tabs
 function calcCompositeScore(aluno, upToWeek) {
-  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Winners Encontro'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+  const tabs = aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro'] : aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -1154,7 +1161,7 @@ function calcAscensaoScore(aluno, upToWeek) {
 }
 
 function calcCompositeScoreWeek(aluno, weekIdx) {
-  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Winners Encontro'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+  const tabs = aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro'] : aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -1175,7 +1182,7 @@ function calcCompositeScoreWeek(aluno, weekIdx) {
 }
 
 function calcEngagement(aluno, week) {
-  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Winners Encontro'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+  const tabs = aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro'] : aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -1259,7 +1266,7 @@ function renderCsTable() {
     const renewB = (()=>{ const r=calcRenewalScore(d,currentWeek); return (r&&r.daysLeft<=60&&r.daysLeft>=0)?`<span class="b" style="background:rgba(0,232,122,.08);color:${r.color};border:1px solid rgba(0,232,122,.2)">${r.label}</span>`:''; })();
     const turmaTag = d.turma==='Master'
       ? `<span class="turma-m">Master</span>`
-      : d.turma==='Winners'
+      : d.isWinners
       ? `<span class="turma-m">Winners</span>`
       : `<span class="turma-t">Mentoria</span>`;
     const dn = displayName(d.name);
@@ -1666,7 +1673,7 @@ function renderGest() {
       </div>`;
     }).join('') || '<div style="color:var(--sub);font-size:12px;padding:12px">Sem dados</div>';
   }
-  renderRiskGrid('gestRiskMaster',   withScores.filter(a=>a.turma==='Master'));
+  renderRiskGrid('gestRiskMaster',   withScores.filter(a=>a.turma==='Master'||a.turma==='Winners'));
   renderRiskGrid('gestRiskMentoria', withScores.filter(a=>a.turma==='Mentoria'));
 
   // ── WINNERS SECTION ───────────────────────
@@ -1828,7 +1835,7 @@ function detectMaxWeek() {
 
 // Engagement for a single week index (0-based)
 function calcEngagementWeek(aluno, weekIdx) {
-  const tabs = aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Winners Encontro'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+  const tabs = aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro'] : aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -1919,11 +1926,11 @@ function openDrModal(name, showMsgs=true) {
   const g = aluno.gender, dn = displayName(name);
 
   // ── Abas que este aluno frequenta ────────
-  const alunoTabs = aluno.turma==='Master'
+  const alunoTabs = aluno.turma==='Winners'
+    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro']
+    : aluno.turma==='Master'
     ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master']
-    : aluno.turma==='Winners'
-    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Winners Encontro']
-    : ['Mentoria','Hotseat'];
+    : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -2037,7 +2044,7 @@ function openDrModal(name, showMsgs=true) {
   document.getElementById('mName').textContent=`${tit(g)}. ${dn}`;
   // Monta label de turma — pode ter múltiplas (Master, Winners, especialidades)
   const turmasAluno = [];
-  if (aluno.turma === 'Winners') { turmasAluno.push('Master'); turmasAluno.push('Winners'); }
+  if (aluno.turma==='Winners') { turmasAluno.push('Master'); turmasAluno.push('Winners'); }
   else { turmasAluno.push(aluno.turma); }
   const espLbl = espLabel(aluno);
   if (espLbl) turmasAluno.push(...espLbl.split(', '));
@@ -2346,9 +2353,14 @@ async function loadChamada() {
 }
 
 function getChamadaPool(tab) {
-  if (tab==='Master')                return allAlunos.filter(a=>a.turma==='Master');
-  if (tab==='Winners Encontro')      return allAlunos.filter(a=>a.turma==='Winners');
-  if (ESPECIALIDADES.includes(tab))  return allAlunos.filter(a=>hasEsp(a, tab));
+  if (tab==='Mentoria' || tab==='Hotseat' || tab==='Hotseat Simultâneo')
+    return allAlunos;
+  if (tab==='Master')
+    return allAlunos.filter(a=>a.turma==='Master' || a.turma==='Winners');
+  if (tab==='Winners Encontro')
+    return allAlunos.filter(a=>a.turma==='Winners');
+  if (ESPECIALIDADES.includes(tab))
+    return allAlunos.filter(a=>hasEsp(a, tab));
   return allAlunos;
 }
 
