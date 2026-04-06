@@ -320,6 +320,7 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
     <button class="nav-tab" onclick="switchView('gest',this)">Gestão · Saúde</button>
     <button class="nav-tab" onclick="switchView('aluno',this)">Aluno · Perfil</button>
     <button class="nav-tab" onclick="switchView('chamada',this)">📋 Chamada</button>
+    <button class="nav-tab" onclick="switchView('acionamentos',this)">📊 Acionamentos</button>
   </div>
   <div class="topbar-right">
     <div class="month-badge" id="monthBadge">—</div>
@@ -346,11 +347,13 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
         <option value="Ortoped">Ortoped</option>
         <option value="Psiquiatras">Psiquiatras</option>
         <option value="Gestores">Gestores</option>
-        <option value="Emagrecimento1">Emagrecimento1</option>
-        <option value="Emagrecimento2">Emagrecimento2</option>
+        <option value="Emagrecimento">Emagrecimento</option>
         <option value="Retomada">Retomada</option>
         <option value="Cirurgiões">Cirurgiões</option>
       </optgroup>
+    </select>
+    <select id="csCiclo" onchange="onCsCicloChange()" style="background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:12px;outline:none;cursor:pointer;">
+      <option value="">Mês atual</option>
     </select>
     <select id="csWeek" onchange="csLoad()">
       <option value="1">Semana 1</option>
@@ -576,17 +579,22 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
           <option value="Ortoped">Ortoped</option>
           <option value="Psiquiatras">Psiquiatras</option>
           <option value="Gestores">Gestores</option>
-          <option value="Emagrecimento1">Emagrecimento1</option>
-          <option value="Emagrecimento2">Emagrecimento2</option>
+          <option value="Emagrecimento">Emagrecimento</option>
           <option value="Retomada">Retomada</option>
           <option value="Cirurgiões">Cirurgiões</option>
         </optgroup>
       </select>
-      <input type="date" id="chamadaData" onchange="loadChamada();atualizarSemanaBadge()"
+      <select id="chamadaCiclo" onchange="onChamadaCicloChange()" style="display:none;">
+        <option value="">Mês atual</option>
+      </select>
+      <input type="date" id="chamadaData" onchange="loadChamada();atualizarSemanaBadge();checkSemanaAtual()"
         style="background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:12px;outline:none;cursor:pointer;"
         title="Data da aula"/>
       <span id="semanaBadge" style="font-size:11px;font-weight:700;color:var(--acc);background:rgba(0,232,122,.1);border:1px solid rgba(0,232,122,.2);padding:4px 10px;border-radius:20px;white-space:nowrap;"></span>
       <button onclick="salvarChamada()" style="background:var(--acc);color:#000;border:none;padding:8px 20px;border-radius:9px;font-family:'Outfit',sans-serif;font-weight:700;font-size:12px;cursor:pointer;margin-left:auto;">💾 Salvar chamada</button>
+    </div>
+    <div id="chamadaPassadaAviso" style="display:none;padding:10px 16px;border-radius:9px;background:rgba(255,149,0,.08);border:1px solid rgba(255,149,0,.25);color:var(--warn);font-size:12px;font-weight:600;margin-bottom:14px;">
+      ⚠️ Você está visualizando uma semana passada. O acionamento não está disponível para semanas anteriores.
     </div>
 
     <!-- BUSCA -->
@@ -614,6 +622,27 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
     </div>
 
     <div id="chamadaSaveMsg" style="display:none;margin-top:12px;padding:12px 16px;border-radius:9px;font-size:12px;font-weight:600;"></div>
+  </div>
+</div>
+
+<!-- ACIONAMENTOS VIEW -->
+<div class="view" id="view-acionamentos">
+  <div style="padding:16px 0 0;">
+    <div class="controls" style="margin-bottom:16px;">
+      <input type="date" id="acDeData" style="background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:12px;outline:none;" title="De"/>
+      <input type="date" id="acAteData" style="background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:9px;font-family:'Outfit',sans-serif;font-size:12px;outline:none;" title="Até"/>
+      <button onclick="carregarAcionamentos()" style="background:var(--acc);color:#000;border:none;padding:8px 20px;border-radius:9px;font-family:'Outfit',sans-serif;font-weight:700;font-size:12px;cursor:pointer;">🔍 Buscar</button>
+    </div>
+    <div id="acStats" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;"></div>
+    <div id="acLogin" style="display:none;padding:16px;font-size:12px;color:var(--warn);">⚠️ Faça login na aba Chamada primeiro para visualizar os acionamentos.</div>
+    <div id="acLoading" style="display:none;padding:20px;text-align:center;color:var(--sub);font-size:12px;">⏳ Carregando...</div>
+    <div id="acEmpty" style="display:none;padding:40px;text-align:center;color:var(--sub);font-size:12px;">Nenhum acionamento encontrado no período.</div>
+    <div class="tbl-wrap" id="acTblWrap" style="display:none;">
+      <table>
+        <thead><tr><th>Data/Hora</th><th>Aluno</th><th>CS</th><th>Motivos</th><th>Via</th><th>Mensagem</th></tr></thead>
+        <tbody id="acTbody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -673,7 +702,7 @@ const BOARDS = {
   Master:   { id:'18365478944', tagCol:'tag_mm1cqsgs' },
   Mentoria: { id:'18391780128', tagCol:'tag_mm1cs0hm' }
 };
-const ESPECIALIDADES = ['Dermato','Oftalmo','Ortoped','Psiquiatras','Gestores','Emagrecimento1','Emagrecimento2','Retomada','Cirurgiões'];
+const ESPECIALIDADES = ['Dermato','Oftalmo','Ortoped','Psiquiatras','Gestores','Emagrecimento','Retomada','Cirurgiões'];
 const AULAS_GERAIS   = ['Mentoria','Hotseat','Hotseat Simultâneo','Master'];
 const AULAS_WINNERS  = ['Winners Encontro'];
 const ALL_TABS       = [...AULAS_GERAIS, ...ESPECIALIDADES, ...AULAS_WINNERS];
@@ -915,6 +944,8 @@ async function reloadAll() {
       const kvRes = await fetch(WORKER_URL.replace('/dados','/presenca/all'));
       kvPresenca = kvRes.ok ? await kvRes.json() : {};
       popularCicloSelector();
+      popularCicloSelectorCS();
+      popularCicloSelectorChamada();
     } catch(e) { kvPresenca = {}; }
 
     loaded = true;
@@ -1008,37 +1039,94 @@ function calcEvolutionByTurma(turma, upToWeek) {
 }
 
 // ── COMPOSITE QUALITY SCORE ──────────────────
-// P(40%) + C(25%) + V(25%) + F(10%) across all relevant tabs
+// Weighted scoring by turma priority order.
+// Novos alunos (<60 dias) include especialidade weight.
+// Each tab score = P(50%) + C(25%) + V(25%) [+ F(20%) for esp tabs, redistributed]
 function calcCompositeScore(aluno, upToWeek) {
-  const tabs = aluno.isWinners ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro'] : aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
-  if (aluno.especialidades && aluno.especialidades.length) {
-    for (const esp of aluno.especialidades) {
-      const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
-      if (spec && !tabs.includes(spec)) tabs.push(spec);
+  const novo = isNovo(aluno);
+  const hasEspTabs = aluno.especialidades && aluno.especialidades.length > 0;
+
+  // Build weighted tab list based on turma
+  // format: { tab, weight }
+  let weightedTabs = [];
+
+  if (aluno.isWinners) {
+    weightedTabs = [
+      { tab: 'Winners Encontro', w: 30 },
+      { tab: 'Master',           w: 25 },
+      { tab: 'Mentoria',         w: 20 },
+      { tab: 'Hotseat',          w: 15 },
+      { tab: 'Hotseat Simultâneo', w: (novo && hasEspTabs) ? 5 : 10 }
+    ];
+    if (novo && hasEspTabs) {
+      for (const esp of aluno.especialidades) {
+        const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
+        if (spec) weightedTabs.push({ tab: spec, w: 5 });
+      }
+    }
+  } else if (aluno.turma === 'Master') {
+    weightedTabs = [
+      { tab: 'Master',           w: 35 },
+      { tab: 'Mentoria',         w: 25 },
+      { tab: 'Hotseat',          w: 20 },
+      { tab: 'Hotseat Simultâneo', w: (novo && hasEspTabs) ? 8 : 20 }
+    ];
+    if (novo && hasEspTabs) {
+      for (const esp of aluno.especialidades) {
+        const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
+        if (spec) weightedTabs.push({ tab: spec, w: 12 });
+      }
+    }
+  } else {
+    // Mentoria turma
+    weightedTabs = [
+      { tab: 'Mentoria',           w: 35 },
+      { tab: 'Hotseat',            w: 30 },
+      { tab: 'Hotseat Simultâneo', w: (novo && hasEspTabs) ? 15 : 35 }
+    ];
+    if (novo && hasEspTabs) {
+      for (const esp of aluno.especialidades) {
+        const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
+        if (spec) weightedTabs.push({ tab: spec, w: 20 });
+      }
     }
   }
 
-  let pSlots=0,pHit=0, cSlots=0,cHit=0, vSlots=0,vHit=0, fSlots=0,fHit=0;
-  for (const tab of tabs) {
+  // Normalize weights to sum 100
+  const totalW = weightedTabs.reduce((s,t)=>s+t.w,0);
+
+  let compositeScore = 0;
+  for (const { tab, w } of weightedTabs) {
     const entry = getKvEntry(tab, norm(aluno.name));
     const isEspTab = ESPECIALIDADES.includes(tab);
-    for (let w=0; w<upToWeek; w++) {
-      const h = entry&&entry.history[w] ? entry.history[w] : {P:false,C:false,F:false,V:false};
-      pSlots++; if(h.P) pHit++;
-      cSlots++; if(h.P&&h.C) cHit++;
-      vSlots++; if(h.P&&h.V) vHit++;
-      if(isEspTab){ fSlots++; if(h.P&&h.F) fHit++; }
+    let pHit=0, cHit=0, vHit=0, fHit=0, slots=0;
+    for (let i=0; i<upToWeek; i++) {
+      const h = entry&&entry.history[i] ? entry.history[i] : {P:false,C:false,F:false,V:false};
+      slots++;
+      if(h.P) pHit++;
+      if(h.P&&h.C) cHit++;
+      if(h.P&&h.V) vHit++;
+      if(isEspTab&&h.P&&h.F) fHit++;
     }
+    if (!slots) continue;
+    const pS = pHit/slots;
+    const cS = cHit/slots;
+    const vS = vHit/slots;
+    let tabScore;
+    if (isEspTab) {
+      const fS = fHit/Math.max(pHit,1);
+      tabScore = pS*50 + cS*15 + vS*15 + fS*20;
+    } else {
+      tabScore = pS*50 + cS*25 + vS*25;
+    }
+    compositeScore += tabScore * (w / totalW);
   }
-  const pScore = pSlots  ? pHit/pSlots   : 0;
-  const cScore = cSlots  ? cHit/cSlots   : 0;
-  const vScore = vSlots  ? vHit/vSlots   : 0;
-  const fScore = fSlots  ? fHit/fSlots   : 1; // no esp = full score for F
-  // Calls bonus: +5 per call with specialist, max +10 (2 calls)
+
+  // Calls bonus: +5 per call with specialist, max +10
   const callsData = (kvPresenca['__calls__']||{})[norm(aluno.name)] || { leonardo: 0, bruno: 0 };
   const totalCalls = (callsData.leonardo||0) + (callsData.bruno||0);
   const callsBonus = Math.min(totalCalls, 2) * 5;
-  return Math.round((pScore*40 + cScore*25 + vScore*25 + fScore*10) + callsBonus);
+  return Math.round(compositeScore + callsBonus);
 }
 
 // Risk = inverse of composite score, weighted by consecutive absences
@@ -2114,14 +2202,29 @@ function openDrModal(name, showMsgs=true) {
   window._aiAlunoScore = engScore;
   window._aiAlunoTrend = trendLabel;
 
-  // Mensagens — só no CS/Gestão, não no Perfil
+  // Mensagens — só no CS/Gestão, não no Perfil; e só na semana atual na Chamada
   const msgSection = document.getElementById('mMsgSection');
-  if (showMsgs) {
+  const viewAtiva = document.querySelector('.view.active')?.id;
+  const semanaPassadaNaChamada = viewAtiva === 'view-chamada' && window._chamadaSemanaAtual === false;
+  if (showMsgs && !semanaPassadaNaChamada) {
     msgSection.style.display = 'block';
     const d=_csDoctors.find(x=>x.name===name)||{motivos:[],consAbs:0};
     const msgs=buildMsgs({name:dn,motivos:d.motivos,consAbs:d.consAbs,tab:currentTab,g});
     document.getElementById('mTabs').innerHTML=msgs.map((m,i)=>`<button class="mtab ${i===0?'active':''}" onclick="switchMsg(${i},this)">${m.label}</button>`).join('');
     document.getElementById('mBoxes').innerHTML=msgs.map((m,i)=>`<div class="msg-box ${i===0?'active':''}" id="mbox${i}">${escHtml(m.text)}<br><button class="copy-btn" onclick="copyMsg(${i},this)">📋 COPIAR</button></div>`).join('');
+  } else if (showMsgs && semanaPassadaNaChamada) {
+    // Semana passada: mostra só resumo da presença registrada, sem acionamento
+    msgSection.style.display = 'block';
+    const d=_csDoctors.find(x=>x.name===name)||{motivos:[],consAbs:0};
+    document.getElementById('mTabs').innerHTML='';
+    const presStatus = d.cur?.P
+      ? `<span style="color:var(--safe)">✓ Presente</span>${d.cur.C?' · Câmera':''}${d.cur.V?' · Vitória':''}`
+      : `<span style="color:var(--danger)">✗ Ausente</span>`;
+    document.getElementById('mBoxes').innerHTML=`<div style="padding:14px 16px;background:var(--s2);border-radius:10px;font-size:12px;color:var(--sub);">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;font-weight:700;">Registro da semana passada</div>
+      <div style="font-size:13px;color:var(--text)">${presStatus}</div>
+      <div style="margin-top:6px;font-size:11px;">Acionamento disponível apenas na semana atual.</div>
+    </div>`;
   } else {
     msgSection.style.display = 'none';
   }
@@ -2241,9 +2344,80 @@ function switchView(id,el) {
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('view-'+id).classList.add('active');
   el.classList.add('active');
-  if (id==='gest'    && loaded) renderGest();
-  if (id==='aluno'   && loaded) renderAlunoView();
-  if (id==='chamada' && loaded) initChamada();
+  if (id==='gest'          && loaded) renderGest();
+  if (id==='aluno'         && loaded) renderAlunoView();
+  if (id==='chamada'       && loaded) initChamada();
+  if (id==='acionamentos')           initAcionamentos();
+}
+
+// ── Chamada: seletor de ciclo ────────────────
+function popularCicloSelectorChamada() {
+  const sel = document.getElementById('chamadaCiclo');
+  if (!sel) return;
+  const ciclos = [];
+  for (const tab of Object.keys(kvPresenca)) {
+    if (tab === '__calls__' || tab === '__dates__') continue;
+    for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
+      if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
+    }
+  }
+  ciclos.sort().reverse();
+  const mesAtual = new Date().toISOString().slice(0,7);
+  if (!ciclos.includes(mesAtual)) ciclos.unshift(mesAtual);
+  sel.innerHTML = ciclos.map(c => {
+    const label = new Date(c+'-15').toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+    return `<option value="${c}" ${c===mesAtual?'selected':''}>${label.charAt(0).toUpperCase()+label.slice(1)}</option>`;
+  }).join('');
+}
+
+// ── CS: seletor de ciclo ────────────────────
+function popularCicloSelectorCS() {
+  const sel = document.getElementById('csCiclo');
+  if (!sel) return;
+  const ciclos = [];
+  for (const tab of Object.keys(kvPresenca)) {
+    if (tab === '__calls__' || tab === '__dates__') continue;
+    for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
+      if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
+    }
+  }
+  ciclos.sort().reverse();
+  const mesAtual = new Date().toISOString().slice(0,7);
+  if (!ciclos.includes(mesAtual)) ciclos.unshift(mesAtual);
+  sel.innerHTML = ciclos.map(c => {
+    const label = new Date(c+'-15').toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+    return `<option value="${c}" ${c===mesAtual?'selected':''}>${label.charAt(0).toUpperCase()+label.slice(1)}</option>`;
+  }).join('');
+}
+
+function onCsCicloChange() {
+  cicloAtivo = document.getElementById('csCiclo').value || new Date().toISOString().slice(0,7);
+  csLoad();
+}
+
+function onChamadaCicloChange() {
+  // Select oculto — sem ação visual necessária
+  loadChamada();
+}
+
+// Verifica se a data selecionada é da semana atual e mostra/oculta aviso
+function checkSemanaAtual() {
+  const dateStr = document.getElementById('chamadaData')?.value;
+  const aviso = document.getElementById('chamadaPassadaAviso');
+  const mMsgSection = document.getElementById('mMsgSection');
+  if (!aviso) return;
+  if (!dateStr) { aviso.style.display='none'; return; }
+  const hoje = new Date();
+  const hojeStr = hoje.toISOString().slice(0,10);
+  const semanaHoje = dateToSemana(hojeStr);
+  const cicloHoje = hojeStr.slice(0,7);
+  const semanaData = dateToSemana(dateStr);
+  const cicloData = dateStr.slice(0,7);
+  const isSemanaAtual = (cicloData === cicloHoje && semanaData === semanaHoje);
+  aviso.style.display = isSemanaAtual ? 'none' : 'block';
+  // O mMsgSection no modal é controlado por openDrModal, não precisamos tocar aqui
+  // Guardamos o estado para uso no modal
+  window._chamadaSemanaAtual = isSemanaAtual;
 }
 
 // ═══════════════════════════════════════════
@@ -2287,7 +2461,9 @@ function initChamada() {
     // Set default date to today
     const dataEl = document.getElementById('chamadaData');
     if (!dataEl.value) dataEl.value = new Date().toISOString().slice(0,10);
+    popularCicloSelectorChamada();
     atualizarSemanaBadge();
+    checkSemanaAtual();
     loadChamada();
   }
 }
@@ -2690,6 +2866,107 @@ async function gerarAcionamentoIA() {
   } catch(e) {
     aiLoadingStop();
     aiShowOutput('Erro de conexão: ' + e.message);
+  }
+}
+
+// ═══════════════════════════════════════════
+// ACIONAMENTOS — Histórico
+// ═══════════════════════════════════════════
+function initAcionamentos() {
+  const pwd = localStorage.getItem('am_cs_pwd');
+  const loginDiv = document.getElementById('acLogin');
+  if (!pwd) {
+    if (loginDiv) loginDiv.style.display = 'block';
+    return;
+  }
+  if (loginDiv) loginDiv.style.display = 'none';
+  // Preenche datas padrão: hoje e 7 dias atrás
+  const hoje = new Date().toISOString().slice(0,10);
+  const seteDias = new Date(Date.now() - 7*24*60*60*1000).toISOString().slice(0,10);
+  const deEl = document.getElementById('acDeData');
+  const ateEl = document.getElementById('acAteData');
+  if (deEl && !deEl.value) deEl.value = seteDias;
+  if (ateEl && !ateEl.value) ateEl.value = hoje;
+  carregarAcionamentos();
+}
+
+async function carregarAcionamentos() {
+  const pwd = localStorage.getItem('am_cs_pwd');
+  if (!pwd) return;
+  const de  = document.getElementById('acDeData')?.value || new Date(Date.now()-7*24*60*60*1000).toISOString().slice(0,10);
+  const ate = document.getElementById('acAteData')?.value || new Date().toISOString().slice(0,10);
+
+  document.getElementById('acLoading').style.display = 'block';
+  document.getElementById('acEmpty').style.display = 'none';
+  document.getElementById('acTblWrap').style.display = 'none';
+  document.getElementById('acStats').innerHTML = '';
+
+  try {
+    const res = await fetch(`${WORKER_BASE}/acionamentos?de=${de}&ate=${ate}`, {
+      headers: { 'X-CS-Password': pwd }
+    });
+    const data = await res.json();
+    document.getElementById('acLoading').style.display = 'none';
+
+    if (!data.ok || !data.registros?.length) {
+      document.getElementById('acEmpty').style.display = 'block';
+      return;
+    }
+
+    const registros = data.registros;
+
+    // Stats por CS
+    const porCS = {};
+    for (const r of registros) {
+      const n = r.csNome || 'CS';
+      if (!porCS[n]) porCS[n] = { total: 0, wpp: 0, manual: 0 };
+      porCS[n].total++;
+      if (r.via === 'whatsapp') porCS[n].wpp++;
+      else porCS[n].manual++;
+    }
+
+    // Renderiza stats
+    const statColors = ['var(--acc)','var(--safe)','var(--blue)','var(--warn)','#9966FF'];
+    let statsHtml = `<div class="stat-card sc-acc" style="padding:10px 16px;min-width:90px"><div class="stat-num" style="font-size:28px">${registros.length}</div><div class="stat-lbl">Total acionamentos</div></div>`;
+    Object.entries(porCS).forEach(([nome, s], i) => {
+      const cor = statColors[(i+1) % statColors.length];
+      statsHtml += `<div class="stat-card" style="padding:10px 16px;min-width:90px;border-color:rgba(255,255,255,.08)">
+        <div class="stat-num" style="font-size:24px;color:${cor}">${s.total}</div>
+        <div class="stat-lbl">${nome}</div>
+        <div style="font-size:10px;color:var(--sub);margin-top:2px">${s.wpp} WPP · ${s.manual} manual</div>
+      </div>`;
+    });
+    document.getElementById('acStats').innerHTML = statsHtml;
+
+    // Renderiza tabela
+    const fmtHora = iso => {
+      const d = new Date(iso);
+      return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    };
+    const viaBadge = via => {
+      if (via === 'whatsapp')       return '<span style="color:var(--safe);font-weight:700;font-size:10px">✓ WPP</span>';
+      if (via === 'whatsapp-erro')  return '<span style="color:var(--warn);font-weight:700;font-size:10px">⚠️ WPP</span>';
+      return '<span style="color:var(--sub);font-size:10px">📋 Manual</span>';
+    };
+
+    document.getElementById('acTbody').innerHTML = [...registros].reverse().map(r => {
+      const motivos = (r.motivos||[]).map(m=>`<span class="b ${bCls(m)}">${bLbl(m)}</span>`).join('');
+      const msgPreview = (r.mensagem||'').slice(0,80).replace(/\n/g,' ') + ((r.mensagem||'').length > 80 ? '…' : '');
+      return `<tr>
+        <td style="white-space:nowrap;font-size:11px;color:var(--sub)">${fmtHora(r.hora)}</td>
+        <td><div style="font-weight:600;font-size:12px">${esc(r.alunoNome||'—')}</div></td>
+        <td style="font-size:12px;color:var(--acc);font-weight:600">${esc(r.csNome||'CS')}</td>
+        <td><div class="badges">${motivos||'<span style="color:var(--sub);font-size:10px">—</span>'}</div></td>
+        <td>${viaBadge(r.via)}</td>
+        <td style="font-size:11px;color:var(--sub);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.mensagem||'')}">${esc(msgPreview)||'—'}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('acTblWrap').style.display = 'block';
+  } catch(e) {
+    document.getElementById('acLoading').style.display = 'none';
+    document.getElementById('acEmpty').style.display = 'block';
+    document.getElementById('acEmpty').textContent = 'Erro ao carregar: ' + e.message;
   }
 }
 
