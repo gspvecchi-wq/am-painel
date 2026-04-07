@@ -964,6 +964,8 @@ async function enviarResumoWpp(teste=false) {
     const res = await fetch(`${WORKER_BASE}/whatsapp/resumo`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd, 'X-CS-Nome': localStorage.getItem('am_cs_nome')||csNomeAtual||'CS' },
+      body
+    });
     if (res.ok) {
       const data = await res.json();
       msg.style.display = 'block';
