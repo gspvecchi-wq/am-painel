@@ -325,7 +325,19 @@ tbody td{padding:12px 14px;font-size:12px;vertical-align:middle;}
       <div class="field"><label>Senha</label><input type="password" id="csLoginPwdNew2" placeholder="••••••" onkeydown="if(event.key==='Enter')doLogin()"/></div>
       <button class="btn-primary" onclick="doLogin()" style="width:100%;margin-bottom:12px">Entrar</button>
       <div id="loginErr2" style="color:var(--danger);font-size:11px;margin-bottom:8px;display:none"></div>
-      <div style="text-align:center;"><button onclick="toggleOverlayCadastro(true)" style="background:transparent;border:none;color:var(--acc);font-size:12px;cursor:pointer;text-decoration:underline;">Criar conta com código de convite</button></div>
+      <div style="text-align:center;display:flex;justify-content:center;gap:16px;">
+        <button onclick="toggleOverlayCadastro(true)" style="background:transparent;border:none;color:var(--acc);font-size:12px;cursor:pointer;text-decoration:underline;">Criar conta com código de convite</button>
+        <button onclick="toggleOverlayReset(true)" style="background:transparent;border:none;color:var(--sub);font-size:12px;cursor:pointer;text-decoration:underline;">Esqueci minha senha</button>
+      </div>
+    </div>
+    <div id="resetSenhaForm2" style="display:none">
+      <div style="font-size:13px;color:var(--sub);margin-bottom:16px;text-align:center;">Redefina sua senha usando seu e-mail e o código de convite.</div>
+      <div class="field"><label>E-mail</label><input type="email" id="resetEmail2" placeholder="seu@email.com"/></div>
+      <div class="field"><label>Nova senha</label><input type="password" id="resetNovaSenha2" placeholder="Mínimo 6 caracteres"/></div>
+      <div class="field"><label>Código de convite</label><input type="text" id="resetCodigo2" placeholder="Código fornecido pelo gestor"/></div>
+      <button class="btn-primary" onclick="doResetSenha()" style="width:100%;margin-bottom:12px">Redefinir senha</button>
+      <div id="resetErr2" style="color:var(--danger);font-size:11px;margin-bottom:8px;display:none"></div>
+      <div style="text-align:center;"><button onclick="toggleOverlayReset(false)" style="background:transparent;border:none;color:var(--sub);font-size:12px;cursor:pointer;">← Voltar ao login</button></div>
     </div>
     <div id="cadastroForm2" style="display:none">
       <div class="field"><label>Nome completo</label><input type="text" id="cadNome2" placeholder="Seu nome"/></div>
@@ -2430,8 +2442,42 @@ let chamadaRegistros = {}; // normName → {P,C,F,V,name}
 function toggleOverlayCadastro(show) {
   document.getElementById('loginForm2').style.display    = show ? 'none'  : 'block';
   document.getElementById('cadastroForm2').style.display = show ? 'block' : 'none';
+  document.getElementById('resetSenhaForm2').style.display = 'none';
   document.getElementById('loginErr2').style.display     = 'none';
   document.getElementById('cadErr2').style.display       = 'none';
+}
+
+function toggleOverlayReset(show) {
+  document.getElementById('loginForm2').style.display      = show ? 'none'  : 'block';
+  document.getElementById('cadastroForm2').style.display   = 'none';
+  document.getElementById('resetSenhaForm2').style.display = show ? 'block' : 'none';
+  document.getElementById('loginErr2').style.display       = 'none';
+  if (document.getElementById('resetErr2')) document.getElementById('resetErr2').style.display = 'none';
+}
+
+async function doResetSenha() {
+  const email         = document.getElementById('resetEmail2').value.trim();
+  const novaSenha     = document.getElementById('resetNovaSenha2').value.trim();
+  const codigoConvite = document.getElementById('resetCodigo2').value.trim();
+  const errEl         = document.getElementById('resetErr2');
+  if (!email || !novaSenha || !codigoConvite) {
+    errEl.textContent = 'Preencha todos os campos.'; errEl.style.display = 'block'; return;
+  }
+  const res = await fetch(WORKER_BASE + '/auth/reset-senha', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, novaSenha, codigoConvite })
+  }).catch(() => null);
+  if (!res) { errEl.textContent = 'Erro de conexão.'; errEl.style.display = 'block'; return; }
+  const data = await res.json();
+  if (res.ok && data.ok) {
+    localStorage.setItem('am_cs_email', email);
+    localStorage.setItem('am_cs_senha', novaSenha);
+    localStorage.setItem('am_cs_pwd',   novaSenha);
+    dismissOverlay(data.nome, email, data.funcao);
+  } else {
+    errEl.textContent = data.error || 'Erro ao redefinir senha.';
+    errEl.style.display = 'block';
+  }
 }
 
 function dismissOverlay(nome, email, funcao) {
@@ -2894,13 +2940,14 @@ function buildAlunoPayload() {
 async function gerarDiagnostico() {
   const payload = buildAlunoPayload();
   if (!payload) return;
-  const pwd = localStorage.getItem('am_cs_pwd') || '';
+  const pwd  = localStorage.getItem('am_cs_pwd')  || '';
+  const nome = localStorage.getItem('am_cs_nome') || '';
 
   aiLoadingStart();
   try {
     const res = await fetch(WORKER_BASE + '/ai/diagnostico', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd },
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd, 'X-CS-Nome': nome },
       body: JSON.stringify({ aluno: payload })
     });
     const data = await res.json();
@@ -2919,13 +2966,14 @@ async function gerarDiagnostico() {
 async function gerarAcionamentoIA() {
   const payload = buildAlunoPayload();
   if (!payload) return;
-  const pwd = localStorage.getItem('am_cs_pwd') || '';
+  const pwd  = localStorage.getItem('am_cs_pwd')  || '';
+  const nome = localStorage.getItem('am_cs_nome') || '';
 
   aiLoadingStart();
   try {
     const res = await fetch(WORKER_BASE + '/ai/acionamento', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd },
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd, 'X-CS-Nome': nome },
       body: JSON.stringify({ aluno: payload })
     });
     const data = await res.json();
