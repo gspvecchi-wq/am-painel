@@ -963,7 +963,7 @@ async function enviarResumoWpp(teste=false) {
     const body = teste ? JSON.stringify({ numTeste }) : JSON.stringify({});
     const res = await fetch(`${WORKER_BASE}/whatsapp/resumo`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd, 'X-CS-Nome': localStorage.getItem('am_cs_nome')||csNomeAtual||'CS' },
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd, 'X-CS-Nome': localStorage.getItem('am_cs_nome')||csNomeAtual||'CS', 'X-CS-Email': localStorage.getItem('am_cs_email')||'' },
       body
     });
     if (res.ok) {
@@ -2345,7 +2345,7 @@ async function registerCall(normName, espKey, delta) {
   try {
     await fetch(`${WORKER_BASE}/presenca`, {
       method: 'POST',
-      headers: { 'Content-Type':'application/json','X-CS-Password': pwd,'X-CS-Nome': localStorage.getItem('am_cs_nome')||csNomeAtual||'CS' },
+      headers: { 'Content-Type':'application/json','X-CS-Password': pwd,'X-CS-Nome': localStorage.getItem('am_cs_nome')||csNomeAtual||'CS', 'X-CS-Email': localStorage.getItem('am_cs_email')||'' },
       body: JSON.stringify({
         tab: '__calls__',
         semana: 1,
@@ -2770,7 +2770,7 @@ async function salvarChamada() {
   try {
     res = await fetch(WORKER_BASE+'/presenca', {
       method: 'POST',
-      headers: {'Content-Type':'application/json','X-CS-Password': pwd, 'X-CS-Nome': nome},
+      headers: {'Content-Type':'application/json','X-CS-Password': pwd, 'X-CS-Nome': nome, 'X-CS-Email': localStorage.getItem('am_cs_email')||''},
       body: JSON.stringify({tab, semana, date, registros: chamadaRegistros})
     });
   } catch(e) {
@@ -2885,7 +2885,8 @@ async function enviarAcionamento() {
       headers: {
         'Content-Type': 'application/json',
         'X-CS-Password': pwd,
-        'X-CS-Nome': nome
+        'X-CS-Nome': nome,
+        'X-CS-Email': localStorage.getItem('am_cs_email')||''
       },
       body: JSON.stringify({
         alunoNome:  aluno.name,
@@ -2993,7 +2994,7 @@ async function gerarDiagnostico() {
   try {
     const res = await fetch(WORKER_BASE + '/ai/diagnostico', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd, 'X-CS-Nome': nome },
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd, 'X-CS-Nome': nome, 'X-CS-Email': localStorage.getItem('am_cs_email')||'' },
       body: JSON.stringify({ aluno: payload })
     });
     const data = await res.json();
@@ -3019,7 +3020,7 @@ async function gerarAcionamentoIA() {
   try {
     const res = await fetch(WORKER_BASE + '/ai/acionamento', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd, 'X-CS-Nome': nome },
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd, 'X-CS-Nome': nome, 'X-CS-Email': localStorage.getItem('am_cs_email')||'' },
       body: JSON.stringify({ aluno: payload })
     });
     const data = await res.json();
@@ -3069,7 +3070,7 @@ async function carregarAcionamentos() {
 
   try {
     const res = await fetch(`${WORKER_BASE}/acionamentos?de=${de}&ate=${ate}`, {
-      headers: { 'X-CS-Password': pwd, 'X-CS-Nome': localStorage.getItem('am_cs_nome')||csNomeAtual||'CS' }
+      headers: { 'X-CS-Password': pwd, 'X-CS-Nome': localStorage.getItem('am_cs_nome')||csNomeAtual||'CS', 'X-CS-Email': localStorage.getItem('am_cs_email')||'' }
     });
     const data = await res.json();
     document.getElementById('acLoading').style.display = 'none';
