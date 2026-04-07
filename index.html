@@ -963,9 +963,7 @@ async function enviarResumoWpp(teste=false) {
     const body = teste ? JSON.stringify({ numTeste }) : JSON.stringify({});
     const res = await fetch(`${WORKER_BASE}/whatsapp/resumo`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd },
-      body
-    });
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd, 'X-CS-Nome': localStorage.getItem('am_cs_nome')||csNomeAtual||'CS' },
     if (res.ok) {
       const data = await res.json();
       msg.style.display = 'block';
@@ -2345,7 +2343,7 @@ async function registerCall(normName, espKey, delta) {
   try {
     await fetch(`${WORKER_BASE}/presenca`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd },
+      headers: { 'Content-Type':'application/json','X-CS-Password': pwd,'X-CS-Nome': localStorage.getItem('am_cs_nome')||csNomeAtual||'CS' },
       body: JSON.stringify({
         tab: '__calls__',
         semana: 1,
@@ -2764,11 +2762,24 @@ async function salvarChamada() {
   const ok = confirm(`Confirmar salvamento:\n\nAula: ${tab}\nData: ${dataFmt}\nSemana: ${semana}\n\nEstá correto?`);
   if (!ok) return;
 
-  const res = await fetch(WORKER_BASE+'/presenca', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json','X-CS-Password': pwd},
-    body: JSON.stringify({tab, semana, date, registros: chamadaRegistros})
-  });
+  const nome = localStorage.getItem('am_cs_nome') || csNomeAtual || 'CS';
+
+  let res;
+  try {
+    res = await fetch(WORKER_BASE+'/presenca', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-CS-Password': pwd, 'X-CS-Nome': nome},
+      body: JSON.stringify({tab, semana, date, registros: chamadaRegistros})
+    });
+  } catch(e) {
+    msg.style.display='block';
+    msg.style.background='rgba(255,51,85,.1)';
+    msg.style.color='var(--danger)';
+    msg.style.border='1px solid rgba(255,51,85,.3)';
+    msg.textContent='Erro de conexão: ' + e.message;
+    setTimeout(()=>msg.style.display='none', 5000);
+    return;
+  }
 
   msg.style.display='block';
   if (res.ok) {
@@ -2777,15 +2788,16 @@ async function salvarChamada() {
     msg.style.color='var(--safe)';
     msg.style.border='1px solid rgba(0,232,122,.3)';
     msg.textContent=`✓ Chamada salva! ${data.total} alunos registrados para ${tab} · Semana ${semana} · ${dataFmt}`;
-    // Reload main data
     reloadAll();
   } else {
+    let errMsg = 'Erro ao salvar.';
+    try { const d = await res.json(); errMsg = d.error || errMsg; } catch {}
     msg.style.background='rgba(255,51,85,.1)';
     msg.style.color='var(--danger)';
     msg.style.border='1px solid rgba(255,51,85,.3)';
-    msg.textContent='Erro ao salvar. Verifique sua conexão.';
+    msg.textContent=`✗ ${errMsg} (HTTP ${res.status})`;
   }
-  setTimeout(()=>msg.style.display='none', 4000);
+  setTimeout(()=>msg.style.display='none', 5000);
 }
 
 // Safe ID encoding for norm names (may contain special chars)
@@ -3055,7 +3067,7 @@ async function carregarAcionamentos() {
 
   try {
     const res = await fetch(`${WORKER_BASE}/acionamentos?de=${de}&ate=${ate}`, {
-      headers: { 'X-CS-Password': pwd }
+      headers: { 'X-CS-Password': pwd, 'X-CS-Nome': localStorage.getItem('am_cs_nome')||csNomeAtual||'CS' }
     });
     const data = await res.json();
     document.getElementById('acLoading').style.display = 'none';
