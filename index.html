@@ -2914,6 +2914,10 @@ async function enviarAcionamento() {
       throw new Error(data.error || 'Erro desconhecido');
     }
     btnEnviar.textContent = '✓ Concluído';
+    setTimeout(() => {
+      btnEnviar.disabled = false;
+      btnEnviar.textContent = phoneValido ? '📤 ENVIAR WHATSAPP' : '📋 REGISTRAR (sem número)';
+    }, 3000);
   } catch(e) {
     statusEl.style.display = 'block';
     statusEl.style.background = 'rgba(255,51,85,.1)';
@@ -2969,6 +2973,8 @@ function buildAlunoPayload() {
     firstName,
     tratamento,
     turma: aluno.turma,
+    aula: currentTab,
+    csNome: localStorage.getItem('am_cs_nome') || 'CS',
     score: window._aiAlunoScore || 0,
     presencas: totP,
     totalSlots: totSlots,
