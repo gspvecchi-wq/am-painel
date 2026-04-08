@@ -1537,23 +1537,24 @@ function renderGestComparacao() {
   const cicloB = document.getElementById('gestCicloB')?.value;
   if (!cicloA || !cicloB) return;
 
+  const origCiclo = cicloAtivo;
+
+  // detectMaxWeekForCiclo depende de cicloAtivo — setar antes de chamar
+  cicloAtivo = cicloA;
   const maxA = detectMaxWeekForCiclo(cicloA);
+  cicloAtivo = cicloB;
   const maxB = detectMaxWeekForCiclo(cicloB);
+  cicloAtivo = origCiclo;
 
   const labelA = new Date(cicloA + '-15').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   const labelB = new Date(cicloB + '-15').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
   // Função auxiliar: calcula score médio para um ciclo
   function avgScoreForCiclo(ciclo, maxW) {
-    const prevCiclo = getCicloAtivo();
     cicloAtivo = ciclo;
     const scores = allAlunos.map(a => calcCompositeScore(a, maxW));
-    cicloAtivo = prevCiclo;
     return scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
   }
-
-  // Temporarily switch ciclo context for each period
-  const origCiclo = cicloAtivo;
 
   cicloAtivo = cicloA;
   const engA = avgScoreForCiclo(cicloA, maxA);
@@ -1600,8 +1601,12 @@ function renderGestComparacao() {
   document.getElementById('gestCompareSub').textContent =
     `${labelA} (A) vs ${labelB} (B) — presença por turma`;
 
-  // Gráfico comparativo por turma
-  const compareTabs = ['Mentoria','Hotseat','Master'];
+  // Gráfico comparativo por turma — todas as turmas com dados
+  const compareTabs = ALL_TABS.filter(tab => {
+    const hasA = Object.keys((kvPresenca[tab] || {})[cicloA] || {}).length > 0;
+    const hasB = Object.keys((kvPresenca[tab] || {})[cicloB] || {}).length > 0;
+    return hasA || hasB;
+  });
   const wcEl = document.getElementById('weekCompare');
   wcEl.innerHTML = compareTabs.map(tab => {
     cicloAtivo = cicloA;
@@ -2914,10 +2919,6 @@ async function enviarAcionamento() {
       throw new Error(data.error || 'Erro desconhecido');
     }
     btnEnviar.textContent = '✓ Concluído';
-    setTimeout(() => {
-      btnEnviar.disabled = false;
-      btnEnviar.textContent = phoneValido ? '📤 ENVIAR WHATSAPP' : '📋 REGISTRAR (sem número)';
-    }, 3000);
   } catch(e) {
     statusEl.style.display = 'block';
     statusEl.style.background = 'rgba(255,51,85,.1)';
@@ -2973,8 +2974,6 @@ function buildAlunoPayload() {
     firstName,
     tratamento,
     turma: aluno.turma,
-    aula: currentTab,
-    csNome: localStorage.getItem('am_cs_nome') || 'CS',
     score: window._aiAlunoScore || 0,
     presencas: totP,
     totalSlots: totSlots,
