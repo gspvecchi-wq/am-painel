@@ -2867,7 +2867,7 @@ function copyAI() {
   });
 }
 
-async function enviarAcionamento() {
+async function enviarAcionamento(forcar = false) {
   const aluno    = window._aiAlunoAtual;
   const mensagem = document.getElementById('aiOutputText').value.trim();
   if (!aluno || !mensagem) return;
@@ -2897,10 +2897,23 @@ async function enviarAcionamento() {
         alunoNome:  aluno.name,
         alunoPhone: phone,
         mensagem,
-        motivos
+        motivos,
+        forcar
       })
     });
     const data = await res.json();
+
+    // Aluno já foi acionado recentemente — pede confirmação
+    if (data.acionamentoRecente && !forcar) {
+      btnEnviar.disabled = false;
+      btnEnviar.textContent = phoneValido ? '📤 ENVIAR WHATSAPP' : '📋 REGISTRAR (sem número)';
+      const mins = Math.round(data.minutosDesdeUltimo);
+      const tempoStr = mins < 60 ? mins + ' minutos' : mins < 1440 ? Math.round(mins/60) + ' horas' : Math.round(mins/1440) + ' dias';
+      const conf = confirm(`⚠️ ${displayName(aluno.name)} já foi acionado(a) há ${tempoStr}.\n\nQuer enviar novamente?`);
+      if (conf) enviarAcionamento(true);
+      return;
+    }
+
     statusEl.style.display = 'block';
     if (data.enviadoWhatsapp) {
       statusEl.style.background = 'rgba(0,232,122,.1)';
@@ -2918,7 +2931,12 @@ async function enviarAcionamento() {
     } else {
       throw new Error(data.error || 'Erro desconhecido');
     }
+    // Reabilita botão após sucesso
+    btnEnviar.disabled = false;
     btnEnviar.textContent = '✓ Concluído';
+    setTimeout(() => {
+      btnEnviar.textContent = phoneValido ? '📤 ENVIAR WHATSAPP' : '📋 REGISTRAR (sem número)';
+    }, 3000);
   } catch(e) {
     statusEl.style.display = 'block';
     statusEl.style.background = 'rgba(255,51,85,.1)';
@@ -2926,7 +2944,7 @@ async function enviarAcionamento() {
     statusEl.style.border = '1px solid rgba(255,51,85,.3)';
     statusEl.textContent = '✗ Erro: ' + e.message;
     btnEnviar.disabled = false;
-    btnEnviar.textContent = '📤 ENVIAR WHATSAPP';
+    btnEnviar.textContent = phoneValido ? '📤 ENVIAR WHATSAPP' : '📋 REGISTRAR (sem número)';
   }
 }
 
