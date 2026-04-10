@@ -870,6 +870,7 @@ function displayName(rawName) { return cleanSuffix(rawName); }
 // ═══════════════════════════════════════════
 let allAlunos   = [];
 let kvPresenca  = {}; // { tab: { ciclo: { normName: { history:[...] } } } }
+let kvGrupoScores = {}; // { normName: { total, resultado, ajuda, duvida, outro, msgs } }
 let cicloAtivo = ''; // AAAA-MM do ciclo sendo visualizado
 
 // Retorna o ciclo ativo (padrão: mês atual)
@@ -1022,6 +1023,13 @@ async function reloadAll() {
       popularCicloSelectorCS();
       popularCicloSelectorChamada();
     } catch(e) { kvPresenca = {}; }
+
+    // Load grupo participation scores for current week
+    try {
+      const grupoRes = await fetch(WORKER_URL.replace('/dados','/grupo/score'));
+      const grupoData = grupoRes.ok ? await grupoRes.json() : {};
+      kvGrupoScores = grupoData.scores || {};
+    } catch(e) { kvGrupoScores = {}; }
 
     loaded = true;
     const now = new Date().toLocaleTimeString('pt-BR');
@@ -1201,7 +1209,12 @@ function calcCompositeScore(aluno, upToWeek) {
   const callsData = (kvPresenca['__calls__']||{})[norm(aluno.name)] || { leonardo: 0, bruno: 0 };
   const totalCalls = (callsData.leonardo||0) + (callsData.bruno||0);
   const callsBonus = Math.min(totalCalls, 2) * 5;
-  return Math.round(compositeScore + callsBonus);
+
+  // Grupo bonus: participação no grupo desta semana, cap 20pts
+  const grupoData = kvGrupoScores[norm(aluno.name)] || null;
+  const grupoBonus = grupoData ? Math.min(grupoData.total || 0, 20) : 0;
+
+  return Math.round(compositeScore + callsBonus + grupoBonus);
 }
 
 // Risk = inverse of composite score, weighted by consecutive absences
@@ -2265,7 +2278,8 @@ function openDrModal(name, showMsgs=true) {
     </div>
     ${fatIni ? `<div class="mstat"><div class="mstat-v" style="color:var(--sub);font-size:13px">${fmtR(fatIni)}</div><div class="mstat-l">Fat. inicial</div></div>` : ''}
     ${fatAtu ? `<div class="mstat"><div class="mstat-v" style="color:var(--sub);font-size:13px">${fmtR(fatAtu)}</div><div class="mstat-l">Fat. atual</div></div>` : ''}
-    ${fatDelta !== null ? `<div class="mstat"><div class="mstat-v" style="color:${fatColor};font-size:13px">${fatDelta >= 0 ? '+' : ''}${fatDelta}%${fatDeltaR ? ' · ' + (fatDeltaR >= 0 ? '+' : '') + fmtR(fatDeltaR) : ''}</div><div class="mstat-l">Crescimento</div></div>` : ''}`;
+    ${fatDelta !== null ? `<div class="mstat"><div class="mstat-v" style="color:${fatColor};font-size:13px">${fatDelta >= 0 ? '+' : ''}${fatDelta}%${fatDeltaR ? ' · ' + (fatDeltaR >= 0 ? '+' : '') + fmtR(fatDeltaR) : ''}</div><div class="mstat-l">Crescimento</div></div>` : ''}
+    ${(()=>{ const g=kvGrupoScores[norm(aluno.name)]; if(!g||!g.msgs) return '<div class="mstat"><div class="mstat-v" style="color:var(--sub);font-size:13px">—</div><div class="mstat-l">Grupo</div></div>'; const icons=[g.resultado?'🏆'+g.resultado:'',g.ajuda?'🤝'+g.ajuda:'',g.duvida?'❓'+g.duvida:''].filter(Boolean).join(' '); return '<div class="mstat"><div class="mstat-v" style="color:var(--acc);font-size:13px">+'+g.total+'pts</div><div class="mstat-l">Grupo '+(icons||'💬'+g.msgs)+'</div></div>'; })()}`;
 
   // Seção IA — visível sempre que autenticado
   const aiSection = document.getElementById('mAISection');
