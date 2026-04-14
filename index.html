@@ -1208,13 +1208,14 @@ function calcCompositeScore(aluno, upToWeek) {
   // Calls bonus: +5 per call with specialist, max +10
   const callsData = (kvPresenca['__calls__']||{})[norm(aluno.name)] || { leonardo: 0, bruno: 0 };
   const totalCalls = (callsData.leonardo||0) + (callsData.bruno||0);
-  const callsBonus = Math.min(totalCalls, 2) * 5;
+  const callsBonus = Math.min(totalCalls * 5, 5); // max +5pts
 
-  // Grupo bonus: participação no grupo desta semana, cap 20pts
+  // Grupo bonus: últimas 4 semanas, já vem com cap de 15 do worker
   const grupoData = kvGrupoScores[norm(aluno.name)] || null;
-  const grupoBonus = grupoData ? Math.min(grupoData.total || 0, 20) : 0;
+  const grupoBonus = grupoData ? Math.min(grupoData.total || 0, 15) : 0;
 
-  return Math.round(compositeScore + callsBonus + grupoBonus);
+  // Cap geral: 120% (100 base + 20 bônus)
+  return Math.min(Math.round(compositeScore + callsBonus + grupoBonus), 120);
 }
 
 // Risk = inverse of composite score, weighted by consecutive absences
