@@ -329,92 +329,27 @@ function getPool(tab) {
 }
 
 function buildDoctors(tab, week) {
+  const sheetTab = getKvTab(tab);
   const pool = getPool(tab);
-  const isEsp = ESPECIALIDADES.includes(tab) || ESPECIALIDADES_LEGADO.includes(tab);
-
-  return pool.map(aluno => {
-    // ── Coleta as últimas 4 semanas reais cruzando ciclos ──
-    const alunoTabs = aluno.isWinners
-      ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro']
-      : aluno.turma==='Master'
-      ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master']
-      : ['Mentoria','Hotseat','Hotseat Simultâneo'];
-    if (aluno.especialidades && aluno.especialidades.length) {
-      for (const esp of aluno.especialidades) {
-        const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp)) || ESPECIALIDADES_LEGADO.find(e=>norm(e)===norm(esp));
-        if (spec && !alunoTabs.includes(spec)) alunoTabs.push(spec);
-      }
-    }
-
-    // Ciclos disponíveis do mais recente ao mais antigo
-    const ciclosDisp = Object.keys(kvPresenca)
-      .filter(k => k!=='__calls__' && k!=='__dates__')
-      .flatMap(t => Object.keys(kvPresenca[t]||{}))
-      .filter(c => /^\d{4}-\d{2}$/.test(c))
-      .filter((c,i,arr) => arr.indexOf(c)===i)
-      .sort().reverse();
-
-    // Coleta slots com dados para esse aluno
-    const slotsComDados = [];
-    for (const ciclo of ciclosDisp) {
-      for (let w = 4; w >= 0; w--) {
-        const temDados = alunoTabs.some(t => {
-          const e = kvPresenca[t]?.[ciclo]?.[norm(aluno.name)];
-          return e?.history?.[w] !== undefined;
-        });
-        if (temDados) slotsComDados.push({ ciclo, w });
-      }
-      if (slotsComDados.length >= 4) break;
-    }
-    slotsComDados.reverse();
-    const slots = slotsComDados.slice(-4);
-
-    // Agrega dados por slot (todas as tabs do aluno)
-    const recentWeeks = slots.map(({ ciclo, w }) => {
-      let P=0, C=0, F=0, V=0, totalTabs=0;
-      for (const t of alunoTabs) {
-        const e = kvPresenca[t]?.[ciclo]?.[norm(aluno.name)];
-        const h = e?.history?.[w];
-        totalTabs++;
-        if (h) {
-          if (h.P) P++;
-          if (h.P && h.C) C++;
-          if (h.P && h.F) F++;
-          if (h.P && h.V) V++;
-        }
-      }
-      return { P, C, F, V, totalTabs, presente: P > 0 };
+  const w = week-1;
+  return pool.map(aluno=>{
+    const entry = sheetTab[norm(aluno.name)]||null;
+    const history = Array.from({length:5},(_,i)=>{
+      return entry&&entry.history[i] ? entry.history[i] : {P:false,C:false,F:false,V:false};
     });
-
-    // Semana mais recente
-    const cur = recentWeeks.length > 0 ? recentWeeks[recentWeeks.length - 1] : { P:0,C:0,F:0,V:0,presente:false };
-
-    // Faltas consecutivas (das semanas mais recentes para trás)
-    let consAbs = 0;
-    for (let i = recentWeeks.length - 1; i >= 0; i--) {
-      if (!recentWeeks[i].presente) consAbs++;
-      else break;
-    }
-
-    // Motivos baseados nas últimas 4 semanas
-    const motivos = [];
-    if (!cur.presente) {
-      motivos.push('ausente');
-    } else {
+    const cur = history[w];
+    let consAbs=0;
+    for (let i=w; i>=0; i--) { if (!history[i].P) consAbs++; else break; }
+    const isEsp = ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab);
+    const motivos=[];
+    if (!cur.P) { motivos.push('ausente'); }
+    else {
       if (!cur.C) motivos.push('camera');
+      if (!cur.F && isEsp) motivos.push('feedback');
       if (!cur.V) motivos.push('vitoria');
-      if (isEsp && !cur.F) motivos.push('feedback');
     }
-
-    // History compatível com calcRisk (usa semanas do ciclo ativo para risco)
-    const sheetTab = getKvTab(tab);
-    const entry = sheetTab[norm(aluno.name)] || null;
-    const history = Array.from({length:5}, (_,i) =>
-      entry?.history?.[i] || {P:false,C:false,F:false,V:false}
-    );
-
     const risk = calcRisk(history, week);
-    return {...aluno, history, cur: {P: cur.P>0, C: cur.C>0, F: cur.F>0, V: cur.V>0}, consAbs, motivos, risk, recentWeeks};
+    return {...aluno, history, cur, consAbs, motivos, risk};
   });
 }
 
@@ -1782,40 +1717,25 @@ function openDrModal(name, showMsgs=true) {
     }
   }
 
-  // ── Coleta todas as semanas reais com dados, retroativamente ──
-  // Ordena ciclos disponíveis do mais recente ao mais antigo
-  const ciclosDisponiveis = Object.keys(kvPresenca)
-    .filter(k => k !== '__calls__' && k !== '__dates__')
-    .flatMap(tab => Object.keys(kvPresenca[tab] || {}))
-    .filter(c => /^\d{4}-\d{2}$/.test(c))
-    .filter((c, i, arr) => arr.indexOf(c) === i)
-    .sort()
-    .reverse();
-
-  // Gera lista de "slots" = { ciclo, semana (0-based), label } das últimas semanas com dados
-  const slotsComDados = [];
-  for (const ciclo of ciclosDisponiveis) {
-    for (let w = 4; w >= 0; w--) {
-      const temDados = alunoTabs.some(tab => {
-        const entry = (kvPresenca[tab]?.[ciclo]?.[norm(name)]);
-        return entry?.history?.[w] && (entry.history[w].P || entry.history[w].C || entry.history[w].F || entry.history[w].V);
-      });
-      if (temDados) {
-        slotsComDados.push({ ciclo, w });
-      }
+  // ── Últimas 4 semanas do calendário (com ou sem dados) ──
+  function getLastNWeekSlots(n) {
+    const resultado = [];
+    const hoje = new Date();
+    for (let i = 0; i < n; i++) {
+      const d = new Date(hoje);
+      d.setDate(d.getDate() - i * 7);
+      const ciclo = d.toISOString().slice(0, 7);
+      const dia = d.getDate();
+      const semIdx = dia <= 7 ? 0 : dia <= 14 ? 1 : dia <= 21 ? 2 : dia <= 28 ? 3 : 4;
+      resultado.unshift({ ciclo, w: semIdx });
     }
-    if (slotsComDados.length >= 4) break;
+    return resultado;
   }
-  // Ordena cronologicamente (mais antiga → mais recente)
-  slotsComDados.reverse();
-  // Pega as últimas 4
-  const slots = slotsComDados.slice(-4);
+  const slots = getLastNWeekSlots(4);
 
   // ── Agrega dados por slot ──
   function getSlotData(ciclo, w) {
     let slots_=0, P=0, C=0, F=0, V=0, espSlots=0, espF=0;
-    const prevCiclo = cicloAtivo;
-    cicloAtivo = ciclo;
     for (const tab of alunoTabs) {
       const entry = kvPresenca[tab]?.[ciclo]?.[norm(name)];
       const h = entry?.history?.[w] || null;
@@ -1831,13 +1751,12 @@ function openDrModal(name, showMsgs=true) {
         if (h && h.P && h.F) espF++;
       }
     }
-    cicloAtivo = prevCiclo;
     return { slots: slots_, P, C, F, V, espSlots, espF };
   }
 
   const weekData = slots.map(s => getSlotData(s.ciclo, s.w));
 
-  // Label de cada semana: "S3 · Abr"
+  // Label de cada semana: "S3·Abr"
   const mesAbrev = ciclo => new Date(ciclo + '-15').toLocaleDateString('pt-BR', { month: 'short' }).replace('.','');
   const weekLabels = slots.map(s => `S${s.w+1}·${mesAbrev(s.ciclo)}`);
 
