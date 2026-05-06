@@ -1636,8 +1636,8 @@ function calcScoreRecentWeeks(aluno) {
 
   if (!totSlots) return 0;
   const pScore = totP / totSlots;
-  const cScore = totP ? totC / totP : 0;
-  const vScore = totP ? totV / totP : 0;
+  const cScore = totSlots ? totC / totSlots : 0;
+  const vScore = totSlots ? totV / totSlots : 0;
   const fScore = totEspSlots ? totEspF / totEspSlots : 1;
   const base = Math.round(pScore*40 + cScore*25 + vScore*25 + fScore*10);
 
