@@ -329,27 +329,92 @@ function getPool(tab) {
 }
 
 function buildDoctors(tab, week) {
-  const sheetTab = getKvTab(tab);
   const pool = getPool(tab);
-  const w = week-1;
-  return pool.map(aluno=>{
-    const entry = sheetTab[norm(aluno.name)]||null;
-    const history = Array.from({length:5},(_,i)=>{
-      return entry&&entry.history[i] ? entry.history[i] : {P:false,C:false,F:false,V:false};
-    });
-    const cur = history[w];
-    let consAbs=0;
-    for (let i=w; i>=0; i--) { if (!history[i].P) consAbs++; else break; }
-    const isEsp = ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab);
-    const motivos=[];
-    if (!cur.P) { motivos.push('ausente'); }
-    else {
-      if (!cur.C) motivos.push('camera');
-      if (!cur.F && isEsp) motivos.push('feedback');
-      if (!cur.V) motivos.push('vitoria');
+  const isEsp = ESPECIALIDADES.includes(tab) || ESPECIALIDADES_LEGADO.includes(tab);
+
+  return pool.map(aluno => {
+    // ── Coleta as últimas 4 semanas reais cruzando ciclos ──
+    const alunoTabs = aluno.isWinners
+      ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro']
+      : aluno.turma==='Master'
+      ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master']
+      : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+    if (aluno.especialidades && aluno.especialidades.length) {
+      for (const esp of aluno.especialidades) {
+        const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp)) || ESPECIALIDADES_LEGADO.find(e=>norm(e)===norm(esp));
+        if (spec && !alunoTabs.includes(spec)) alunoTabs.push(spec);
+      }
     }
+
+    // Ciclos disponíveis do mais recente ao mais antigo
+    const ciclosDisp = Object.keys(kvPresenca)
+      .filter(k => k!=='__calls__' && k!=='__dates__')
+      .flatMap(t => Object.keys(kvPresenca[t]||{}))
+      .filter(c => /^\d{4}-\d{2}$/.test(c))
+      .filter((c,i,arr) => arr.indexOf(c)===i)
+      .sort().reverse();
+
+    // Coleta slots com dados para esse aluno
+    const slotsComDados = [];
+    for (const ciclo of ciclosDisp) {
+      for (let w = 4; w >= 0; w--) {
+        const temDados = alunoTabs.some(t => {
+          const e = kvPresenca[t]?.[ciclo]?.[norm(aluno.name)];
+          return e?.history?.[w] !== undefined;
+        });
+        if (temDados) slotsComDados.push({ ciclo, w });
+      }
+      if (slotsComDados.length >= 4) break;
+    }
+    slotsComDados.reverse();
+    const slots = slotsComDados.slice(-4);
+
+    // Agrega dados por slot (todas as tabs do aluno)
+    const recentWeeks = slots.map(({ ciclo, w }) => {
+      let P=0, C=0, F=0, V=0, totalTabs=0;
+      for (const t of alunoTabs) {
+        const e = kvPresenca[t]?.[ciclo]?.[norm(aluno.name)];
+        const h = e?.history?.[w];
+        totalTabs++;
+        if (h) {
+          if (h.P) P++;
+          if (h.P && h.C) C++;
+          if (h.P && h.F) F++;
+          if (h.P && h.V) V++;
+        }
+      }
+      return { P, C, F, V, totalTabs, presente: P > 0 };
+    });
+
+    // Semana mais recente
+    const cur = recentWeeks.length > 0 ? recentWeeks[recentWeeks.length - 1] : { P:0,C:0,F:0,V:0,presente:false };
+
+    // Faltas consecutivas (das semanas mais recentes para trás)
+    let consAbs = 0;
+    for (let i = recentWeeks.length - 1; i >= 0; i--) {
+      if (!recentWeeks[i].presente) consAbs++;
+      else break;
+    }
+
+    // Motivos baseados nas últimas 4 semanas
+    const motivos = [];
+    if (!cur.presente) {
+      motivos.push('ausente');
+    } else {
+      if (!cur.C) motivos.push('camera');
+      if (!cur.V) motivos.push('vitoria');
+      if (isEsp && !cur.F) motivos.push('feedback');
+    }
+
+    // History compatível com calcRisk (usa semanas do ciclo ativo para risco)
+    const sheetTab = getKvTab(tab);
+    const entry = sheetTab[norm(aluno.name)] || null;
+    const history = Array.from({length:5}, (_,i) =>
+      entry?.history?.[i] || {P:false,C:false,F:false,V:false}
+    );
+
     const risk = calcRisk(history, week);
-    return {...aluno, history, cur, consAbs, motivos, risk};
+    return {...aluno, history, cur: {P: cur.P>0, C: cur.C>0, F: cur.F>0, V: cur.V>0}, consAbs, motivos, risk, recentWeeks};
   });
 }
 
@@ -1717,81 +1782,97 @@ function openDrModal(name, showMsgs=true) {
     }
   }
 
-  // ── KV lookup helper ─────────────────────
-  function kvEntry(tab) {
-    return getKvEntry(tab, norm(name));
-  }
+  // ── Coleta todas as semanas reais com dados, retroativamente ──
+  // Ordena ciclos disponíveis do mais recente ao mais antigo
+  const ciclosDisponiveis = Object.keys(kvPresenca)
+    .filter(k => k !== '__calls__' && k !== '__dates__')
+    .flatMap(tab => Object.keys(kvPresenca[tab] || {}))
+    .filter(c => /^\d{4}-\d{2}$/.test(c))
+    .filter((c, i, arr) => arr.indexOf(c) === i)
+    .sort()
+    .reverse();
 
-  // ── Número de semanas com pelo menos 1 dado ──
-  const maxW = 5;
-  // Semanas que realmente têm dados no KV para esse aluno
-  function hasDataWeek(w) {
-    return alunoTabs.some(tab=>{
-      const e = kvEntry(tab);
-      return e && e.history && e.history[w] && (e.history[w].P || e.history[w].C || e.history[w].F || e.history[w].V);
-    });
+  // Gera lista de "slots" = { ciclo, semana (0-based), label } das últimas semanas com dados
+  const slotsComDados = [];
+  for (const ciclo of ciclosDisponiveis) {
+    for (let w = 4; w >= 0; w--) {
+      const temDados = alunoTabs.some(tab => {
+        const entry = (kvPresenca[tab]?.[ciclo]?.[norm(name)]);
+        return entry?.history?.[w] && (entry.history[w].P || entry.history[w].C || entry.history[w].F || entry.history[w].V);
+      });
+      if (temDados) {
+        slotsComDados.push({ ciclo, w });
+      }
+    }
+    if (slotsComDados.length >= 4) break;
   }
-  // Último índice (0-based) com dado; determina alcance do mês
-  let lastWeek = 0;
-  for (let w=0; w<maxW; w++) { if (hasDataWeek(w)) lastWeek = w; }
-  const totalWeeks = lastWeek + 1; // semanas ocorridas
+  // Ordena cronologicamente (mais antiga → mais recente)
+  slotsComDados.reverse();
+  // Pega as últimas 4
+  const slots = slotsComDados.slice(-4);
 
-  // ── Agrega por semana (somando todas as abas) ──
-  // weekData[w] = { slots, P, C, F, V, espSlots, espF }
-  const weekData = Array.from({length: maxW}, (_,w) => {
-    let slots=0, P=0, C=0, F=0, V=0, espSlots=0, espF=0;
+  // ── Agrega dados por slot ──
+  function getSlotData(ciclo, w) {
+    let slots_=0, P=0, C=0, F=0, V=0, espSlots=0, espF=0;
+    const prevCiclo = cicloAtivo;
+    cicloAtivo = ciclo;
     for (const tab of alunoTabs) {
-      const e = kvEntry(tab);
-      const h = e&&e.history&&e.history[w] ? e.history[w] : null;
-      if (!h && !hasDataWeek(w)) continue; // semana sem dados
-      slots++;
+      const entry = kvPresenca[tab]?.[ciclo]?.[norm(name)];
+      const h = entry?.history?.[w] || null;
+      slots_++;
       if (h) {
         if (h.P) P++;
         if (h.P && h.C) C++;
         if (h.P && h.F) F++;
         if (h.P && h.V) V++;
       }
-      if (ESPECIALIDADES.includes(tab)) {
+      if (ESPECIALIDADES.includes(tab) || ESPECIALIDADES_LEGADO.includes(tab)) {
         espSlots++;
         if (h && h.P && h.F) espF++;
       }
     }
-    return { slots, P, C, F, V, espSlots, espF };
-  });
-
-  // ── KPIs totais (semanas ocorridas) ──────
-  let totSlots=0, totP=0, totC=0, totF=0, totV=0, totEspSlots=0, totEspF=0;
-  for (let w=0; w<totalWeeks; w++) {
-    const d = weekData[w];
-    totSlots  += d.slots;
-    totP      += d.P;
-    totC      += d.C;
-    totF      += d.F;
-    totV      += d.V;
-    totEspSlots += d.espSlots;
-    totEspF   += d.espF;
+    cicloAtivo = prevCiclo;
+    return { slots: slots_, P, C, F, V, espSlots, espF };
   }
 
-  const presRate  = totSlots  ? Math.round(totP/totSlots*100)    : 0;
-  const camRate   = totP      ? Math.round(totC/totP*100)        : 0;
-  const vitRate   = totP      ? Math.round(totV/totP*100)        : 0;
+  const weekData = slots.map(s => getSlotData(s.ciclo, s.w));
+
+  // Label de cada semana: "S3 · Abr"
+  const mesAbrev = ciclo => new Date(ciclo + '-15').toLocaleDateString('pt-BR', { month: 'short' }).replace('.','');
+  const weekLabels = slots.map(s => `S${s.w+1}·${mesAbrev(s.ciclo)}`);
+
+  // ── KPIs totais (todas as semanas) ──────
+  const totalWeeks = weekData.length;
+  let totSlots=0, totP=0, totC=0, totF=0, totV=0, totEspSlots=0, totEspF=0;
+  for (const d of weekData) {
+    totSlots   += d.slots;
+    totP       += d.P;
+    totC       += d.C;
+    totF       += d.F;
+    totV       += d.V;
+    totEspSlots += d.espSlots;
+    totEspF    += d.espF;
+  }
+
+  const presRate  = totSlots   ? Math.round(totP/totSlots*100)        : 0;
+  const camRate   = totP       ? Math.round(totC/totP*100)            : 0;
+  const vitRate   = totP       ? Math.round(totV/totP*100)            : 0;
   const fbRate    = totEspSlots ? Math.round(totEspF/totEspSlots*100) : null;
 
   // ── Score de engajamento composto ────────
-  // P(40%) + C(25%) + V(25%) + F(10% — só quem tem esp)
-  const pScore  = totSlots      ? totP/totSlots      : 0;
-  const cScore  = totSlots      ? totC/totSlots      : 0;
-  const vScore  = totSlots      ? totV/totSlots      : 0;
-  const fScore  = totEspSlots   ? totEspF/totEspSlots : 1;
+  const pScore  = totSlots     ? totP/totSlots       : 0;
+  const cScore  = totSlots     ? totC/totSlots       : 0;
+  const vScore  = totSlots     ? totV/totSlots       : 0;
+  const fScore  = totEspSlots  ? totEspF/totEspSlots : 1;
   const engScore = Math.round(pScore*40 + cScore*25 + vScore*25 + fScore*10);
   const engColor = engScore>=70?'var(--safe)':engScore>=40?'var(--warn)':'var(--danger)';
 
-  // ── Tendência: compara primeira metade × segunda ──
+  // ── Tendência ──
   let trendLabel = '➡ Estável', trendColor = 'var(--sub)';
   if (totalWeeks >= 3) {
     const mid = Math.floor(totalWeeks/2);
     const firstHalf  = weekData.slice(0,mid);
-    const secondHalf = weekData.slice(mid,totalWeeks);
+    const secondHalf = weekData.slice(mid);
     const avg = arr => {
       const s = arr.reduce((a,d)=>a+(d.slots?d.P/d.slots:0),0);
       return arr.length ? s/arr.length : 0;
@@ -1801,16 +1882,16 @@ function openDrModal(name, showMsgs=true) {
     else if (diff < -0.15) { trendLabel='📉 Caindo';   trendColor='var(--danger)'; }
   }
 
-  // ── Mini-grid de semanas (dot por semana, por indicador) ──
+  // ── Mini-grid de semanas com label de mês ──
   const dotRow = (label, color, vals) => `
     <div class="ph-row">
       <div class="ph-lbl">${label}</div>
       <div class="ph-dots">
-        ${Array.from({length:maxW},(_,w)=>{
-          if (w >= totalWeeks) return `<div class="ph-dot ph-dot-na">·</div>`;
+        ${weekLabels.map((lbl, w) => {
           const on = vals[w];
-          return `<div class="ph-dot ${on?'ph-dot-on':'ph-dot-off'}" style="${on?'background:'+color:''}">S${w+1}</div>`;
+          return `<div class="ph-dot ${on?'ph-dot-on':'ph-dot-off'}" style="${on?'background:'+color:''}" title="${lbl}">${lbl}</div>`;
         }).join('')}
+        ${weekLabels.length === 0 ? `<div style="color:var(--sub);font-size:10px">Sem dados</div>` : ''}
       </div>
     </div>`;
 
