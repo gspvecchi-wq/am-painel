@@ -139,6 +139,18 @@ function espLabel(aluno) {
 // INIT
 // ═══════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', () => {
+  // Mostra/esconde overlay de login baseado na sessão
+  const overlay = document.getElementById('loginOverlay');
+  const savedEmail = localStorage.getItem('am_cs_email');
+  const savedSenha = localStorage.getItem('am_cs_senha');
+  if (overlay) {
+    if (savedEmail && savedSenha) {
+      overlay.style.display = 'none';
+    } else {
+      overlay.style.display = 'flex';
+    }
+  }
+
   updateBadge();
   reloadAll();
 
@@ -2112,7 +2124,7 @@ function dismissOverlay(nome, email, funcao) {
   csNomeAtual = nome;
   localStorage.setItem('am_cs_nome',  nome);
   localStorage.setItem('am_cs_funcao', funcao);
-  document.getElementById('loginOverlay').classList.add('hidden');
+  document.getElementById('loginOverlay').style.display = 'none';
   document.getElementById('chamadaLogin').style.display = 'none';
   document.getElementById('chamadaForm').style.display  = 'block';
   loadChamada();
@@ -2187,7 +2199,7 @@ function initChamada() {
           csNomeAtual = data.nome;
           localStorage.setItem('am_cs_pwd', savedSenha);
           localStorage.setItem('am_cs_nome', data.nome);
-          document.getElementById('loginOverlay')?.classList.add('hidden');
+          if(document.getElementById('loginOverlay')) document.getElementById('loginOverlay').style.display = 'none';
           document.getElementById('chamadaLogin').style.display='none';
           document.getElementById('chamadaForm').style.display='block';
           const dataEl = document.getElementById('chamadaData');
