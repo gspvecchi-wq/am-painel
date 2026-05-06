@@ -1590,6 +1590,66 @@ function detectMaxWeek() {
   return detectMaxWeekForCiclo(getCicloAtivo());
 }
 
+// Score baseado nas últimas 4 semanas reais — consistente com o modal
+function calcScoreRecentWeeks(aluno) {
+  const alunoTabs = aluno.isWinners
+    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro']
+    : aluno.turma==='Master'
+    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master']
+    : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+  if (aluno.especialidades && aluno.especialidades.length) {
+    for (const esp of aluno.especialidades) {
+      const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp)) || ESPECIALIDADES_LEGADO.find(e=>norm(e)===norm(esp));
+      if (spec && !alunoTabs.includes(spec)) alunoTabs.push(spec);
+    }
+  }
+
+  // Últimas 4 semanas do calendário
+  const slots = [];
+  const hoje = new Date();
+  for (let i = 0; i < 4; i++) {
+    const d = new Date(hoje);
+    d.setDate(d.getDate() - i * 7);
+    const ciclo = d.toISOString().slice(0, 7);
+    const dia = d.getDate();
+    const w = dia <= 7 ? 0 : dia <= 14 ? 1 : dia <= 21 ? 2 : dia <= 28 ? 3 : 4;
+    slots.unshift({ ciclo, w });
+  }
+
+  let totSlots=0, totP=0, totC=0, totV=0, totEspSlots=0, totEspF=0;
+  for (const { ciclo, w } of slots) {
+    for (const tab of alunoTabs) {
+      const entry = kvPresenca[tab]?.[ciclo]?.[norm(aluno.name)];
+      const h = entry?.history?.[w] || null;
+      totSlots++;
+      if (h) {
+        if (h.P) totP++;
+        if (h.P && h.C) totC++;
+        if (h.P && h.V) totV++;
+      }
+      if (ESPECIALIDADES.includes(tab) || ESPECIALIDADES_LEGADO.includes(tab)) {
+        totEspSlots++;
+        if (h && h.P && h.F) totEspF++;
+      }
+    }
+  }
+
+  if (!totSlots) return 0;
+  const pScore = totP / totSlots;
+  const cScore = totP ? totC / totP : 0;
+  const vScore = totP ? totV / totP : 0;
+  const fScore = totEspSlots ? totEspF / totEspSlots : 1;
+  const base = Math.round(pScore*40 + cScore*25 + vScore*25 + fScore*10);
+
+  // Bônus calls e grupo (igual ao calcCompositeScore)
+  const callsData = (kvPresenca['__calls__']||{})[norm(aluno.name)] || { leonardo: 0, bruno: 0 };
+  const totalCalls = (callsData.leonardo||0) + (callsData.bruno||0);
+  const callsBonus = Math.min(totalCalls * 5, 5);
+  const grupoData = kvGrupoScores[norm(aluno.name)] || null;
+  const grupoBonus = grupoData ? Math.min(grupoData.total || 0, 15) : 0;
+  return Math.min(base + callsBonus + grupoBonus, 120);
+}
+
 // Engagement for a single week index (0-based)
 function calcEngagementWeek(aluno, weekIdx) {
   const tabs = aluno.isWinners ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro'] : aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
@@ -1684,7 +1744,7 @@ function renderProfiles() {
   const grid=document.getElementById('profileGrid');
   if (!list.length) { grid.innerHTML=`<div style="color:var(--sub);font-size:12px">Nenhum resultado.</div>`; return; }
   grid.innerHTML=list.slice(0,80).map(a=>{
-    const eng=calcCompositeScore(a, detectMaxWeek());
+    const eng=calcScoreRecentWeeks(a);
     const color=eng<40?'var(--danger)':eng<70?'var(--warn)':'var(--safe)';
     const dn=displayName(a.name);
     return `<div class="profile-card" onclick="openDrModal('${esc(a.name)}', false)">
