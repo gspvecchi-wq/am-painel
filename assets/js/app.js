@@ -5,10 +5,17 @@ const BOARDS = {
   Master:   { id:'18365478944', tagCol:'tag_mm1cqsgs' },
   Mentoria: { id:'18391780128', tagCol:'tag_mm1cs0hm' }
 };
-const ESPECIALIDADES = ['Dermato','Oftalmo','Ortoped','Psiquiatras','Gestores','Emagrecimento','Retomada','Cirurgiões'];
+const ESPECIALIDADES = ['Dermato&Oftalmo','Ortoped','Psiquiatras','Gestores','Emagrecimento','Cirurgiões'];
+// Especialidades legado mantidas para exibição de dados históricos (março/abril)
+const ESPECIALIDADES_LEGADO = ['Dermato','Oftalmo','Retomada'];
+// Retorna lista de especialidades por ciclo
+function getEspecialidadesPorCiclo(ciclo) {
+  const CICLO_NOVO = '2026-05'; // a partir de maio usa a lista nova
+  return ciclo >= CICLO_NOVO ? ESPECIALIDADES : [...ESPECIALIDADES, ...ESPECIALIDADES_LEGADO];
+}
 const AULAS_GERAIS   = ['Mentoria','Hotseat','Hotseat Simultâneo','Master'];
 const AULAS_WINNERS  = ['Winners Encontro'];
-const ALL_TABS       = [...AULAS_GERAIS, ...ESPECIALIDADES, ...AULAS_WINNERS];
+const ALL_TABS       = [...AULAS_GERAIS, ...ESPECIALIDADES, ...ESPECIALIDADES_LEGADO, ...AULAS_WINNERS];
 
 // ═══════════════════════════════════════════
 // GENDER — explicit list + smart heuristics
@@ -313,7 +320,7 @@ function getPool(tab) {
     return allAlunos.filter(a=>a.turma==='Master' || a.isWinners);
   if (tab==='Winners Encontro')
     return allAlunos.filter(a=>a.isWinners);
-  if (ESPECIALIDADES.includes(tab))
+  if (ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab))
     return allAlunos.filter(a=>hasEsp(a, tab));
   return allAlunos;
 }
@@ -330,7 +337,7 @@ function buildDoctors(tab, week) {
     const cur = history[w];
     let consAbs=0;
     for (let i=w; i>=0; i--) { if (!history[i].P) consAbs++; else break; }
-    const isEsp = ESPECIALIDADES.includes(tab);
+    const isEsp = ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab);
     const motivos=[];
     if (!cur.P) { motivos.push('ausente'); }
     else {
@@ -438,7 +445,7 @@ function calcCompositeScore(aluno, upToWeek) {
   let compositeScore = 0;
   for (const { tab, w } of weightedTabs) {
     const entry = getKvEntry(tab, norm(aluno.name));
-    const isEspTab = ESPECIALIDADES.includes(tab);
+    const isEspTab = ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab);
     let pHit=0, cHit=0, vHit=0, fHit=0, slots=0;
     for (let i=0; i<upToWeek; i++) {
       const h = entry&&entry.history[i] ? entry.history[i] : {P:false,C:false,F:false,V:false};
@@ -603,7 +610,7 @@ function calcCompositeScoreWeek(aluno, weekIdx) {
   for (const tab of tabs) {
     const entry = getKvEntry(tab, norm(aluno.name));
     const h = entry&&entry.history[weekIdx] ? entry.history[weekIdx] : {P:false,C:false,F:false,V:false};
-    const isEspTab = ESPECIALIDADES.includes(tab);
+    const isEspTab = ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab);
     total++;
     if(h.P) pHit++; if(h.P&&h.C) cHit++; if(h.P&&h.V) vHit++;
     if(isEspTab){ fSlots++; if(h.P&&h.F) fHit++; }
@@ -2292,14 +2299,14 @@ function getChamadaPool(tab) {
     return allAlunos.filter(a=>a.turma==='Master' || a.isWinners);
   if (tab==='Winners Encontro')
     return allAlunos.filter(a=>a.isWinners);
-  if (ESPECIALIDADES.includes(tab))
+  if (ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab))
     return allAlunos.filter(a=>hasEsp(a, tab));
   return allAlunos;
 }
 
 function renderChamadaTable(pool) {
   const tab = document.getElementById('chamadaTab').value;
-  const isEsp = ESPECIALIDADES.includes(tab);
+  const isEsp = ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab);
   const isSoP = tab === 'Hotseat Simultâneo'; // só P visível
   const tbody = document.getElementById('chamadaTbody');
   tbody.innerHTML = pool.map(aluno=>{
