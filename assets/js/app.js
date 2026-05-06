@@ -2061,7 +2061,7 @@ function checkSemanaAtual() {
 // CHAMADA — Registration
 // ═══════════════════════════════════════════
 const WORKER_BASE = WORKER_URL.replace('/dados','');
-let csAuthenticated = true; // TEMP: login desabilitado para visualização
+let csAuthenticated = false;
 let csNomeAtual = 'Preview'; // nome do CS logado
 let chamadaRegistros = {}; // normName → {P,C,F,V,name}
 
