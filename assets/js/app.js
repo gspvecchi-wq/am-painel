@@ -124,6 +124,8 @@ function getKvEntry(tab, normName, ciclo) {
   return getKvTab(tab, ciclo)[normName] || null;
 }
 let csFilter       = 'todos';
+let csPage         = 1;
+const CS_PAGE_SIZE = 20;
 let currentTab     = 'Mentoria';
 let currentWeek    = 1;
 let loaded         = false;
@@ -271,27 +273,28 @@ async function reloadAll() {
   setStatus(false,'Carregando dados...');
   loaded = false;
   try {
-    const res = await fetch(WORKER_URL);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    // Dispara as 3 chamadas em paralelo
+    const [dadosRes, kvRes, grupoRes] = await Promise.all([
+      fetch(WORKER_URL),
+      fetch(WORKER_URL.replace('/dados','/presenca/all')).catch(() => null),
+      fetch(WORKER_URL.replace('/dados','/grupo/score')).catch(() => null)
+    ]);
+
+    if (!dadosRes.ok) throw new Error(`HTTP ${dadosRes.status}`);
+    const data = await dadosRes.json();
     if (data.error) throw new Error(data.error);
 
-    // Worker já retorna allAlunos sem gender — inferimos no cliente
     allAlunos = data.allAlunos.map(a=>({...a, gender: inferGender(a.name), especialidades: a.especialidades || []}));
 
-    // Load all KV presenca data for profile use
     try {
-      const kvRes = await fetch(WORKER_URL.replace('/dados','/presenca/all'));
-      kvPresenca = kvRes.ok ? await kvRes.json() : {};
-      popularCicloSelector();
-      popularCicloSelectorCS();
-      popularCicloSelectorChamada();
+      kvPresenca = (kvRes && kvRes.ok) ? await kvRes.json() : {};
     } catch(e) { kvPresenca = {}; }
+    popularCicloSelector();
+    popularCicloSelectorCS();
+    popularCicloSelectorChamada();
 
-    // Load grupo participation scores for current week
     try {
-      const grupoRes = await fetch(WORKER_URL.replace('/dados','/grupo/score'));
-      const grupoData = grupoRes.ok ? await grupoRes.json() : {};
+      const grupoData = (grupoRes && grupoRes.ok) ? await grupoRes.json() : {};
       kvGrupoScores = grupoData.scores || {};
     } catch(e) { kvGrupoScores = {}; }
 
@@ -748,12 +751,14 @@ function updateFilterCounts() {
 
 function csSearchTable(val) {
   csSearchQuery = (val || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  csPage = 1;
   renderCsTable();
 }
 
 
 function setPill(f,el) {
   csFilter=f;
+  csPage = 1;
   csSearchQuery = '';
   const inp = document.getElementById('csSearch'); if (inp) inp.value = '';
   document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
@@ -789,13 +794,21 @@ function renderCsTable() {
   if (!list.length) {
     tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--sub)">Nenhum médico para acionar neste filtro 🎉</td></tr>`;
     renderCsMobileCards();
+    renderCsPagination(0, 0);
     return;
   }
   renderCsMobileCards();
   // Sync mobile filter count
   const _mfCount = document.getElementById('csMfCount');
   if (_mfCount) _mfCount.textContent = list.length + ' resultado' + (list.length !== 1 ? 's' : '');
-  tbody.innerHTML=list.map(d=>{
+
+  // Paginação
+  const totalPages = Math.ceil(list.length / CS_PAGE_SIZE);
+  if (csPage > totalPages) csPage = totalPages;
+  const start = (csPage - 1) * CS_PAGE_SIZE;
+  const pageList = list.slice(start, start + CS_PAGE_SIZE);
+
+  tbody.innerHTML=pageList.map(d=>{
     const rc       = d.risk>=60?'rh':d.risk>=30?'rm':'rl';
     const rcColor  = d.risk>=60?'var(--danger)':d.risk>=30?'var(--warn)':'var(--safe)';
     const rl       = d.risk>=60?'ALTO':d.risk>=30?'MÉD':'BAIXO';
@@ -825,6 +838,48 @@ function renderCsTable() {
       <td class="td-act"><button class="dr-act-btn" onclick="event.stopPropagation();openDrModal('${esc(d.name)}')">Acionar <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button></td>
     </tr>`;
   }).join('');
+  renderCsPagination(list.length, totalPages);
+}
+
+function renderCsPagination(total, totalPages) {
+  let el = document.getElementById('csPagination');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'csPagination';
+    el.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:6px;padding:16px 0;flex-wrap:wrap;';
+    const tblWrap = document.getElementById('csTbody')?.closest('.tbl-wrap');
+    if (tblWrap) tblWrap.after(el);
+  }
+  if (!total || totalPages <= 1) { el.innerHTML = ''; return; }
+
+  const start = (csPage - 1) * CS_PAGE_SIZE + 1;
+  const end = Math.min(csPage * CS_PAGE_SIZE, total);
+
+  const btnStyle = (active) => `style="padding:5px 11px;border-radius:7px;border:1px solid ${active?'var(--acc)':'var(--border2)'};background:${active?'var(--acc)':'transparent'};color:${active?'#000':'var(--sub)'};font-size:12px;font-weight:${active?'700':'500'};cursor:pointer;transition:all .15s;"`;
+
+  let html = `<span style="font-size:11px;color:var(--sub);margin-right:4px;">${start}–${end} de ${total}</span>`;
+  html += `<button ${btnStyle(false)} onclick="csGoPage(${csPage-1})" ${csPage===1?'disabled':''}>‹</button>`;
+
+  // Páginas
+  for (let p = 1; p <= totalPages; p++) {
+    if (totalPages > 7 && p > 2 && p < totalPages - 1 && Math.abs(p - csPage) > 1) {
+      if (p === 3 || p === totalPages - 2) html += `<span style="color:var(--sub);padding:0 2px">…</span>`;
+      continue;
+    }
+    html += `<button ${btnStyle(p===csPage)} onclick="csGoPage(${p})">${p}</button>`;
+  }
+
+  html += `<button ${btnStyle(false)} onclick="csGoPage(${csPage+1})" ${csPage===totalPages?'disabled':''}>›</button>`;
+  el.innerHTML = html;
+}
+
+function csGoPage(p) {
+  const all = _csDoctors.filter(d=>d.motivos.length>0||d.consAbs>=4);
+  const totalPages = Math.ceil(all.length / CS_PAGE_SIZE);
+  if (p < 1 || p > totalPages) return;
+  csPage = p;
+  renderCsTable();
+  document.getElementById('csTbody')?.closest('.tbl-wrap')?.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 function bCls(m){return{ausente:'b-aus',camera:'b-cam',feedback:'b-fb',vitoria:'b-vit'}[m]||'';}
