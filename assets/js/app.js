@@ -1096,13 +1096,47 @@ function renderGestComparacao() {
      <span style="color:var(--warn);font-size:28px">${quedaB}</span>
      ${delta(quedaA, quedaB)}`;
 
-  document.getElementById('gRisk').innerHTML = '—';
-  document.getElementById('gQueda').innerHTML = '—';
-  document.getElementById('gNovos').innerHTML = '—';
+  // Risco alto por ciclo
+  cicloAtivo = cicloA;
+  const riscoA = allAlunos.filter(a => calcRisk(a.history || [], maxA) >= 60).length;
+  cicloAtivo = cicloB;
+  const riscoB = allAlunos.filter(a => calcRisk(a.history || [], maxB) >= 60).length;
+  cicloAtivo = origCiclo;
+
+  document.getElementById('gRisk').innerHTML =
+    `<span style="color:var(--sub);font-size:20px">${riscoA}</span>
+     <span style="color:var(--sub);font-size:12px;margin:0 4px">→</span>
+     <span style="color:var(--danger);font-size:28px">${riscoB}</span>
+     ${delta(riscoA, riscoB)}`;
+
+  document.getElementById('gQueda').innerHTML =
+    `<span style="color:var(--sub);font-size:20px">${quedaA}</span>
+     <span style="color:var(--sub);font-size:12px;margin:0 4px">→</span>
+     <span style="color:var(--warn);font-size:28px">${quedaB}</span>
+     ${delta(quedaA, quedaB)}`;
+
+  document.getElementById('gNovos').innerHTML =
+    `<span style="color:var(--sub);font-size:20px">${novosA}</span>
+     <span style="color:var(--sub);font-size:12px;margin:0 4px">→</span>
+     <span style="color:var(--blue);font-size:28px">${novosB}</span>
+     ${delta(novosA, novosB)}`;
 
   // Título dos comparativos
   document.getElementById('gestCompareSub').textContent =
     `${labelA} (A) vs ${labelB} (B) — presença por turma`;
+
+  // Função: calcula presença média do mês inteiro para uma turma
+  function monthAvgPresence(tab, ciclo, maxW) {
+    const prev = cicloAtivo;
+    cicloAtivo = ciclo;
+    let totalPct = 0, count = 0;
+    for (let w = 0; w < maxW; w++) {
+      const r = weekPresenceRate(tab, w);
+      if (r && r.total > 0) { totalPct += r.pct; count++; }
+    }
+    cicloAtivo = prev;
+    return count > 0 ? Math.round(totalPct / count) : 0;
+  }
 
   // Gráfico comparativo por turma — todas as turmas com dados
   const compareTabs = ALL_TABS.filter(tab => {
@@ -1112,29 +1146,35 @@ function renderGestComparacao() {
   });
   const wcEl = document.getElementById('weekCompare');
   wcEl.innerHTML = compareTabs.map(tab => {
+    // Média mensal
+    const avgA = monthAvgPresence(tab, cicloA, maxA);
+    const avgB = monthAvgPresence(tab, cicloB, maxB);
+
+    // Última semana (comparativo pontual)
     cicloAtivo = cicloA;
     const rA = weekPresenceRate(tab, maxA - 1) || { pct: 0 };
     cicloAtivo = cicloB;
     const rB = weekPresenceRate(tab, maxB - 1) || { pct: 0 };
     cicloAtivo = origCiclo;
 
-    const colorA = rA.pct >= 70 ? 'var(--safe)' : rA.pct >= 40 ? 'var(--warn)' : 'var(--danger)';
-    const colorB = rB.pct >= 70 ? 'var(--safe)' : rB.pct >= 40 ? 'var(--warn)' : 'var(--danger)';
-    const d = rB.pct - rA.pct;
+    const colorAvgA = avgA >= 70 ? 'var(--safe)' : avgA >= 40 ? 'var(--warn)' : 'var(--danger)';
+    const colorAvgB = avgB >= 70 ? 'var(--safe)' : avgB >= 40 ? 'var(--warn)' : 'var(--danger)';
+    const d = avgB - avgA;
     const dColor = d > 0 ? 'var(--safe)' : d < 0 ? 'var(--danger)' : 'var(--sub)';
     const dTxt = d > 0 ? '▲ +'+d+'pp' : d < 0 ? '▼ '+d+'pp' : '= Sem variação';
 
     return `<div class="wcard">
       <div class="wcard-title">${tab}</div>
-      <div style="display:flex;gap:12px;align-items:flex-end;margin:8px 0;">
+      <div style="font-size:9px;color:var(--sub);margin-bottom:6px;letter-spacing:.08em">MÉDIA DO MÊS</div>
+      <div style="display:flex;gap:12px;align-items:flex-end;margin:4px 0 10px;">
         <div style="text-align:center;flex:1">
           <div style="font-size:9px;color:var(--sub);margin-bottom:4px">A · ${labelA.split(' ')[0]}</div>
-          <div style="font-family:'Inter',sans-serif;font-weight:800;font-size:36px;color:${colorA};line-height:1">${rA.pct}%</div>
+          <div style="font-family:'Inter',sans-serif;font-weight:800;font-size:36px;color:${colorAvgA};line-height:1">${avgA}%</div>
         </div>
         <div style="font-size:18px;color:var(--sub)">→</div>
         <div style="text-align:center;flex:1">
           <div style="font-size:9px;color:var(--sub);margin-bottom:4px">B · ${labelB.split(' ')[0]}</div>
-          <div style="font-family:'Inter',sans-serif;font-weight:800;font-size:36px;color:${colorB};line-height:1">${rB.pct}%</div>
+          <div style="font-family:'Inter',sans-serif;font-weight:800;font-size:36px;color:${colorAvgB};line-height:1">${avgB}%</div>
         </div>
       </div>
       <div class="wcard-delta" style="color:${dColor};background:transparent;border:1px solid ${dColor}">${dTxt}</div>
