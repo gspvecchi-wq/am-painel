@@ -1949,10 +1949,12 @@ function openDrModal(name, showMsgs=true) {
     ${fatDelta !== null ? `<div class="mstat"><div class="mstat-v" style="color:${fatColor};font-size:13px">${fatDelta >= 0 ? '+' : ''}${fatDelta}%${fatDeltaR ? ' · ' + (fatDeltaR >= 0 ? '+' : '') + fmtR(fatDeltaR) : ''}</div><div class="mstat-l">Crescimento</div></div>` : ''}
     ${(()=>{ const g=kvGrupoScores[norm(aluno.name)]; if(!g||!g.msgs) return '<div class="mstat"><div class="mstat-v" style="color:var(--sub);font-size:13px">—</div><div class="mstat-l">Grupo</div></div>'; const icons=[g.resultado?'🏆'+g.resultado:'',g.ajuda?'🤝'+g.ajuda:'',g.duvida?'❓'+g.duvida:''].filter(Boolean).join(' '); return '<div class="mstat"><div class="mstat-v" style="color:var(--acc);font-size:13px">+'+g.total+'pts</div><div class="mstat-l">Grupo '+(icons||'💬'+g.msgs)+'</div></div>'; })()}`;
 
-  // Seção IA — visível sempre que autenticado
+  // Seção IA — visível se autenticado (verifica localStorage como fallback)
+  const isAuth = csAuthenticated || !!(localStorage.getItem('am_cs_pwd') && localStorage.getItem('am_cs_email'));
+  if (!csAuthenticated && isAuth) csAuthenticated = true; // sincroniza variável
   const aiSection = document.getElementById('mAISection');
   if (aiSection) {
-    aiSection.style.display = csAuthenticated ? 'block' : 'none';
+    aiSection.style.display = isAuth ? 'block' : 'none';
     // Limpa output anterior
     document.getElementById('aiOutput').style.display = 'none';
     document.getElementById('aiLoading').style.display = 'none';
