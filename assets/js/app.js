@@ -348,7 +348,7 @@ function buildDoctors(tab, week) {
       if (!cur.F && isEsp) motivos.push('feedback');
       if (!cur.V) motivos.push('vitoria');
     }
-    const risk = calcRisk(history, week);
+    const risk = calcRiskRecentWeeks(aluno);
     return {...aluno, history, cur, consAbs, motivos, risk};
   });
 }
@@ -497,6 +497,52 @@ function calcRisk(history, upTo) {
   const vitRate  = pres.length ? pres.filter(w=>!w.V).length/pres.length : 1;
   let score = consAbs*18 + absRate*35 + camRate*12 + vitRate*8;
   return Math.min(Math.round(score), 100);
+}
+
+// Calcula risco baseado nas últimas 4 semanas reais cruzando ciclos
+function calcRiskRecentWeeks(aluno) {
+  const alunoTabs = aluno.isWinners
+    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro']
+    : aluno.turma==='Master'
+    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master']
+    : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+
+  // Últimas 4 semanas do calendário
+  const slots = [];
+  const hoje = new Date();
+  for (let i = 0; i < 4; i++) {
+    const d = new Date(hoje);
+    d.setDate(d.getDate() - i * 7);
+    const ciclo = d.toISOString().slice(0, 7);
+    const dia = d.getDate();
+    const w = dia <= 7 ? 0 : dia <= 14 ? 1 : dia <= 21 ? 2 : dia <= 28 ? 3 : 4;
+    slots.unshift({ ciclo, w });
+  }
+
+  // Agrega presença por semana (pelo menos 1 presença em qualquer tab = presente)
+  const semanas = slots.map(({ ciclo, w }) => {
+    let P=false, C=false, V=false;
+    for (const tab of alunoTabs) {
+      const h = kvPresenca[tab]?.[ciclo]?.[norm(aluno.name)]?.history?.[w];
+      if (h) {
+        if (h.P) P = true;
+        if (h.P && h.C) C = true;
+        if (h.P && h.V) V = true;
+      }
+    }
+    return { P, C, V };
+  });
+
+  let consAbs = 0;
+  for (let i = semanas.length-1; i >= 0; i--) {
+    if (!semanas[i].P) consAbs++;
+    else break;
+  }
+  const absRate = semanas.filter(s=>!s.P).length / semanas.length;
+  const pres = semanas.filter(s=>s.P);
+  const camRate = pres.length ? pres.filter(s=>!s.C).length/pres.length : 1;
+  const vitRate = pres.length ? pres.filter(s=>!s.V).length/pres.length : 1;
+  return Math.min(Math.round(consAbs*18 + absRate*35 + camRate*12 + vitRate*8), 100);
 }
 
 // Detect if aluno is "new" — cycleStart within 60 days
@@ -790,7 +836,8 @@ function renderCsTable() {
              (phoneQ && phone.includes(phoneQ));
     });
   }
-  const tbody = document.getElementById('csTbody');
+  // Ordena por risco (maior primeiro) — consistente em todos os filtros
+  list = [...list].sort((a, b) => b.risk - a.risk);
   if (!list.length) {
     tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--sub)">Nenhum médico para acionar neste filtro 🎉</td></tr>`;
     renderCsMobileCards();
