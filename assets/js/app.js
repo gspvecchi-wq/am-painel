@@ -836,10 +836,10 @@ function renderCsTable() {
              (phoneQ && phone.includes(phoneQ));
     });
   }
+  const tbody = document.getElementById('csTbody');
   // Ordena por risco (maior primeiro) — consistente em todos os filtros
   list = [...list].sort((a, b) => b.risk - a.risk);
   if (!list.length) {
-    tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--sub)">Nenhum médico para acionar neste filtro 🎉</td></tr>`;
     renderCsMobileCards();
     renderCsPagination(0, 0);
     return;
