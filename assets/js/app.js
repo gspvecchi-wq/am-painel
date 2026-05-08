@@ -2349,6 +2349,10 @@ function initChamada() {
   const savedEmail = localStorage.getItem('am_cs_email');
   const savedSenha = localStorage.getItem('am_cs_senha');
   if (savedEmail && savedSenha && !csAuthenticated) {
+    // Autentica otimisticamente — já tem credenciais salvas
+    csAuthenticated = true;
+    csNomeAtual = localStorage.getItem('am_cs_nome') || '';
+    // Valida no servidor em segundo plano
     fetch(WORKER_BASE+'/auth/login', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -2370,9 +2374,16 @@ function initChamada() {
           atualizarSemanaBadge();
           checkSemanaAtual();
           loadChamada();
+        } else {
+          // Credenciais inválidas — força logout
+          csAuthenticated = false;
+          localStorage.removeItem('am_cs_pwd');
+          localStorage.removeItem('am_cs_email');
+          localStorage.removeItem('am_cs_nome');
+          if(document.getElementById('loginOverlay')) document.getElementById('loginOverlay').style.display = 'flex';
         }
       }
-    }).catch(()=>{});
+    }).catch(()=>{}); // Se offline, mantém autenticado com credenciais salvas
   }
   if (csAuthenticated) {
     document.getElementById('chamadaLogin').style.display='none';
