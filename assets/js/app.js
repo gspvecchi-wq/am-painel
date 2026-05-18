@@ -5,12 +5,12 @@ const BOARDS = {
   Master:   { id:'18365478944', tagCol:'tag_mm1cqsgs' },
   Mentoria: { id:'18391780128', tagCol:'tag_mm1cs0hm' }
 };
-const ESPECIALIDADES = ['Dermato&Oftalmo','Ortoped','Psiquiatras','Gestores','Emagrecimento','Cirurgiões'];
-// Especialidades legado mantidas para exibição de dados históricos (março/abril)
-const ESPECIALIDADES_LEGADO = ['Dermato','Oftalmo','Retomada'];
+const ESPECIALIDADES = ['Gestores','Ortopedia/Dor','Estética&Oftalmo','Emagrecimento/Integrativa','Cirurgiões','Psiquiatras/Clínicos','Mentores'];
+// Especialidades legado — mantidas para leitura de dados históricos
+const ESPECIALIDADES_LEGADO = ['Dermato','Oftalmo','Retomada','Dermato&Oftalmo','Ortoped','Psiquiatras','Emagrecimento','Gestores'];
 // Retorna lista de especialidades por ciclo
 function getEspecialidadesPorCiclo(ciclo) {
-  const CICLO_NOVO = '2026-05'; // a partir de maio usa a lista nova
+  const CICLO_NOVO = '2026-05';
   return ciclo >= CICLO_NOVO ? ESPECIALIDADES : [...ESPECIALIDADES, ...ESPECIALIDADES_LEGADO];
 }
 const AULAS_GERAIS   = ['Mentoria','Hotseat','Hotseat Simultâneo','Master'];
