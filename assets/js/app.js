@@ -133,10 +133,38 @@ let _csDoctors     = [];
 let gestTurmaFilter = 'todos'; // 'todos' | 'Master' | 'Mentoria'
 
 // ─── especialidade helpers ───────────────────
+// Mapa de tags legado do Monday → nome canônico atual (usando norm())
+// Permite que alunos ainda tagueados com nomes antigos apareçam nas abas novas
+const LEGACY_ESP_NORM_MAP = {
+  'psiquiatras':      'psiquiatras/clinicos',
+  'emagrecimento':    'emagrecimento/integrativa',
+  'emagrecimento1':   'emagrecimento/integrativa',
+  'emagrecimento2':   'emagrecimento/integrativa',
+  'ortoped':          'ortopedia/dor',
+  'oftalmo':          'estetica&oftalmo',
+  'dermato':          'estetica&oftalmo',
+  'dermato&oftalmo':  'estetica&oftalmo',
+};
+
+// Verifica se `tab` é uma aba de especialidade — usa norm() para evitar
+// falhas por diferenças de normalização Unicode (NFC vs NFD) entre o
+// valor do <option> HTML e o literal no array ESPECIALIDADES.
+function isEspecialidade(tab) {
+  const n = norm(tab);
+  return ESPECIALIDADES.some(e => norm(e) === n) || ESPECIALIDADES_LEGADO.some(e => norm(e) === n);
+}
+
 // aluno.especialidades is now an array (e.g. ['Dermato','Psiquiatras'])
 function hasEsp(aluno, tab) {
   if (!aluno.especialidades || !aluno.especialidades.length) return false;
-  return aluno.especialidades.some(e => norm(e) === norm(tab));
+  const tabNorm = norm(tab);
+  return aluno.especialidades.some(e => {
+    const eNorm = norm(e);
+    if (eNorm === tabNorm) return true;
+    // Compatibilidade com tags legado do Monday (ex: 'Psiquiatras' → 'Psiquiatras/Clínicos')
+    const canonical = LEGACY_ESP_NORM_MAP[eNorm];
+    return canonical !== undefined && canonical === tabNorm;
+  });
 }
 function espLabel(aluno) {
   if (!aluno.especialidades || !aluno.especialidades.length) return '';
@@ -310,7 +338,7 @@ function getPool(tab) {
     return allAlunos.filter(a=>a.turma==='Master' || a.turma==='Winners');
   if (tab==='Winners Encontro')
     return allAlunos.filter(a=>a.turma==='Winners');
-  if ((ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab)))
+  if (isEspecialidade(tab))
     return allAlunos.filter(a=>hasEsp(a, tab));
   return allAlunos;
 }
@@ -327,7 +355,7 @@ function buildDoctors(tab, week) {
     const cur = history[w];
     let consAbs=0;
     for (let i=w; i>=0; i--) { if (!history[i].P) consAbs++; else break; }
-    const isEsp = (ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab));
+    const isEsp = isEspecialidade(tab);
     const motivos=[];
     if (!cur.P) { motivos.push('ausente'); }
     else {
@@ -439,7 +467,7 @@ function calcCompositeScore(aluno, upToWeek) {
   let compositeScore = 0;
   for (const { tab, w } of weightedTabs) {
     const entry = getKvEntry(tab, norm(aluno.name));
-    const isEspTab = (ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab));
+    const isEspTab = isEspecialidade(tab);
     let pHit=0, cHit=0, vHit=0, fHit=0, slots=0;
     for (let i=0; i<upToWeek; i++) {
       const h = entry&&entry.history[i] ? entry.history[i] : {P:false,C:false,F:false,V:false};
@@ -604,7 +632,7 @@ function calcCompositeScoreWeek(aluno, weekIdx) {
   for (const tab of tabs) {
     const entry = getKvEntry(tab, norm(aluno.name));
     const h = entry&&entry.history[weekIdx] ? entry.history[weekIdx] : {P:false,C:false,F:false,V:false};
-    const isEspTab = (ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab));
+    const isEspTab = isEspecialidade(tab);
     total++;
     if(h.P) pHit++; if(h.P&&h.C) cHit++; if(h.P&&h.V) vHit++;
     if(isEspTab){ fSlots++; if(h.P&&h.F) fHit++; }
@@ -1642,7 +1670,7 @@ function openDrModal(name, showMsgs=true) {
         if (h.P && h.F) F++;
         if (h.P && h.V) V++;
       }
-      if ((ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab))) {
+      if (isEspecialidade(tab)) {
         espSlots++;
         if (h && h.P && h.F) espF++;
       }
@@ -2287,14 +2315,14 @@ function getChamadaPool(tab) {
     return allAlunos.filter(a=>a.turma==='Master' || a.turma==='Winners');
   if (tab==='Winners Encontro')
     return allAlunos.filter(a=>a.turma==='Winners');
-  if ((ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab)))
+  if (isEspecialidade(tab))
     return allAlunos.filter(a=>hasEsp(a, tab));
   return allAlunos;
 }
 
 function renderChamadaTable(pool) {
   const tab = document.getElementById('chamadaTab').value;
-  const isEsp = (ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab));
+  const isEsp = isEspecialidade(tab);
   const isSoP = tab === 'Hotseat Simultâneo'; // só P visível
   const tbody = document.getElementById('chamadaTbody');
   tbody.innerHTML = pool.map(aluno=>{
@@ -2337,7 +2365,7 @@ function togglePCFV(keyId, field) {
 }
 
 function updateChamadaStats(pool) {
-  const isEsp = ESPECIALIDADES.includes(document.getElementById('chamadaTab').value);
+  const isEsp = isEspecialidade(document.getElementById('chamadaTab').value);
   const total   = pool.length;
   const present = Object.values(chamadaRegistros).filter(r=>r.P).length;
   const absent  = total - present;
