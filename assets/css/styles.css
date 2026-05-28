@@ -88,11 +88,8 @@ body {
    SIDEBAR — desktop only
 ═══════════════════════════════════════════ */
 .sidebar {
-  position: fixed;
-  top: 52px;
-  left: 0;
-  bottom: 32px; /* altura da statusbar */
   width: 220px;
+  flex-shrink: 0;
   background: var(--s1);
   border-right: 1px solid var(--border);
   padding: 20px 10px;
@@ -100,7 +97,9 @@ body {
   flex-direction: column;
   gap: 24px;
   overflow-y: auto;
-  z-index: 90;
+  position: sticky;
+  top: 68px;
+  height: calc(100vh - 68px);
   scrollbar-width: none;
 }
 .sidebar::-webkit-scrollbar { display: none; }
@@ -159,9 +158,9 @@ body {
 }
 .sidebar-item.active svg { opacity: 1; }
 
-/* Views e statusbar recuam para dar espaço ao sidebar */
-.view        { margin-left: 220px; }
-.statusbar   { left: 220px; }
+/* Sidebar flex layout */
+.layout-body  { display: flex; }
+.layout-main  { flex: 1; min-width: 0; }
 
 /* ═══════════════════════════════════════════
    TOPBAR — Floating card nav (CardNav inspired)
@@ -3747,10 +3746,9 @@ body.light-theme .cs-stat-card {
   .mobile-dock { display: block; }
   /* Extra bottom padding so content isn't hidden behind dock */
   .view { padding-bottom: 110px !important; }
-  /* Hide sidebar, reset content offset */
+  /* Hide sidebar, reset layout to block on mobile */
   .sidebar { display: none; }
-  .view { margin-left: 0 !important; }
-  .statusbar { left: 0; }
+  .layout-body { display: block; }
   /* Hide desktop statusbar — info already shown in mobile dock */
   .statusbar { display: none !important; }
   /* ── Page header: compact on mobile ── */
