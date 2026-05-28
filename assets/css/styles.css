@@ -514,6 +514,10 @@ body {
   gap: 12px;
   margin-bottom: 28px;
 }
+.cs-stat-strip-6 { grid-template-columns: repeat(6, 1fr); }
+@media (min-width: 769px) and (max-width: 1560px) {
+  .cs-stat-strip-6 { grid-template-columns: repeat(3, 1fr); }
+}
 
 .cs-stat-card {
   position: relative;
@@ -657,8 +661,10 @@ body {
   border: 1px solid var(--border);
   border-bottom: none;
   border-radius: 12px 12px 0 0;
-  overflow: hidden;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.cs-filter-bar::-webkit-scrollbar { display: none; }
 
 /* ── From Uiverse.io by Smit-Prajapati — horizontal adaptation ── */
 .radio-container {
@@ -671,6 +677,7 @@ body {
   position: relative;
   padding-bottom: 2px;
   width: 100%;
+  min-width: max-content;
 }
 
 .radio-container input {
@@ -2661,7 +2668,11 @@ tbody tr:hover .dr-act-btn {
 /* ═══════════════════════════════════════════
    RESPONSIVE
 ═══════════════════════════════════════════ */
-@media (max-width: 1200px) {
+/* Sidebar ocupa 220px — breakpoints do stat strip deslocados */
+@media (min-width: 769px) and (max-width: 1440px) {
+  .cs-stat-strip { grid-template-columns: repeat(4, 1fr); }
+}
+@media (min-width: 769px) and (max-width: 1200px) {
   .cs-stat-strip { grid-template-columns: repeat(3, 1fr); }
 }
 
