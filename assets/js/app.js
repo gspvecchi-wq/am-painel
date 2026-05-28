@@ -5,7 +5,7 @@ const FEATURES = {
   NOVO_VOCABULARIO:         true,  // fase 1 — renomeação de menus e labels
   NOVA_ARQUITETURA_MODULOS: true,  // fase 2 — separadores de grupo + badges de categoria
   MOTOR_DE_SAUDE:           true,  // fase 3 — breakdown do score
-  DETECCAO_QUEDA:           false, // fase 4 — queda de engajamento como módulo central
+  DETECCAO_QUEDA:           true,  // fase 4 — queda de engajamento como módulo central
   LINHA_DO_TEMPO:           false, // fase 5 — histórico do cliente
   RECEITA_EM_RISCO:         false, // fase 6 — camada financeira
 };
@@ -645,6 +645,140 @@ function isQuedaAcelerada(aluno, upToWeek) {
   return (older - recent) >= 30;
 }
 
+// ── DETECÇÃO DE QUEDA — Fase 4 ────────────────────────────
+
+function classificarCausaProvavel(weekData, totalWeeks, aluno) {
+  let totSlots=0, totP=0, totC=0, totV=0;
+  for (let i=0; i<totalWeeks; i++) {
+    totSlots += weekData[i].slots;
+    totP     += weekData[i].P;
+    totC     += weekData[i].C;
+    totV     += weekData[i].V;
+  }
+  const presRate = totSlots ? totP/totSlots*100 : 0;
+  const camRate  = totP    ? totC/totP*100 : 0;
+  const vitRate  = totP    ? totV/totP*100 : 0;
+
+  // Semanas consecutivas recentes com presença mas sem vitória
+  let semansSemVitoria = 0;
+  for (let i=totalWeeks-1; i>=0; i--) {
+    const d = weekData[i];
+    if (d.P > 0) {
+      if (d.V === 0) semansSemVitoria++;
+      else break;
+    }
+  }
+
+  const grupoTotal = kvGrupoScores[norm(aluno.name)]
+    ? Math.min(kvGrupoScores[norm(aluno.name)].total||0, 15)
+    : 0;
+
+  const causas = [];
+  if (presRate < 50 && camRate < 30)
+    causas.push('Desconexão emocional');
+  if (semansSemVitoria >= 3 && presRate >= 40)
+    causas.push('Baixa percepção de resultado');
+  if (presRate >= 50 && camRate < 20 && grupoTotal < 5 && vitRate < 20)
+    causas.push('Sobrecarga operacional');
+  return causas;
+}
+
+function analisarSinalDeRisco(aluno, upToWeek, weekData, totalWeeks) {
+  if (!isQuedaAcelerada(aluno, upToWeek)) return null;
+  const older  = calcCompositeScoreWeek(aluno, upToWeek-2);
+  const recent = calcCompositeScoreWeek(aluno, upToWeek-1);
+  const queda  = Math.max(0, older - recent);
+  const causas = classificarCausaProvavel(weekData, totalWeeks, aluno);
+  const ACOES = {
+    'Desconexão emocional':         ['Ligação empática em até 24h', 'Escuta ativa sem agenda'],
+    'Baixa percepção de resultado': ['Resgatar conquistas anteriores', 'Redefinir micrometa realista'],
+    'Sobrecarga operacional':       ['Entender o momento clínico', 'Ajustar expectativas do ciclo'],
+  };
+  const acoes = causas.flatMap(c => ACOES[c] || []);
+  if (!acoes.length) acoes.push('Ligar e entender o que mudou nas últimas semanas');
+  const prioridade = causas.length >= 2 ? 'ALTA' : causas.length === 1 ? 'MÉDIA' : 'BAIXA';
+  return { scorePrev: older, scoreRecente: recent, queda, causas, acoes, prioridade };
+}
+
+function renderSinalDeRisco(sinal) {
+  const cores = {
+    ALTA:  { c:'var(--danger)', bg:'var(--danger-dim)', b:'rgba(255,59,92,0.3)' },
+    MÉDIA: { c:'var(--warn)',   bg:'var(--warn-dim)',   b:'rgba(255,140,0,0.3)' },
+    BAIXA: { c:'var(--blue)',   bg:'var(--blue-dim)',   b:'rgba(77,142,255,0.3)' },
+  };
+  const cor = cores[sinal.prioridade] || cores.BAIXA;
+  const causasHtml = sinal.causas.length
+    ? sinal.causas.map(c=>`<div class="sinal-causa">→ ${c}</div>`).join('')
+    : `<div class="sinal-causa sinal-causa-nd">Causa não identificada automaticamente</div>`;
+  const acoesHtml = sinal.acoes.map(a=>`<div class="sinal-acao">→ ${a}</div>`).join('');
+  return `
+    <div class="sinal-risco-card">
+      <div class="sinal-risco-head">
+        <div>
+          <div class="sinal-risco-eyebrow">⚡ Sinal de Risco Detectado</div>
+          <div class="sinal-risco-titulo">Queda de Engajamento: <span style="color:var(--danger)">-${sinal.queda} pts</span></div>
+        </div>
+        <span class="sinal-prio-badge" style="color:${cor.c};background:${cor.bg};border:1px solid ${cor.b}">
+          Prioridade: ${sinal.prioridade}
+        </span>
+      </div>
+      <div class="sinal-risco-body">
+        <div class="sinal-risco-col">
+          <div class="sinal-risco-col-title">Causas prováveis</div>
+          ${causasHtml}
+        </div>
+        <div class="sinal-risco-col">
+          <div class="sinal-risco-col-title">Ação sugerida</div>
+          ${acoesHtml}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderCsAlertPanel() {
+  const panel = document.getElementById('csAlertPanel');
+  if (!panel) return;
+  if (!FEATURES.DETECCAO_QUEDA) { panel.style.display='none'; return; }
+  const upToWeek = detectMaxWeek();
+  if (upToWeek < 3) { panel.style.display='none'; return; }
+
+  const comQueda = (_csDoctors||[])
+    .filter(a => isQuedaAcelerada(a, upToWeek))
+    .map(a => {
+      const older  = calcCompositeScoreWeek(a, upToWeek-2);
+      const recent = calcCompositeScoreWeek(a, upToWeek-1);
+      const delta  = Math.max(0, older - recent);
+      const prio   = delta >= 40 ? 'ALTA' : 'MÉDIA';
+      return { ...a, quedaDelta: delta, prioridade: prio };
+    })
+    .sort((a,b) => a.prioridade===b.prioridade ? b.quedaDelta-a.quedaDelta : a.prioridade==='ALTA'?-1:1);
+
+  if (!comQueda.length) { panel.style.display='none'; return; }
+
+  panel.style.display = 'block';
+  const items = comQueda.slice(0,6).map(a => {
+    const dn = displayName(a.name);
+    const isAlta = a.prioridade==='ALTA';
+    const c = isAlta ? 'var(--danger)' : 'var(--warn)';
+    const bg= isAlta ? 'var(--danger-dim)' : 'var(--warn-dim)';
+    const bd= isAlta ? 'rgba(255,59,92,0.25)' : 'rgba(255,140,0,0.25)';
+    return `<div class="ap-item" onclick="openDrModal('${esc(a.name)}')">
+      <span class="ap-name">${tit(a.gender)}. ${esc(dn)}</span>
+      <span class="ap-delta">⬇ ${a.quedaDelta} pts</span>
+      <span class="ap-prio" style="color:${c};background:${bg};border-color:${bd}">${a.prioridade}</span>
+    </div>`;
+  }).join('');
+
+  const extra = comQueda.length > 6 ? `<span class="ap-extra">+${comQueda.length-6} outros</span>` : '';
+  panel.innerHTML = `<div class="alert-panel">
+    <div class="ap-head">
+      <span class="ap-title">⚡ Sinais de Queda Detectados</span>
+      <span class="ap-count">${comQueda.length} aluno${comQueda.length>1?'s':''}</span>
+    </div>
+    <div class="ap-list">${items}${extra}</div>
+  </div>`;
+}
+
 // ── RENEWAL SCORE ─────────────────────────────────────────
 // Retorna { score, daysLeft, label, color } ou null
 function calcRenewalScore(aluno, upToWeek) {
@@ -885,6 +1019,7 @@ function csLoad() {
   document.getElementById('csEmpty').style.display='none';
   updateFilterCounts();
   renderCsTable();
+  renderCsAlertPanel();
 }
 
 function setStatDelta(elId, curr, prev, prevWeek, direction) {
@@ -2062,6 +2197,23 @@ function openDrModal(name, showMsgs=true) {
   window._aiAlunoScore = engScore;
   window._aiAlunoTrend = trendLabel;
 
+  // Fase 4 — Sinal de Risco
+  const mSinal = document.getElementById('mSinalDeRisco');
+  if (mSinal) {
+    if (FEATURES.DETECCAO_QUEDA) {
+      const sinal = analisarSinalDeRisco(aluno, totalWeeks, weekData, totalWeeks);
+      if (sinal) {
+        mSinal.style.display = 'block';
+        mSinal.innerHTML = renderSinalDeRisco(sinal);
+      } else {
+        mSinal.style.display = 'none';
+        mSinal.innerHTML = '';
+      }
+    } else {
+      mSinal.style.display = 'none';
+    }
+  }
+
   // Motor de Saúde — breakdown do score
   const mBreakdown = document.getElementById('mScoreBreakdown');
   if (FEATURES.MOTOR_DE_SAUDE && mBreakdown) {
@@ -2888,7 +3040,13 @@ function buildAlunoPayload() {
     fatInicial: fmtFat(aluno.fatInicial),
     fatAtual:   fmtFat(aluno.fatAtual),
     novo: isNovo(aluno),
-    motivos: (_csDoctors.find(x => x.name === aluno.name)?.motivos || [])
+    motivos: (_csDoctors.find(x => x.name === aluno.name)?.motivos || []),
+    causasProvavel: FEATURES.DETECCAO_QUEDA
+      ? classificarCausaProvavel(weekData, totalWeeks, aluno)
+      : [],
+    sinalDeRisco: FEATURES.DETECCAO_QUEDA && isQuedaAcelerada(aluno, totalWeeks)
+      ? `Queda de engajamento detectada nas últimas semanas`
+      : null,
   };
 }
 
