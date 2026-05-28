@@ -160,7 +160,23 @@ body {
 .sidebar-item.active svg { opacity: 1; }
 
 /* Sidebar flex layout */
-.layout-body  { display: flex; }
+.layout-body {
+  display: flex;
+  position: relative;
+  min-height: calc(100vh - 68px - 32px);
+}
+/* Fundo do sidebar estende até o rodapé via pseudo-elemento */
+.layout-body::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 220px;
+  background: var(--s1);
+  border-right: 1px solid var(--border);
+  pointer-events: none;
+}
 .layout-main  { flex: 1; min-width: 0; }
 
 /* ═══════════════════════════════════════════
@@ -2725,10 +2741,10 @@ tbody tr:hover .dr-act-btn {
    RESPONSIVE
 ═══════════════════════════════════════════ */
 /* Sidebar ocupa 220px — breakpoints do stat strip deslocados */
-@media (min-width: 769px) and (max-width: 1440px) {
+@media (min-width: 769px) and (max-width: 1120px) {
   .cs-stat-strip { grid-template-columns: repeat(4, 1fr); }
 }
-@media (min-width: 769px) and (max-width: 1200px) {
+@media (min-width: 769px) and (max-width: 920px) {
   .cs-stat-strip { grid-template-columns: repeat(3, 1fr); }
 }
 
@@ -3816,6 +3832,7 @@ body.light-theme .cs-stat-card {
   /* Hide sidebar, reset layout to block on mobile */
   .sidebar { display: none; }
   .layout-body { display: block; }
+  .layout-body::before { display: none; }
   /* Hide desktop statusbar — info already shown in mobile dock */
   .statusbar { display: none !important; }
   /* ── Page header: compact on mobile ── */
