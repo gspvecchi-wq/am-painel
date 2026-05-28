@@ -1,4 +1,16 @@
 // ═══════════════════════════════════════════
+// FEATURE FLAGS — alternar false para rollback
+// ═══════════════════════════════════════════
+const FEATURES = {
+  NOVO_VOCABULARIO:         true,  // fase 1 — renomeação de menus e labels
+  NOVA_ARQUITETURA_MODULOS: false, // fase 2 — reorganização de módulos
+  MOTOR_DE_SAUDE:           false, // fase 3 — breakdown do score
+  DETECCAO_QUEDA:           false, // fase 4 — queda de engajamento como módulo central
+  LINHA_DO_TEMPO:           false, // fase 5 — histórico do cliente
+  RECEITA_EM_RISCO:         false, // fase 6 — camada financeira
+};
+
+// ═══════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════
 const BOARDS = {
@@ -2673,7 +2685,7 @@ async function enviarAcionamento(forcar = false) {
       btnEnviar.textContent = phoneValido ? '📤 ENVIAR WHATSAPP' : '📋 REGISTRAR (sem número)';
       const mins = Math.round(data.minutosDesdeUltimo);
       const tempoStr = mins < 60 ? mins + ' minutos' : mins < 1440 ? Math.round(mins/60) + ' horas' : Math.round(mins/1440) + ' dias';
-      const conf = confirm(`⚠️ ${displayName(aluno.name)} já foi acionado(a) há ${tempoStr}.\n\nQuer enviar novamente?`);
+      const conf = confirm(`⚠️ ${displayName(aluno.name)} já recebeu uma intervenção há ${tempoStr}.\n\nQuer enviar novamente?`);
       if (conf) enviarAcionamento(true);
       return;
     }
@@ -2691,7 +2703,7 @@ async function enviarAcionamento(forcar = false) {
       statusEl.style.border = '1px solid rgba(255,149,0,.3)';
       statusEl.textContent = phoneValido
         ? '⚠️ Registrado, mas houve erro no WhatsApp: ' + (data.zapiError || 'erro desconhecido')
-        : '📋 Registrado como acionamento manual (sem número).';
+        : '📋 Registrado como intervenção manual (sem número).';
     } else {
       throw new Error(data.error || 'Erro desconhecido');
     }
@@ -2881,7 +2893,7 @@ async function carregarAcionamentos() {
 
     // Renderiza stats
     const statColors = ['var(--acc)','var(--safe)','var(--blue)','var(--warn)','#9966FF'];
-    let statsHtml = `<div class="stat-card sc-acc" style="padding:10px 16px;min-width:90px"><div class="stat-num" style="font-size:28px">${registros.length}</div><div class="stat-lbl">Total acionamentos</div></div>`;
+    let statsHtml = `<div class="stat-card sc-acc" style="padding:10px 16px;min-width:90px"><div class="stat-num" style="font-size:28px">${registros.length}</div><div class="stat-lbl">Total de intervenções</div></div>`;
     Object.entries(porCS).forEach(([nome, s], i) => {
       const cor = statColors[(i+1) % statColors.length];
       statsHtml += `<div class="stat-card" style="padding:10px 16px;min-width:90px;border-color:rgba(255,255,255,.08)">
