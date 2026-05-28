@@ -145,19 +145,24 @@ body {
   padding: 0;
   border-radius: 0;
   box-shadow: none;
-  /* True viewport centering — independent of left/right column widths */
+  /* Centrado na viewport, mas com limite para não sobrepor logo/controles */
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
+  max-width: calc(100vw - 320px);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.nav-tabs::-webkit-scrollbar { display: none; }
 
 .nav-tab {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 12px;
+  gap: 5px;
+  padding: 5px 9px;
   border-radius: 9px;
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 500;
   cursor: pointer;
   border: none;
@@ -187,6 +192,33 @@ body {
   opacity: 1;
   color: #0A0A0C;
 }
+
+/* Separador de grupo no nav */
+.nav-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--border2);
+  margin: 0 3px;
+  flex-shrink: 0;
+  border-radius: 1px;
+}
+
+/* Badges de categoria nos headers de view */
+.view-module-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-bottom: 8px;
+}
+.badge-analise  { background: var(--danger-dim);  color: var(--danger); }
+.badge-cliente  { background: var(--blue-dim);    color: var(--blue);   }
+.badge-operacoes{ background: var(--acc-dim);     color: var(--acc);    }
 
 /* Glass scroll enhancement */
 .topbar.scrolled {

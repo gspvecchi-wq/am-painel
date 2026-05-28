@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════
 const FEATURES = {
   NOVO_VOCABULARIO:         true,  // fase 1 — renomeação de menus e labels
-  NOVA_ARQUITETURA_MODULOS: false, // fase 2 — reorganização de módulos
+  NOVA_ARQUITETURA_MODULOS: true,  // fase 2 — separadores de grupo + badges de categoria
   MOTOR_DE_SAUDE:           false, // fase 3 — breakdown do score
   DETECCAO_QUEDA:           false, // fase 4 — queda de engajamento como módulo central
   LINHA_DO_TEMPO:           false, // fase 5 — histórico do cliente
