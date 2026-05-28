@@ -684,6 +684,61 @@ function weekPresenceRate(tab, weekIdx) {
 // CS VIEW
 // ═══════════════════════════════════════════
 let csSearchQuery = '';
+let csCurrentPage = 1;
+const CS_PAGE_SIZE = 30;
+
+let acCurrentPage = 1;
+const AC_PAGE_SIZE = 25;
+let acAllRegistros = [];
+
+function renderAcionamentosPage(fmtHora, viaBadge) {
+  if (!fmtHora) {
+    fmtHora = iso => { const d=new Date(iso); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); };
+  }
+  if (!viaBadge) {
+    viaBadge = via => {
+      if (via==='whatsapp')      return '<span style="color:var(--safe);font-weight:700;font-size:10px">✓ WPP</span>';
+      if (via==='whatsapp-erro') return '<span style="color:var(--warn);font-weight:700;font-size:10px">⚠️ WPP</span>';
+      return '<span style="color:var(--sub);font-size:10px">📋 Manual</span>';
+    };
+  }
+  const total = acAllRegistros.length;
+  const totalPages = Math.ceil(total / AC_PAGE_SIZE);
+  acCurrentPage = Math.min(Math.max(acCurrentPage, 1), totalPages || 1);
+  const start = (acCurrentPage - 1) * AC_PAGE_SIZE;
+  const page  = acAllRegistros.slice(start, start + AC_PAGE_SIZE);
+
+  document.getElementById('acTbody').innerHTML = page.map(r => {
+    const motivos = (r.motivos||[]).map(m=>`<span class="b ${bCls(m)}">${bLbl(m)}</span>`).join('');
+    const msgPreview = (r.mensagem||'').slice(0,80).replace(/\n/g,' ') + ((r.mensagem||'').length > 80 ? '…' : '');
+    return `<tr>
+      <td style="white-space:nowrap;font-size:11px;color:var(--sub)">${fmtHora(r.hora)}</td>
+      <td><div style="font-weight:600;font-size:12px">${esc(r.alunoNome||'—')}</div></td>
+      <td style="font-size:12px;color:var(--acc);font-weight:600">${esc(r.csNome||'CS')}</td>
+      <td><div class="badges">${motivos||'<span style="color:var(--sub);font-size:10px">—</span>'}</div></td>
+      <td>${viaBadge(r.via)}</td>
+      <td style="font-size:11px;color:var(--sub);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.mensagem||'')}">${esc(msgPreview)||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  const pagEl = document.getElementById('acPagination');
+  if (pagEl) {
+    const show = totalPages > 1;
+    pagEl.style.display = show ? 'flex' : 'none';
+    if (show) {
+      document.getElementById('acPagInfo').textContent  = `Exibindo ${start+1}–${Math.min(start+AC_PAGE_SIZE,total)} de ${total} intervenções`;
+      document.getElementById('acPagPages').textContent = `Página ${acCurrentPage} de ${totalPages}`;
+      document.getElementById('acPagPrev').disabled = acCurrentPage <= 1;
+      document.getElementById('acPagNext').disabled = acCurrentPage >= totalPages;
+    }
+  }
+}
+
+function acChangePage(dir) {
+  acCurrentPage += dir;
+  renderAcionamentosPage();
+  document.getElementById('acTblWrap')?.scrollIntoView({behavior:'smooth', block:'start'});
+}
 
 function csLoad() {
   currentTab  = document.getElementById('csTab').value;
@@ -782,12 +837,14 @@ function updateFilterCounts() {
 
 function csSearchTable(val) {
   csSearchQuery = (val || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  csCurrentPage = 1;
   renderCsTable();
 }
 
 
 function setPill(f,el) {
   csFilter=f;
+  csCurrentPage = 1;
   csSearchQuery = '';
   const inp = document.getElementById('csSearch'); if (inp) inp.value = '';
   document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
@@ -820,16 +877,24 @@ function renderCsTable() {
     });
   }
   const tbody = document.getElementById('csTbody');
+  const pagEl = document.getElementById('csPagination');
   if (!list.length) {
-    tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--sub)">Nenhum médico para acionar neste filtro 🎉</td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:36px;color:var(--sub)">Nenhum médico para acionar neste filtro 🎉</td></tr>`;
+    if (pagEl) pagEl.style.display='none';
     renderCsMobileCards();
     return;
   }
   renderCsMobileCards();
-  // Sync mobile filter count
   const _mfCount = document.getElementById('csMfCount');
   if (_mfCount) _mfCount.textContent = list.length + ' resultado' + (list.length !== 1 ? 's' : '');
-  tbody.innerHTML=list.map(d=>{
+
+  const total = list.length;
+  const totalPages = Math.ceil(total / CS_PAGE_SIZE);
+  csCurrentPage = Math.min(csCurrentPage, totalPages);
+  const start = (csCurrentPage - 1) * CS_PAGE_SIZE;
+  const page  = list.slice(start, start + CS_PAGE_SIZE);
+
+  tbody.innerHTML=page.map(d=>{
     const rc       = d.risk>=60?'rh':d.risk>=30?'rm':'rl';
     const rcColor  = d.risk>=60?'var(--danger)':d.risk>=30?'var(--warn)':'var(--safe)';
     const rl       = d.risk>=60?'ALTO':d.risk>=30?'MÉD':'BAIXO';
@@ -844,7 +909,6 @@ function renderCsTable() {
       : d.turma==='Master' ? `<span class="turma-m">Master</span>`
       : `<span class="turma-t">Mentoria</span>`;
     const dn = displayName(d.name);
-    // Consecutive absences visual
     const absHtml  = d.consAbs>=4
       ? `<span class="abs-badge abs-crit">${d.consAbs}×</span>`
       : d.consAbs>=2
@@ -859,6 +923,23 @@ function renderCsTable() {
       <td class="td-act"><button class="dr-act-btn" onclick="event.stopPropagation();openDrModal('${esc(d.name)}')">Acionar <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button></td>
     </tr>`;
   }).join('');
+
+  if (pagEl) {
+    const show = totalPages > 1;
+    pagEl.style.display = show ? 'flex' : 'none';
+    if (show) {
+      document.getElementById('csPagInfo').textContent  = `Exibindo ${start+1}–${Math.min(start+CS_PAGE_SIZE,total)} de ${total} médicos`;
+      document.getElementById('csPagPages').textContent = `Página ${csCurrentPage} de ${totalPages}`;
+      document.getElementById('csPagPrev').disabled = csCurrentPage <= 1;
+      document.getElementById('csPagNext').disabled = csCurrentPage >= totalPages;
+    }
+  }
+}
+
+function csChangePage(dir) {
+  csCurrentPage += dir;
+  renderCsTable();
+  document.getElementById('csMain')?.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 function bCls(m){return{ausente:'b-aus',camera:'b-cam',feedback:'b-fb',vitoria:'b-vit'}[m]||'';}
@@ -2793,19 +2874,10 @@ async function carregarAcionamentos() {
       return '<span style="color:var(--sub);font-size:10px">📋 Manual</span>';
     };
 
-    document.getElementById('acTbody').innerHTML = [...registros].reverse().map(r => {
-      const motivos = (r.motivos||[]).map(m=>`<span class="b ${bCls(m)}">${bLbl(m)}</span>`).join('');
-      const msgPreview = (r.mensagem||'').slice(0,80).replace(/\n/g,' ') + ((r.mensagem||'').length > 80 ? '…' : '');
-      return `<tr>
-        <td style="white-space:nowrap;font-size:11px;color:var(--sub)">${fmtHora(r.hora)}</td>
-        <td><div style="font-weight:600;font-size:12px">${esc(r.alunoNome||'—')}</div></td>
-        <td style="font-size:12px;color:var(--acc);font-weight:600">${esc(r.csNome||'CS')}</td>
-        <td><div class="badges">${motivos||'<span style="color:var(--sub);font-size:10px">—</span>'}</div></td>
-        <td>${viaBadge(r.via)}</td>
-        <td style="font-size:11px;color:var(--sub);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.mensagem||'')}">${esc(msgPreview)||'—'}</td>
-      </tr>`;
-    }).join('');
-
+    const allReg = [...registros].reverse();
+    acAllRegistros = allReg;
+    acCurrentPage = 1;
+    renderAcionamentosPage(fmtHora, viaBadge);
     document.getElementById('acTblWrap').style.display = 'block';
   } catch(e) {
     document.getElementById('acLoading').style.display = 'none';

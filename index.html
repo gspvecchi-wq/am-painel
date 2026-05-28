@@ -117,6 +117,7 @@
   </nav>
 </div>
 
+<div class="layout-body">
 <!-- SIDEBAR — desktop only -->
 <aside class="sidebar" id="mainSidebar">
   <div class="sidebar-group">
@@ -149,8 +150,6 @@
     </button>
   </div>
 </aside>
-
-<div class="layout-body">
 <div class="layout-main">
 
 <div class="view active" id="view-cs">
@@ -370,6 +369,15 @@
     </div>
     <!-- Mobile cards -->
     <div class="cs-mobile-list" id="csMobileList"></div>
+    <!-- Paginação -->
+    <div class="tbl-pagination" id="csPagination" style="display:none">
+      <span class="pag-info" id="csPagInfo"></span>
+      <div class="pag-controls">
+        <button class="pag-btn" id="csPagPrev" onclick="csChangePage(-1)">‹ Anterior</button>
+        <span class="pag-pages" id="csPagPages"></span>
+        <button class="pag-btn" id="csPagNext" onclick="csChangePage(1)">Próximo ›</button>
+      </div>
+    </div>
   </div>
 
   <div id="csEmpty" class="cs-empty-state">
@@ -741,6 +749,14 @@
       <thead><tr><th>Data/Hora</th><th>Aluno</th><th>CS</th><th>Motivos</th><th>Via</th><th>Mensagem</th></tr></thead>
       <tbody id="acTbody"></tbody>
     </table>
+  </div>
+  <div class="tbl-pagination" id="acPagination" style="display:none">
+    <span class="pag-info" id="acPagInfo"></span>
+    <div class="pag-controls">
+      <button class="pag-btn" id="acPagPrev" onclick="acChangePage(-1)">‹ Anterior</button>
+      <span class="pag-pages" id="acPagPages"></span>
+      <button class="pag-btn" id="acPagNext" onclick="acChangePage(1)">Próximo ›</button>
+    </div>
   </div>
 </div>
 
