@@ -17,17 +17,11 @@ const BOARDS = {
   Master:   { id:'18365478944', tagCol:'tag_mm1cqsgs' },
   Mentoria: { id:'18391780128', tagCol:'tag_mm1cs0hm' }
 };
-const ESPECIALIDADES = ['Dermato&Oftalmo','Ortoped','Psiquiatras','Gestores','Emagrecimento','Cirurgiões'];
-// Especialidades legado mantidas para exibição de dados históricos (março/abril)
-const ESPECIALIDADES_LEGADO = ['Dermato','Oftalmo','Retomada'];
-// Retorna lista de especialidades por ciclo
-function getEspecialidadesPorCiclo(ciclo) {
-  const CICLO_NOVO = '2026-05'; // a partir de maio usa a lista nova
-  return ciclo >= CICLO_NOVO ? ESPECIALIDADES : [...ESPECIALIDADES, ...ESPECIALIDADES_LEGADO];
-}
-const AULAS_GERAIS   = ['Mentoria','Hotseat','Hotseat Simultâneo','Master'];
-const AULAS_WINNERS  = ['Winners Encontro'];
-const ALL_TABS       = [...AULAS_GERAIS, ...ESPECIALIDADES, ...ESPECIALIDADES_LEGADO, ...AULAS_WINNERS];
+const ESPECIALIDADES        = ['Gestores','Ortopedia/Dor','Estética&Oftalmo','Emagrecimento/Integrativa','Cirurgiões','Psiquiatras/Clínicos','Mentores'];
+const ESPECIALIDADES_LEGADO = ['Dermato','Oftalmo','Retomada','Dermato&Oftalmo','Ortoped','Psiquiatras','Emagrecimento'];
+const AULAS_GERAIS          = ['Mentoria','Hotseat','Hotseat Simultâneo','Master'];
+const AULAS_WINNERS         = ['Winners Encontro'];
+const ALL_TABS              = [...AULAS_GERAIS, ...ESPECIALIDADES, ...ESPECIALIDADES_LEGADO, ...AULAS_WINNERS];
 
 // ═══════════════════════════════════════════
 // GENDER — explicit list + smart heuristics
@@ -73,6 +67,14 @@ rubens,rudy,samuel,saulo,sergio,silvio,silas,simon,tarcisio,tiago,thiago,tito,to
 tony,valter,vando,vinicius,vitor,waldir,walter,wellington,willian,william,wilson,yago,yuri`.replace(/\s+/g,'').split(',').filter(Boolean));
 
 // Strip suffixes like "2ª cadeira", "2º Cadeira" etc from name before processing
+// Formata data ISO (YYYY-MM-DD) para DD/MM/YYYY brasileiro
+function fmtCycleDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T12:00:00');
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 function cleanSuffix(name) {
   return (name||'').replace(/\s*\d[ªº°]\s*cadeira.*/i,'').replace(/\s*\(.*\)/g,'').trim();
 }
@@ -136,8 +138,6 @@ function getKvEntry(tab, normName, ciclo) {
   return getKvTab(tab, ciclo)[normName] || null;
 }
 let csFilter       = 'todos';
-let csPage         = 1;
-const CS_PAGE_SIZE = 20;
 let currentTab     = 'Mentoria';
 let currentWeek    = 1;
 let loaded         = false;
@@ -145,10 +145,38 @@ let _csDoctors     = [];
 let gestTurmaFilter = 'todos'; // 'todos' | 'Master' | 'Mentoria'
 
 // ─── especialidade helpers ───────────────────
+// Mapa de tags legado do Monday → nome canônico atual (usando norm())
+// Permite que alunos ainda tagueados com nomes antigos apareçam nas abas novas
+const LEGACY_ESP_NORM_MAP = {
+  'psiquiatras':      'psiquiatras/clinicos',
+  'emagrecimento':    'emagrecimento/integrativa',
+  'emagrecimento1':   'emagrecimento/integrativa',
+  'emagrecimento2':   'emagrecimento/integrativa',
+  'ortoped':          'ortopedia/dor',
+  'oftalmo':          'estetica&oftalmo',
+  'dermato':          'estetica&oftalmo',
+  'dermato&oftalmo':  'estetica&oftalmo',
+};
+
+// Verifica se `tab` é uma aba de especialidade — usa norm() para evitar
+// falhas por diferenças de normalização Unicode (NFC vs NFD) entre o
+// valor do <option> HTML e o literal no array ESPECIALIDADES.
+function isEspecialidade(tab) {
+  const n = norm(tab);
+  return ESPECIALIDADES.some(e => norm(e) === n) || ESPECIALIDADES_LEGADO.some(e => norm(e) === n);
+}
+
 // aluno.especialidades is now an array (e.g. ['Dermato','Psiquiatras'])
 function hasEsp(aluno, tab) {
   if (!aluno.especialidades || !aluno.especialidades.length) return false;
-  return aluno.especialidades.some(e => norm(e) === norm(tab));
+  const tabNorm = norm(tab);
+  return aluno.especialidades.some(e => {
+    const eNorm = norm(e);
+    if (eNorm === tabNorm) return true;
+    // Compatibilidade com tags legado do Monday (ex: 'Psiquiatras' → 'Psiquiatras/Clínicos')
+    const canonical = LEGACY_ESP_NORM_MAP[eNorm];
+    return canonical !== undefined && canonical === tabNorm;
+  });
 }
 function espLabel(aluno) {
   if (!aluno.especialidades || !aluno.especialidades.length) return '';
@@ -160,18 +188,6 @@ function espLabel(aluno) {
 // INIT
 // ═══════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', () => {
-  // Mostra/esconde overlay de login baseado na sessão
-  const overlay = document.getElementById('loginOverlay');
-  const savedEmail = localStorage.getItem('am_cs_email');
-  const savedSenha = localStorage.getItem('am_cs_senha');
-  if (overlay) {
-    if (savedEmail && savedSenha) {
-      overlay.style.display = 'none';
-    } else {
-      overlay.style.display = 'flex';
-    }
-  }
-
   updateBadge();
   reloadAll();
 
@@ -285,28 +301,27 @@ async function reloadAll() {
   setStatus(false,'Carregando dados...');
   loaded = false;
   try {
-    // Dispara as 3 chamadas em paralelo
-    const [dadosRes, kvRes, grupoRes] = await Promise.all([
-      fetch(WORKER_URL),
-      fetch(WORKER_URL.replace('/dados','/presenca/all')).catch(() => null),
-      fetch(WORKER_URL.replace('/dados','/grupo/score')).catch(() => null)
-    ]);
-
-    if (!dadosRes.ok) throw new Error(`HTTP ${dadosRes.status}`);
-    const data = await dadosRes.json();
+    const res = await fetch(WORKER_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
     if (data.error) throw new Error(data.error);
 
+    // Worker já retorna allAlunos sem gender — inferimos no cliente
     allAlunos = data.allAlunos.map(a=>({...a, gender: inferGender(a.name), especialidades: a.especialidades || []}));
 
+    // Load all KV presenca data for profile use
     try {
-      kvPresenca = (kvRes && kvRes.ok) ? await kvRes.json() : {};
+      const kvRes = await fetch(WORKER_URL.replace('/dados','/presenca/all'));
+      kvPresenca = kvRes.ok ? await kvRes.json() : {};
+      popularCicloSelector();
+      popularCicloSelectorCS();
+      popularCicloSelectorChamada();
     } catch(e) { kvPresenca = {}; }
-    popularCicloSelector();
-    popularCicloSelectorCS();
-    popularCicloSelectorChamada();
 
+    // Load grupo participation scores for current week
     try {
-      const grupoData = (grupoRes && grupoRes.ok) ? await grupoRes.json() : {};
+      const grupoRes = await fetch(WORKER_URL.replace('/dados','/grupo/score'));
+      const grupoData = grupoRes.ok ? await grupoRes.json() : {};
       kvGrupoScores = grupoData.scores || {};
     } catch(e) { kvGrupoScores = {}; }
 
@@ -332,10 +347,10 @@ function getPool(tab) {
   if (tab==='Mentoria' || tab==='Hotseat' || tab==='Hotseat Simultâneo')
     return allAlunos;
   if (tab==='Master')
-    return allAlunos.filter(a=>a.turma==='Master' || a.isWinners);
+    return allAlunos.filter(a=>a.turma==='Master' || a.turma==='Winners');
   if (tab==='Winners Encontro')
-    return allAlunos.filter(a=>a.isWinners);
-  if (ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab))
+    return allAlunos.filter(a=>a.turma==='Winners');
+  if (isEspecialidade(tab))
     return allAlunos.filter(a=>hasEsp(a, tab));
   return allAlunos;
 }
@@ -352,7 +367,7 @@ function buildDoctors(tab, week) {
     const cur = history[w];
     let consAbs=0;
     for (let i=w; i>=0; i--) { if (!history[i].P) consAbs++; else break; }
-    const isEsp = ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab);
+    const isEsp = isEspecialidade(tab);
     const motivos=[];
     if (!cur.P) { motivos.push('ausente'); }
     else {
@@ -369,7 +384,9 @@ function buildDoctors(tab, week) {
 // Returns array of {w, pct, attended, total} per week up to currentWeek
 function calcEvolutionByTurma(turma, upToWeek) {
   const pool = turma==='Master'
-    ? allAlunos.filter(a=>a.turma==='Master'||a.isWinners)
+    ? allAlunos.filter(a=>a.turma==='Master')
+    : turma==='Winners'
+    ? allAlunos.filter(a=>a.turma==='Winners')
     : allAlunos.filter(a=>a.turma===turma);
   if (!pool.length) return [];
 
@@ -377,9 +394,11 @@ function calcEvolutionByTurma(turma, upToWeek) {
   for (let w=0; w<upToWeek; w++) {
     let totalSlots=0, attended=0;
     for (const aluno of pool) {
-      // Tabs this turma attends
-      const tabs = turma==='Master'
-        ? (aluno.isWinners ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro'] : ['Mentoria','Hotseat','Hotseat Simultâneo','Master'])
+      // Tabs que cada turma frequenta
+      const tabs = aluno.turma==='Winners'
+        ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro']
+        : aluno.turma==='Master'
+        ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master']
         : ['Mentoria','Hotseat','Hotseat Simultâneo'];
       // Add their specialty if any
       if (aluno.especialidades && aluno.especialidades.length) {
@@ -412,7 +431,7 @@ function calcCompositeScore(aluno, upToWeek) {
   // format: { tab, weight }
   let weightedTabs = [];
 
-  if (aluno.isWinners) {
+  if (aluno.turma === 'Winners') {
     weightedTabs = [
       { tab: 'Winners Encontro', w: 30 },
       { tab: 'Master',           w: 25 },
@@ -460,7 +479,7 @@ function calcCompositeScore(aluno, upToWeek) {
   let compositeScore = 0;
   for (const { tab, w } of weightedTabs) {
     const entry = getKvEntry(tab, norm(aluno.name));
-    const isEspTab = ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab);
+    const isEspTab = isEspecialidade(tab);
     let pHit=0, cHit=0, vHit=0, fHit=0, slots=0;
     for (let i=0; i<upToWeek; i++) {
       const h = entry&&entry.history[i] ? entry.history[i] : {P:false,C:false,F:false,V:false};
@@ -614,7 +633,7 @@ function calcAscensaoScore(aluno, upToWeek) {
 }
 
 function calcCompositeScoreWeek(aluno, weekIdx) {
-  const tabs = aluno.isWinners ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro'] : aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+  const tabs = aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro'] : aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -625,7 +644,7 @@ function calcCompositeScoreWeek(aluno, weekIdx) {
   for (const tab of tabs) {
     const entry = getKvEntry(tab, norm(aluno.name));
     const h = entry&&entry.history[weekIdx] ? entry.history[weekIdx] : {P:false,C:false,F:false,V:false};
-    const isEspTab = ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab);
+    const isEspTab = isEspecialidade(tab);
     total++;
     if(h.P) pHit++; if(h.P&&h.C) cHit++; if(h.P&&h.V) vHit++;
     if(isEspTab){ fSlots++; if(h.P&&h.F) fHit++; }
@@ -635,7 +654,7 @@ function calcCompositeScoreWeek(aluno, weekIdx) {
 }
 
 function calcEngagement(aluno, week) {
-  const tabs = aluno.isWinners ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro'] : aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+  const tabs = aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro'] : aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -763,14 +782,12 @@ function updateFilterCounts() {
 
 function csSearchTable(val) {
   csSearchQuery = (val || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
-  csPage = 1;
   renderCsTable();
 }
 
 
 function setPill(f,el) {
   csFilter=f;
-  csPage = 1;
   csSearchQuery = '';
   const inp = document.getElementById('csSearch'); if (inp) inp.value = '';
   document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
@@ -806,21 +823,13 @@ function renderCsTable() {
   if (!list.length) {
     tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--sub)">Nenhum médico para acionar neste filtro 🎉</td></tr>`;
     renderCsMobileCards();
-    renderCsPagination(0, 0);
     return;
   }
   renderCsMobileCards();
   // Sync mobile filter count
   const _mfCount = document.getElementById('csMfCount');
   if (_mfCount) _mfCount.textContent = list.length + ' resultado' + (list.length !== 1 ? 's' : '');
-
-  // Paginação
-  const totalPages = Math.ceil(list.length / CS_PAGE_SIZE);
-  if (csPage > totalPages) csPage = totalPages;
-  const start = (csPage - 1) * CS_PAGE_SIZE;
-  const pageList = list.slice(start, start + CS_PAGE_SIZE);
-
-  tbody.innerHTML=pageList.map(d=>{
+  tbody.innerHTML=list.map(d=>{
     const rc       = d.risk>=60?'rh':d.risk>=30?'rm':'rl';
     const rcColor  = d.risk>=60?'var(--danger)':d.risk>=30?'var(--warn)':'var(--safe)';
     const rl       = d.risk>=60?'ALTO':d.risk>=30?'MÉD':'BAIXO';
@@ -830,9 +839,9 @@ function renderCsTable() {
     const novoB    = isNovo(d) ? `<span class="b" style="background:linear-gradient(135deg,rgba(77,142,255,.18),rgba(77,142,255,.09));color:var(--blue);border:1px solid rgba(77,142,255,.36);border-radius:6px">✦ NOVO</span>` : '';
     const alertB   = (()=>{ const a=calcAlertLevel(d,currentWeek); return a?`<span class="b" style="background:linear-gradient(135deg,rgba(255,51,85,.15),rgba(255,51,85,.07));color:${a.color};border:1px solid rgba(255,51,85,.28);border-radius:6px">${a.icon} ${a.label}</span>`:''; })();
     const renewB   = (()=>{ const r=calcRenewalScore(d,currentWeek); return (r&&r.daysLeft<=60&&r.daysLeft>=0)?`<span class="b" style="background:linear-gradient(135deg,rgba(34,217,138,.14),rgba(34,217,138,.07));color:${r.color};border:1px solid rgba(34,217,138,.28);border-radius:6px">${r.label}</span>`:''; })();
-    const turmaTag = d.turma==='Master'
-      ? `<span class="turma-m">Master</span>`
-      : d.isWinners ? `<span class="turma-w">Winners</span>`
+    const turmaTag = d.turma==='Winners'
+      ? `<span class="turma-w">Winners</span>`
+      : d.turma==='Master' ? `<span class="turma-m">Master</span>`
       : `<span class="turma-t">Mentoria</span>`;
     const dn = displayName(d.name);
     // Consecutive absences visual
@@ -850,48 +859,6 @@ function renderCsTable() {
       <td class="td-act"><button class="dr-act-btn" onclick="event.stopPropagation();openDrModal('${esc(d.name)}')">Acionar <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button></td>
     </tr>`;
   }).join('');
-  renderCsPagination(list.length, totalPages);
-}
-
-function renderCsPagination(total, totalPages) {
-  let el = document.getElementById('csPagination');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'csPagination';
-    el.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:6px;padding:16px 0;flex-wrap:wrap;';
-    const tblWrap = document.getElementById('csTbody')?.closest('.tbl-wrap');
-    if (tblWrap) tblWrap.after(el);
-  }
-  if (!total || totalPages <= 1) { el.innerHTML = ''; return; }
-
-  const start = (csPage - 1) * CS_PAGE_SIZE + 1;
-  const end = Math.min(csPage * CS_PAGE_SIZE, total);
-
-  const btnStyle = (active) => `style="padding:5px 11px;border-radius:7px;border:1px solid ${active?'var(--acc)':'var(--border2)'};background:${active?'var(--acc)':'transparent'};color:${active?'#000':'var(--sub)'};font-size:12px;font-weight:${active?'700':'500'};cursor:pointer;transition:all .15s;"`;
-
-  let html = `<span style="font-size:11px;color:var(--sub);margin-right:4px;">${start}–${end} de ${total}</span>`;
-  html += `<button ${btnStyle(false)} onclick="csGoPage(${csPage-1})" ${csPage===1?'disabled':''}>‹</button>`;
-
-  // Páginas
-  for (let p = 1; p <= totalPages; p++) {
-    if (totalPages > 7 && p > 2 && p < totalPages - 1 && Math.abs(p - csPage) > 1) {
-      if (p === 3 || p === totalPages - 2) html += `<span style="color:var(--sub);padding:0 2px">…</span>`;
-      continue;
-    }
-    html += `<button ${btnStyle(p===csPage)} onclick="csGoPage(${p})">${p}</button>`;
-  }
-
-  html += `<button ${btnStyle(false)} onclick="csGoPage(${csPage+1})" ${csPage===totalPages?'disabled':''}>›</button>`;
-  el.innerHTML = html;
-}
-
-function csGoPage(p) {
-  const all = _csDoctors.filter(d=>d.motivos.length>0||d.consAbs>=4);
-  const totalPages = Math.ceil(all.length / CS_PAGE_SIZE);
-  if (p < 1 || p > totalPages) return;
-  csPage = p;
-  renderCsTable();
-  document.getElementById('csTbody')?.closest('.tbl-wrap')?.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 function bCls(m){return{ausente:'b-aus',camera:'b-cam',feedback:'b-fb',vitoria:'b-vit'}[m]||'';}
@@ -936,9 +903,9 @@ function renderCsMobileCards() {
     const novoB  = isNovo(d) ? `<span class="b" style="background:linear-gradient(135deg,rgba(77,142,255,.18),rgba(77,142,255,.09));color:var(--blue);border:1px solid rgba(77,142,255,.36);border-radius:6px">✦ NOVO</span>` : '';
     const alertB = (()=>{ const a=calcAlertLevel(d,currentWeek); return a?`<span class="b" style="background:linear-gradient(135deg,rgba(255,51,85,.15),rgba(255,51,85,.07));color:${a.color};border:1px solid rgba(255,51,85,.28);border-radius:6px">${a.icon} ${a.label}</span>`:''; })();
     const renewB = (()=>{ const r=calcRenewalScore(d,currentWeek); return (r&&r.daysLeft<=60&&r.daysLeft>=0)?`<span class="b" style="background:linear-gradient(135deg,rgba(34,217,138,.14),rgba(34,217,138,.07));color:${r.color};border:1px solid rgba(34,217,138,.28);border-radius:6px">${r.label}</span>`:''; })();
-    const turmaTag = d.turma==='Master'
-      ? `<span class="turma-m">Master</span>`
-      : d.isWinners ? `<span class="turma-w">Winners</span>`
+    const turmaTag = d.turma==='Winners'
+      ? `<span class="turma-w">Winners</span>`
+      : d.turma==='Master' ? `<span class="turma-m">Master</span>`
       : `<span class="turma-t">Mentoria</span>`;
     const dn = displayName(d.name);
     return `<div class="cs-mc" onclick="openDrModal('${esc(d.name)}')">
@@ -1108,47 +1075,13 @@ function renderGestComparacao() {
      <span style="color:var(--warn);font-size:28px">${quedaB}</span>
      ${delta(quedaA, quedaB)}`;
 
-  // Risco alto por ciclo
-  cicloAtivo = cicloA;
-  const riscoA = allAlunos.filter(a => calcRisk(a.history || [], maxA) >= 60).length;
-  cicloAtivo = cicloB;
-  const riscoB = allAlunos.filter(a => calcRisk(a.history || [], maxB) >= 60).length;
-  cicloAtivo = origCiclo;
-
-  document.getElementById('gRisk').innerHTML =
-    `<span style="color:var(--sub);font-size:20px">${riscoA}</span>
-     <span style="color:var(--sub);font-size:12px;margin:0 4px">→</span>
-     <span style="color:var(--danger);font-size:28px">${riscoB}</span>
-     ${delta(riscoA, riscoB)}`;
-
-  document.getElementById('gQueda').innerHTML =
-    `<span style="color:var(--sub);font-size:20px">${quedaA}</span>
-     <span style="color:var(--sub);font-size:12px;margin:0 4px">→</span>
-     <span style="color:var(--warn);font-size:28px">${quedaB}</span>
-     ${delta(quedaA, quedaB)}`;
-
-  document.getElementById('gNovos').innerHTML =
-    `<span style="color:var(--sub);font-size:20px">${novosA}</span>
-     <span style="color:var(--sub);font-size:12px;margin:0 4px">→</span>
-     <span style="color:var(--blue);font-size:28px">${novosB}</span>
-     ${delta(novosA, novosB)}`;
+  document.getElementById('gRisk').innerHTML = '—';
+  document.getElementById('gQueda').innerHTML = '—';
+  document.getElementById('gNovos').innerHTML = '—';
 
   // Título dos comparativos
   document.getElementById('gestCompareSub').textContent =
     `${labelA} (A) vs ${labelB} (B) — presença por turma`;
-
-  // Função: calcula presença média do mês inteiro para uma turma
-  function monthAvgPresence(tab, ciclo, maxW) {
-    const prev = cicloAtivo;
-    cicloAtivo = ciclo;
-    let totalPct = 0, count = 0;
-    for (let w = 0; w < maxW; w++) {
-      const r = weekPresenceRate(tab, w);
-      if (r && r.total > 0) { totalPct += r.pct; count++; }
-    }
-    cicloAtivo = prev;
-    return count > 0 ? Math.round(totalPct / count) : 0;
-  }
 
   // Gráfico comparativo por turma — todas as turmas com dados
   const compareTabs = ALL_TABS.filter(tab => {
@@ -1158,35 +1091,29 @@ function renderGestComparacao() {
   });
   const wcEl = document.getElementById('weekCompare');
   wcEl.innerHTML = compareTabs.map(tab => {
-    // Média mensal
-    const avgA = monthAvgPresence(tab, cicloA, maxA);
-    const avgB = monthAvgPresence(tab, cicloB, maxB);
-
-    // Última semana (comparativo pontual)
     cicloAtivo = cicloA;
     const rA = weekPresenceRate(tab, maxA - 1) || { pct: 0 };
     cicloAtivo = cicloB;
     const rB = weekPresenceRate(tab, maxB - 1) || { pct: 0 };
     cicloAtivo = origCiclo;
 
-    const colorAvgA = avgA >= 70 ? 'var(--safe)' : avgA >= 40 ? 'var(--warn)' : 'var(--danger)';
-    const colorAvgB = avgB >= 70 ? 'var(--safe)' : avgB >= 40 ? 'var(--warn)' : 'var(--danger)';
-    const d = avgB - avgA;
+    const colorA = rA.pct >= 70 ? 'var(--safe)' : rA.pct >= 40 ? 'var(--warn)' : 'var(--danger)';
+    const colorB = rB.pct >= 70 ? 'var(--safe)' : rB.pct >= 40 ? 'var(--warn)' : 'var(--danger)';
+    const d = rB.pct - rA.pct;
     const dColor = d > 0 ? 'var(--safe)' : d < 0 ? 'var(--danger)' : 'var(--sub)';
     const dTxt = d > 0 ? '▲ +'+d+'pp' : d < 0 ? '▼ '+d+'pp' : '= Sem variação';
 
     return `<div class="wcard">
       <div class="wcard-title">${tab}</div>
-      <div style="font-size:9px;color:var(--sub);margin-bottom:6px;letter-spacing:.08em">MÉDIA DO MÊS</div>
-      <div style="display:flex;gap:12px;align-items:flex-end;margin:4px 0 10px;">
+      <div style="display:flex;gap:12px;align-items:flex-end;margin:8px 0;">
         <div style="text-align:center;flex:1">
           <div style="font-size:9px;color:var(--sub);margin-bottom:4px">A · ${labelA.split(' ')[0]}</div>
-          <div style="font-family:'Inter',sans-serif;font-weight:800;font-size:36px;color:${colorAvgA};line-height:1">${avgA}%</div>
+          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:36px;color:${colorA};line-height:1">${rA.pct}%</div>
         </div>
         <div style="font-size:18px;color:var(--sub)">→</div>
         <div style="text-align:center;flex:1">
           <div style="font-size:9px;color:var(--sub);margin-bottom:4px">B · ${labelB.split(' ')[0]}</div>
-          <div style="font-family:'Inter',sans-serif;font-weight:800;font-size:36px;color:${colorAvgB};line-height:1">${avgB}%</div>
+          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:36px;color:${colorB};line-height:1">${rB.pct}%</div>
         </div>
       </div>
       <div class="wcard-delta" style="color:${dColor};background:transparent;border:1px solid ${dColor}">${dTxt}</div>
@@ -1272,8 +1199,9 @@ function renderGest() {
   const maxWeek     = detectMaxWeekForCiclo(getCicloAtivo());
 
   // ── FILTRO DE TURMA ──────────────────────────
-  const poolBase = gestTurmaFilter === 'Master'   ? allAlunos.filter(a=>a.turma==='Master'||a.isWinners)
+  const poolBase = gestTurmaFilter === 'Master'   ? allAlunos.filter(a=>a.turma==='Master')
                  : gestTurmaFilter === 'Mentoria' ? allAlunos.filter(a=>a.turma==='Mentoria')
+                 : gestTurmaFilter === 'Winners'  ? allAlunos.filter(a=>a.turma==='Winners')
                  : allAlunos;
 
   // ── INDICADOR DE MODO ────────────────────────
@@ -1316,7 +1244,7 @@ function renderGest() {
   document.getElementById('gAbsent').textContent = absentCount;
 
   // ── WEEK COMPARISON CARDS ──────────────────
-  const hasWinners = allAlunos.some(a=>a.isWinners);
+  const hasWinners = allAlunos.some(a=>a.turma==='Winners');
   const compareTabs = [
     'Mentoria','Hotseat','Hotseat Simultâneo','Master',
     ...(hasWinners ? ['Winners Encontro'] : []),
@@ -1371,8 +1299,9 @@ function renderGest() {
 
   // ── CHARTS ────────────────────────────────
   const chartWeeks = allWeeks ? maxWeek : gestWeekVal;
-  renderEvolutionChart('chartMaster',   calcEvolutionByTurma('Master',chartWeeks),   'var(--acc)',  allAlunos.filter(a=>a.turma==='Master'||a.isWinners).length);
+  renderEvolutionChart('chartMaster',   calcEvolutionByTurma('Master',chartWeeks),   'var(--acc)',  allAlunos.filter(a=>a.turma==='Master').length);
   renderEvolutionChart('chartMentoria', calcEvolutionByTurma('Mentoria',chartWeeks), 'var(--blue)', allAlunos.filter(a=>a.turma==='Mentoria').length);
+  renderEvolutionChart('chartWinners',  calcEvolutionByTurma('Winners',chartWeeks),  'var(--purple)', allAlunos.filter(a=>a.turma==='Winners').length);
 
   // ── COMPOSITE SCORES (aplica filtro de turma) ─
   const refW = allWeeks ? maxWeek : gestWeekVal;
@@ -1395,7 +1324,9 @@ function renderGest() {
   // ── RISK CARDS — SPLIT BY TURMA ───────────
   function riskReason(a) {
     // Calcula métricas reais do aluno para mostrar o porquê do risco
-    const tabs = a.turma==='Master'||a.isWinners
+    const tabs = a.turma==='Winners'
+      ? ['Mentoria','Master','Hotseat','Hotseat Simultâneo','Winners Encontro']
+      : a.turma==='Master'
       ? ['Mentoria','Master','Hotseat','Hotseat Simultâneo']
       : ['Mentoria','Hotseat','Hotseat Simultâneo'];
     let pHit=0,cHit=0,vHit=0,slots=0;
@@ -1442,21 +1373,9 @@ function renderGest() {
       </div>`;
     }).join('') || '<div style="color:var(--sub);font-size:12px;padding:12px">Sem dados</div>';
   }
-  renderRiskGrid('gestRiskMaster',   withScores.filter(a=>a.turma==='Master'||a.isWinners));
+  renderRiskGrid('gestRiskMaster',   withScores.filter(a=>a.turma==='Master'));
   renderRiskGrid('gestRiskMentoria', withScores.filter(a=>a.turma==='Mentoria'));
-
-  // ── WINNERS SECTION ───────────────────────
-  const winnersAlunos = allAlunos.filter(a=>a.isWinners);
-  const gestWinnersSection = document.getElementById('gestWinnersSection');
-  if (gestWinnersSection) {
-    if (winnersAlunos.length > 0) {
-      gestWinnersSection.style.display = 'block';
-      renderEvolutionChart('chartWinners', calcEvolutionByTurmaTab('Winners Encontro', chartWeeks), 'var(--blue)', winnersAlunos.length);
-      renderRiskGrid('gestRiskWinners', withScores.filter(a=>a.isWinners));
-    } else {
-      gestWinnersSection.style.display = 'none';
-    }
-  }
+  renderRiskGrid('gestRiskWinners',  withScores.filter(a=>a.turma==='Winners'));
 
   // ── RENOVAÇÃO RANKING ─────────────────────────────────────
   const renovacaoCandidates = allAlunos
@@ -1576,7 +1495,7 @@ function renderGest() {
     const alert = avg<60 ? '⚠' : '';
     return `<div class="wcard" style="${avg<60?'border-color:rgba(255,51,85,.3)':''}">
       <div class="wcard-title">${alert} ${esp}</div>
-      <div style="font-family:'Inter',sans-serif;font-weight:800;font-size:48px;color:${color};line-height:1;margin:8px 0">${avg}%</div>
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:48px;color:${color};line-height:1;margin:8px 0">${avg}%</div>
       <div style="font-size:11px;color:var(--sub)">${pool.length} alunos · score qualidade</div>
     </div>`;
   }).join('');
@@ -1602,69 +1521,9 @@ function detectMaxWeek() {
   return detectMaxWeekForCiclo(getCicloAtivo());
 }
 
-// Score baseado nas últimas 4 semanas reais — consistente com o modal
-function calcScoreRecentWeeks(aluno) {
-  const alunoTabs = aluno.isWinners
-    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro']
-    : aluno.turma==='Master'
-    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master']
-    : ['Mentoria','Hotseat','Hotseat Simultâneo'];
-  if (aluno.especialidades && aluno.especialidades.length) {
-    for (const esp of aluno.especialidades) {
-      const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp)) || ESPECIALIDADES_LEGADO.find(e=>norm(e)===norm(esp));
-      if (spec && !alunoTabs.includes(spec)) alunoTabs.push(spec);
-    }
-  }
-
-  // Últimas 4 semanas do calendário
-  const slots = [];
-  const hoje = new Date();
-  for (let i = 0; i < 4; i++) {
-    const d = new Date(hoje);
-    d.setDate(d.getDate() - i * 7);
-    const ciclo = d.toISOString().slice(0, 7);
-    const dia = d.getDate();
-    const w = dia <= 7 ? 0 : dia <= 14 ? 1 : dia <= 21 ? 2 : dia <= 28 ? 3 : 4;
-    slots.unshift({ ciclo, w });
-  }
-
-  let totSlots=0, totP=0, totC=0, totV=0, totEspSlots=0, totEspF=0;
-  for (const { ciclo, w } of slots) {
-    for (const tab of alunoTabs) {
-      const entry = kvPresenca[tab]?.[ciclo]?.[norm(aluno.name)];
-      const h = entry?.history?.[w] || null;
-      totSlots++;
-      if (h) {
-        if (h.P) totP++;
-        if (h.P && h.C) totC++;
-        if (h.P && h.V) totV++;
-      }
-      if (ESPECIALIDADES.includes(tab) || ESPECIALIDADES_LEGADO.includes(tab)) {
-        totEspSlots++;
-        if (h && h.P && h.F) totEspF++;
-      }
-    }
-  }
-
-  if (!totSlots) return 0;
-  const pScore = totP / totSlots;
-  const cScore = totSlots ? totC / totSlots : 0;
-  const vScore = totSlots ? totV / totSlots : 0;
-  const fScore = totEspSlots ? totEspF / totEspSlots : 1;
-  const base = Math.round(pScore*40 + cScore*25 + vScore*25 + fScore*10);
-
-  // Bônus calls e grupo (igual ao calcCompositeScore)
-  const callsData = (kvPresenca['__calls__']||{})[norm(aluno.name)] || { leonardo: 0, bruno: 0 };
-  const totalCalls = (callsData.leonardo||0) + (callsData.bruno||0);
-  const callsBonus = Math.min(totalCalls * 5, 5);
-  const grupoData = kvGrupoScores[norm(aluno.name)] || null;
-  const grupoBonus = grupoData ? Math.min(grupoData.total || 0, 15) : 0;
-  return Math.min(base + callsBonus + grupoBonus, 120);
-}
-
 // Engagement for a single week index (0-based)
 function calcEngagementWeek(aluno, weekIdx) {
-  const tabs = aluno.isWinners ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro'] : aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+  const tabs = aluno.turma==='Winners' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro'] : aluno.turma==='Master' ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master'] : ['Mentoria','Hotseat','Hotseat Simultâneo'];
   if (aluno.especialidades && aluno.especialidades.length) {
     for (const esp of aluno.especialidades) {
       const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
@@ -1756,7 +1615,7 @@ function renderProfiles() {
   const grid=document.getElementById('profileGrid');
   if (!list.length) { grid.innerHTML=`<div style="color:var(--sub);font-size:12px">Nenhum resultado.</div>`; return; }
   grid.innerHTML=list.slice(0,80).map(a=>{
-    const eng=calcScoreRecentWeeks(a);
+    const eng=calcCompositeScore(a, detectMaxWeek());
     const color=eng<40?'var(--danger)':eng<70?'var(--warn)':'var(--safe)';
     const dn=displayName(a.name);
     return `<div class="profile-card" onclick="openDrModal('${esc(a.name)}', false)">
@@ -1777,7 +1636,7 @@ function openDrModal(name, showMsgs=true) {
   const g = aluno.gender, dn = displayName(name);
 
   // ── Abas que este aluno frequenta ────────
-  const alunoTabs = aluno.isWinners
+  const alunoTabs = aluno.turma==='Winners'
     ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro']
     : aluno.turma==='Master'
     ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master']
@@ -1789,81 +1648,81 @@ function openDrModal(name, showMsgs=true) {
     }
   }
 
-  // ── Últimas 4 semanas do calendário (com ou sem dados) ──
-  function getLastNWeekSlots(n) {
-    const resultado = [];
-    const hoje = new Date();
-    for (let i = 0; i < n; i++) {
-      const d = new Date(hoje);
-      d.setDate(d.getDate() - i * 7);
-      const ciclo = d.toISOString().slice(0, 7);
-      const dia = d.getDate();
-      const semIdx = dia <= 7 ? 0 : dia <= 14 ? 1 : dia <= 21 ? 2 : dia <= 28 ? 3 : 4;
-      resultado.unshift({ ciclo, w: semIdx });
-    }
-    return resultado;
+  // ── KV lookup helper ─────────────────────
+  function kvEntry(tab) {
+    return getKvEntry(tab, norm(name));
   }
-  const slots = getLastNWeekSlots(4);
 
-  // ── Agrega dados por slot ──
-  function getSlotData(ciclo, w) {
-    let slots_=0, P=0, C=0, F=0, V=0, espSlots=0, espF=0;
+  // ── Número de semanas com pelo menos 1 dado ──
+  const maxW = 5;
+  // Semanas que realmente têm dados no KV para esse aluno
+  function hasDataWeek(w) {
+    return alunoTabs.some(tab=>{
+      const e = kvEntry(tab);
+      return e && e.history && e.history[w] && (e.history[w].P || e.history[w].C || e.history[w].F || e.history[w].V);
+    });
+  }
+  // Último índice (0-based) com dado; determina alcance do mês
+  let lastWeek = 0;
+  for (let w=0; w<maxW; w++) { if (hasDataWeek(w)) lastWeek = w; }
+  const totalWeeks = lastWeek + 1; // semanas ocorridas
+
+  // ── Agrega por semana (somando todas as abas) ──
+  // weekData[w] = { slots, P, C, F, V, espSlots, espF }
+  const weekData = Array.from({length: maxW}, (_,w) => {
+    let slots=0, P=0, C=0, F=0, V=0, espSlots=0, espF=0;
     for (const tab of alunoTabs) {
-      const entry = kvPresenca[tab]?.[ciclo]?.[norm(name)];
-      const h = entry?.history?.[w] || null;
-      slots_++;
+      const e = kvEntry(tab);
+      const h = e&&e.history&&e.history[w] ? e.history[w] : null;
+      if (!h && !hasDataWeek(w)) continue; // semana sem dados
+      slots++;
       if (h) {
         if (h.P) P++;
         if (h.P && h.C) C++;
         if (h.P && h.F) F++;
         if (h.P && h.V) V++;
       }
-      if (ESPECIALIDADES.includes(tab) || ESPECIALIDADES_LEGADO.includes(tab)) {
+      if (isEspecialidade(tab)) {
         espSlots++;
         if (h && h.P && h.F) espF++;
       }
     }
-    return { slots: slots_, P, C, F, V, espSlots, espF };
-  }
+    return { slots, P, C, F, V, espSlots, espF };
+  });
 
-  const weekData = slots.map(s => getSlotData(s.ciclo, s.w));
-
-  // Label de cada semana: "S3·Abr"
-  const mesAbrev = ciclo => new Date(ciclo + '-15').toLocaleDateString('pt-BR', { month: 'short' }).replace('.','');
-  const weekLabels = slots.map(s => `S${s.w+1}·${mesAbrev(s.ciclo)}`);
-
-  // ── KPIs totais (todas as semanas) ──────
-  const totalWeeks = weekData.length;
+  // ── KPIs totais (semanas ocorridas) ──────
   let totSlots=0, totP=0, totC=0, totF=0, totV=0, totEspSlots=0, totEspF=0;
-  for (const d of weekData) {
-    totSlots   += d.slots;
-    totP       += d.P;
-    totC       += d.C;
-    totF       += d.F;
-    totV       += d.V;
+  for (let w=0; w<totalWeeks; w++) {
+    const d = weekData[w];
+    totSlots  += d.slots;
+    totP      += d.P;
+    totC      += d.C;
+    totF      += d.F;
+    totV      += d.V;
     totEspSlots += d.espSlots;
-    totEspF    += d.espF;
+    totEspF   += d.espF;
   }
 
-  const presRate  = totSlots   ? Math.round(totP/totSlots*100)        : 0;
-  const camRate   = totP       ? Math.round(totC/totP*100)            : 0;
-  const vitRate   = totP       ? Math.round(totV/totP*100)            : 0;
+  const presRate  = totSlots  ? Math.round(totP/totSlots*100)    : 0;
+  const camRate   = totP      ? Math.round(totC/totP*100)        : 0;
+  const vitRate   = totP      ? Math.round(totV/totP*100)        : 0;
   const fbRate    = totEspSlots ? Math.round(totEspF/totEspSlots*100) : null;
 
   // ── Score de engajamento composto ────────
-  const pScore  = totSlots     ? totP/totSlots       : 0;
-  const cScore  = totSlots     ? totC/totSlots       : 0;
-  const vScore  = totSlots     ? totV/totSlots       : 0;
-  const fScore  = totEspSlots  ? totEspF/totEspSlots : 1;
+  // P(40%) + C(25%) + V(25%) + F(10% — só quem tem esp)
+  const pScore  = totSlots      ? totP/totSlots      : 0;
+  const cScore  = totSlots      ? totC/totSlots      : 0;
+  const vScore  = totSlots      ? totV/totSlots      : 0;
+  const fScore  = totEspSlots   ? totEspF/totEspSlots : 1;
   const engScore = Math.round(pScore*40 + cScore*25 + vScore*25 + fScore*10);
   const engColor = engScore>=70?'var(--safe)':engScore>=40?'var(--warn)':'var(--danger)';
 
-  // ── Tendência ──
+  // ── Tendência: compara primeira metade × segunda ──
   let trendLabel = '➡ Estável', trendColor = 'var(--sub)';
   if (totalWeeks >= 3) {
     const mid = Math.floor(totalWeeks/2);
     const firstHalf  = weekData.slice(0,mid);
-    const secondHalf = weekData.slice(mid);
+    const secondHalf = weekData.slice(mid,totalWeeks);
     const avg = arr => {
       const s = arr.reduce((a,d)=>a+(d.slots?d.P/d.slots:0),0);
       return arr.length ? s/arr.length : 0;
@@ -1873,16 +1732,16 @@ function openDrModal(name, showMsgs=true) {
     else if (diff < -0.15) { trendLabel='📉 Caindo';   trendColor='var(--danger)'; }
   }
 
-  // ── Mini-grid de semanas com label de mês ──
+  // ── Mini-grid de semanas (dot por semana, por indicador) ──
   const dotRow = (label, color, vals) => `
     <div class="ph-row">
       <div class="ph-lbl">${label}</div>
       <div class="ph-dots">
-        ${weekLabels.map((lbl, w) => {
+        ${Array.from({length:maxW},(_,w)=>{
+          if (w >= totalWeeks) return `<div class="ph-dot ph-dot-na">·</div>`;
           const on = vals[w];
-          return `<div class="ph-dot ${on?'ph-dot-on':'ph-dot-off'}" style="${on?'background:'+color:''}" title="${lbl}">${lbl}</div>`;
+          return `<div class="ph-dot ${on?'ph-dot-on':'ph-dot-off'}" style="${on?'background:'+color:''}">S${w+1}</div>`;
         }).join('')}
-        ${weekLabels.length === 0 ? `<div style="color:var(--sub);font-size:10px">Sem dados</div>` : ''}
       </div>
     </div>`;
 
@@ -1893,10 +1752,8 @@ function openDrModal(name, showMsgs=true) {
 
   // ── Monta o modal ─────────────────────────
   document.getElementById('mName').textContent=`${tit(g)}. ${dn}`;
-  // Monta label de turma — pode ter múltiplas (Master, Winners, especialidades)
-  const turmasAluno = [];
-  if (aluno.isWinners) { turmasAluno.push('Master'); turmasAluno.push('Winners'); }
-  else { turmasAluno.push(aluno.turma); }
+  // Monta label de turma
+  const turmasAluno = [aluno.turma]; // 'Winners', 'Master' ou 'Mentoria'
   const espLbl = espLabel(aluno);
   if (espLbl) turmasAluno.push(...espLbl.split(', '));
   const turmaTagsModal = turmasAluno.map(t => {
@@ -1909,8 +1766,12 @@ function openDrModal(name, showMsgs=true) {
     ? `<div class="modal-phone">${PHONE_ICON}${fmtPhone(aluno.phone)}</div>` : '';
   const entryHtml = aluno.entryDate
     ? `<span class="modal-entry">Entrou: ${aluno.entryDate}</span>` : '';
+  const cycleStartHtml = aluno.cycleStart
+    ? `<span class="modal-entry" title="Início do ciclo">📅 Início: ${fmtCycleDate(aluno.cycleStart)}</span>` : '';
+  const cycleEndHtml = aluno.cycleEnd
+    ? `<span class="modal-entry" title="Fim do ciclo">🏁 Fim: ${fmtCycleDate(aluno.cycleEnd)}</span>` : '';
   document.getElementById('mMeta').innerHTML =
-    `<div class="modal-meta-badges">${turmaTagsModal}${entryHtml}</div>${phoneHtml}`;
+    `<div class="modal-meta-badges">${turmaTagsModal}${entryHtml}${cycleStartHtml}${cycleEndHtml}</div>${phoneHtml}`;
 
   // Substitui mHist por grid histórico
   document.getElementById('mHist').innerHTML=`
@@ -2247,7 +2108,7 @@ function checkSemanaAtual() {
 // CHAMADA — Registration
 // ═══════════════════════════════════════════
 const WORKER_BASE = WORKER_URL.replace('/dados','');
-let csAuthenticated = false;
+let csAuthenticated = true; // TEMP: login desabilitado para visualização
 let csNomeAtual = 'Preview'; // nome do CS logado
 let chamadaRegistros = {}; // normName → {P,C,F,V,name}
 
@@ -2298,7 +2159,7 @@ function dismissOverlay(nome, email, funcao) {
   csNomeAtual = nome;
   localStorage.setItem('am_cs_nome',  nome);
   localStorage.setItem('am_cs_funcao', funcao);
-  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('loginOverlay').classList.add('hidden');
   document.getElementById('chamadaLogin').style.display = 'none';
   document.getElementById('chamadaForm').style.display  = 'block';
   loadChamada();
@@ -2373,7 +2234,7 @@ function initChamada() {
           csNomeAtual = data.nome;
           localStorage.setItem('am_cs_pwd', savedSenha);
           localStorage.setItem('am_cs_nome', data.nome);
-          if(document.getElementById('loginOverlay')) document.getElementById('loginOverlay').style.display = 'none';
+          document.getElementById('loginOverlay')?.classList.add('hidden');
           document.getElementById('chamadaLogin').style.display='none';
           document.getElementById('chamadaForm').style.display='block';
           const dataEl = document.getElementById('chamadaData');
@@ -2463,17 +2324,17 @@ function getChamadaPool(tab) {
   if (tab==='Mentoria' || tab==='Hotseat' || tab==='Hotseat Simultâneo')
     return allAlunos;
   if (tab==='Master')
-    return allAlunos.filter(a=>a.turma==='Master' || a.isWinners);
+    return allAlunos.filter(a=>a.turma==='Master' || a.turma==='Winners');
   if (tab==='Winners Encontro')
-    return allAlunos.filter(a=>a.isWinners);
-  if (ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab))
+    return allAlunos.filter(a=>a.turma==='Winners');
+  if (isEspecialidade(tab))
     return allAlunos.filter(a=>hasEsp(a, tab));
   return allAlunos;
 }
 
 function renderChamadaTable(pool) {
   const tab = document.getElementById('chamadaTab').value;
-  const isEsp = ESPECIALIDADES.includes(tab)||ESPECIALIDADES_LEGADO.includes(tab);
+  const isEsp = isEspecialidade(tab);
   const isSoP = tab === 'Hotseat Simultâneo'; // só P visível
   const tbody = document.getElementById('chamadaTbody');
   tbody.innerHTML = pool.map(aluno=>{
@@ -2516,7 +2377,7 @@ function togglePCFV(keyId, field) {
 }
 
 function updateChamadaStats(pool) {
-  const isEsp = ESPECIALIDADES.includes(document.getElementById('chamadaTab').value);
+  const isEsp = isEspecialidade(document.getElementById('chamadaTab').value);
   const total   = pool.length;
   const present = Object.values(chamadaRegistros).filter(r=>r.P).length;
   const absent  = total - present;
@@ -2525,12 +2386,27 @@ function updateChamadaStats(pool) {
   const comFb   = isEsp ? Object.values(chamadaRegistros).filter(r=>r.P&&r.F).length : null;
 
   document.getElementById('chamadaStats').innerHTML = `
-    <div class="stat-card sc-acc" style="padding:10px 16px;min-width:90px"><div class="stat-num" style="font-size:28px">${total}</div><div class="stat-lbl">Total</div></div>
-    <div class="stat-card sc-grn" style="padding:10px 16px;min-width:90px"><div class="stat-num" style="font-size:28px;color:var(--safe)">${present}</div><div class="stat-lbl">Presentes</div></div>
-    <div class="stat-card sc-red" style="padding:10px 16px;min-width:90px"><div class="stat-num" style="font-size:28px;color:var(--danger)">${absent}</div><div class="stat-lbl">Ausentes</div></div>
-    <div class="stat-card sc-org" style="padding:10px 16px;min-width:90px"><div class="stat-num" style="font-size:28px;color:var(--warn)">${comCam}</div><div class="stat-lbl">Com câmera</div></div>
-    ${isEsp ? `<div class="stat-card sc-pur" style="padding:10px 16px;min-width:90px"><div class="stat-num" style="font-size:28px;color:#9966FF">${comFb}</div><div class="stat-lbl">Com feedback</div></div>` : ''}
-    <div class="stat-card sc-blu" style="padding:10px 16px;min-width:90px"><div class="stat-num" style="font-size:28px;color:var(--blue)">${comVit}</div><div class="stat-lbl">Com vitória</div></div>`;
+    <div class="cs-stat-card cs-stat-acc card-spotlight">
+      <div class="cs-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <div class="cs-stat-num">${total}</div><div class="cs-stat-lbl">Total</div>
+    </div>
+    <div class="cs-stat-card cs-stat-grn card-spotlight">
+      <div class="cs-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="cs-stat-num">${present}</div><div class="cs-stat-lbl">Presentes</div>
+    </div>
+    <div class="cs-stat-card cs-stat-red card-spotlight">
+      <div class="cs-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div>
+      <div class="cs-stat-num">${absent}</div><div class="cs-stat-lbl">Ausentes</div>
+    </div>
+    <div class="cs-stat-card cs-stat-org card-spotlight">
+      <div class="cs-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+      <div class="cs-stat-num">${comCam}</div><div class="cs-stat-lbl">Com câmera</div>
+    </div>
+    ${isEsp ? `<div class="cs-stat-card card-spotlight" style="border-color:var(--border)"><div class="cs-stat-icon" style="background:var(--purple-dim);color:var(--purple)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="cs-stat-num" style="color:var(--purple)">${comFb}</div><div class="cs-stat-lbl">Com feedback</div></div>` : ''}
+    <div class="cs-stat-card cs-stat-blu card-spotlight">
+      <div class="cs-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+      <div class="cs-stat-num">${comVit}</div><div class="cs-stat-lbl">Com vitória</div>
+    </div>`;
 }
 
 async function salvarChamada() {
@@ -2893,13 +2769,15 @@ async function carregarAcionamentos() {
 
     // Renderiza stats
     const statColors = ['var(--acc)','var(--safe)','var(--blue)','var(--warn)','#9966FF'];
-    let statsHtml = `<div class="stat-card sc-acc" style="padding:10px 16px;min-width:90px"><div class="stat-num" style="font-size:28px">${registros.length}</div><div class="stat-lbl">Total de intervenções</div></div>`;
+    const acColorClasses = ['cs-stat-grn','cs-stat-blu','cs-stat-org','cs-stat-acc'];
+    let statsHtml = `<div class="cs-stat-card cs-stat-acc card-spotlight"><div class="cs-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div><div class="cs-stat-num">${registros.length}</div><div class="cs-stat-lbl">Total de intervenções</div></div>`;
     Object.entries(porCS).forEach(([nome, s], i) => {
-      const cor = statColors[(i+1) % statColors.length];
-      statsHtml += `<div class="stat-card" style="padding:10px 16px;min-width:90px;border-color:rgba(255,255,255,.08)">
-        <div class="stat-num" style="font-size:24px;color:${cor}">${s.total}</div>
-        <div class="stat-lbl">${nome}</div>
-        <div style="font-size:10px;color:var(--sub);margin-top:2px">${s.wpp} WPP · ${s.manual} manual</div>
+      const cls = acColorClasses[(i+1) % acColorClasses.length];
+      statsHtml += `<div class="cs-stat-card ${cls} card-spotlight">
+        <div class="cs-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+        <div class="cs-stat-num">${s.total}</div>
+        <div class="cs-stat-lbl">${nome}</div>
+        <div class="cs-stat-delta">${s.wpp} WPP · ${s.manual} manual</div>
       </div>`;
     });
     document.getElementById('acStats').innerHTML = statsHtml;

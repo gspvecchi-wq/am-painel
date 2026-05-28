@@ -47,7 +47,7 @@ Required environment variables (Cloudflare Worker Settings → Variables):
 - `KV` binding — Cloudflare KV namespace `am-presenca`
 
 Key API routes:
-- `GET /dados` — fetches and merges Master + Mentoria + Winners boards from Monday.com + Google Sheets; cached 5 min in CF Cache
+- `GET /dados` — fetches Master + Mentoria + Winners boards from Monday.com (each as independent turma) + Google Sheets; cached 5 min in CF Cache
 - `GET /presenca/all` — returns all KV attendance keys consolidated by tab/ciclo/normName
 - `POST /presenca` — saves attendance for a tab/week; body `{ tab, semana, registros, date }`
 - `POST /ai/diagnostico` — calls Claude API to generate student engagement analysis
@@ -62,7 +62,7 @@ Key API routes:
 
 **Ciclo:** A monthly billing/activity cycle identified by `AAAA-MM`. KV keys follow `presenca:{tab}:{ciclo}:s{1-5}`. Week number within a cycle: days 1–7 = week 1, 8–14 = week 2, etc.
 
-**Turmas:** `Master` and `Mentoria`. `isWinners` is a flag on Master students who also participate in Winners boards — they attend extra `Winners Encontro` sessions.
+**Turmas:** `Master`, `Mentoria`, and `Winners`. Winners is a standalone turma with its own Monday board (`id: 18392478822`). Winners students attend all general sessions (Mentoria, Hotseat, Hotseat Simultâneo, Master) plus the exclusive `Winners Encontro` session.
 
 **Engagement score** (`calcCompositeScore`): weighted average across the student's tabs (Mentoria/Hotseat/Master/especialidade). Weights differ by turma. Per-tab score = P(50%) + C(25%) + V(25%); specialty tabs add F(20%).
 
