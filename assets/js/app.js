@@ -2026,7 +2026,7 @@ function closeMobileNav() {
 // ═══════════════════════════════════════════
 function switchView(id,el) {
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.querySelectorAll('.nav-tab, .mobile-nav-item').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-tab, .mobile-nav-item, .sidebar-item').forEach(t=>t.classList.remove('active'));
   document.getElementById('view-'+id).classList.add('active');
   if (el) el.classList.add('active');
   // Sync counterpart (desktop ↔ mobile)

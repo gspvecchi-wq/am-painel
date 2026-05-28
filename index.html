@@ -62,31 +62,6 @@
     <img src="assets/icons/logo.png" alt="Acelerador Médico" class="topbar-logo-img">
   </a>
 
-  <div class="nav-tabs">
-    <button class="nav-tab active" data-view="cs" onclick="switchView('cs',this)">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      Inteligência de Risco
-    </button>
-    <button class="nav-tab" data-view="gest" onclick="switchView('gest',this)">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      Saúde de Receita
-    </button>
-    <span class="nav-sep"></span>
-    <button class="nav-tab" data-view="aluno" onclick="switchView('aluno',this)">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
-      Jornada do Cliente
-    </button>
-    <button class="nav-tab" data-view="chamada" onclick="switchView('chamada',this)">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-      Inteligência de Presença
-    </button>
-    <span class="nav-sep"></span>
-    <button class="nav-tab" data-view="acionamentos" onclick="switchView('acionamentos',this)">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-      Operações de Retenção
-    </button>
-  </div>
-
   <div class="topbar-right">
     <div class="topbar-status">
       <span class="s-dot s-off" id="sDot"></span>
@@ -141,6 +116,39 @@
     </button>
   </nav>
 </div>
+
+<!-- SIDEBAR — desktop only -->
+<aside class="sidebar" id="mainSidebar">
+  <div class="sidebar-group">
+    <div class="sidebar-group-label">Análise</div>
+    <button class="sidebar-item active" data-view="cs" onclick="switchView('cs',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Inteligência de Risco
+    </button>
+    <button class="sidebar-item" data-view="gest" onclick="switchView('gest',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Saúde de Receita
+    </button>
+  </div>
+  <div class="sidebar-group">
+    <div class="sidebar-group-label">Cliente</div>
+    <button class="sidebar-item" data-view="aluno" onclick="switchView('aluno',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Jornada do Cliente
+    </button>
+    <button class="sidebar-item" data-view="chamada" onclick="switchView('chamada',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Inteligência de Presença
+    </button>
+  </div>
+  <div class="sidebar-group">
+    <div class="sidebar-group-label">Operações</div>
+    <button class="sidebar-item" data-view="acionamentos" onclick="switchView('acionamentos',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Operações de Retenção
+    </button>
+  </div>
+</aside>
 
 <div class="view active" id="view-cs">
 

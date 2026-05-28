@@ -85,6 +85,85 @@ body {
 }
 
 /* ═══════════════════════════════════════════
+   SIDEBAR — desktop only
+═══════════════════════════════════════════ */
+.sidebar {
+  position: fixed;
+  top: 52px;
+  left: 0;
+  bottom: 32px; /* altura da statusbar */
+  width: 220px;
+  background: var(--s1);
+  border-right: 1px solid var(--border);
+  padding: 20px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  overflow-y: auto;
+  z-index: 90;
+  scrollbar-width: none;
+}
+.sidebar::-webkit-scrollbar { display: none; }
+
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-group-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding: 0 10px;
+  margin-bottom: 4px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-item svg {
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.sidebar-item:hover {
+  background: var(--s3);
+  color: var(--text);
+}
+.sidebar-item:hover svg { opacity: 1; }
+.sidebar-item.active {
+  background: var(--acc-dim);
+  color: var(--acc);
+  font-weight: 600;
+}
+.sidebar-item.active svg { opacity: 1; }
+
+/* Views e statusbar recuam para dar espaço ao sidebar */
+.view        { margin-left: 220px; }
+.statusbar   { left: 220px; }
+
+/* ═══════════════════════════════════════════
    TOPBAR — Floating card nav (CardNav inspired)
 ═══════════════════════════════════════════ */
 .topbar {
@@ -3668,6 +3747,10 @@ body.light-theme .cs-stat-card {
   .mobile-dock { display: block; }
   /* Extra bottom padding so content isn't hidden behind dock */
   .view { padding-bottom: 110px !important; }
+  /* Hide sidebar, reset content offset */
+  .sidebar { display: none; }
+  .view { margin-left: 0 !important; }
+  .statusbar { left: 0; }
   /* Hide desktop statusbar — info already shown in mobile dock */
   .statusbar { display: none !important; }
   /* ── Page header: compact on mobile ── */
