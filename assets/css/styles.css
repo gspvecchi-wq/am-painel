@@ -163,7 +163,7 @@ body {
 .layout-body {
   display: flex;
   position: relative;
-  min-height: calc(100vh - 68px - 32px);
+  min-height: calc(100vh - 68px);
 }
 /* Fundo do sidebar estende até o rodapé via pseudo-elemento */
 .layout-body::before {
@@ -2623,6 +2623,100 @@ tbody tr:hover .dr-act-btn {
 }
 
 /* ═══════════════════════════════════════════
+   MOTOR DE SAÚDE — Score Breakdown
+═══════════════════════════════════════════ */
+.score-bd-section {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.score-bd-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.score-bd-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-3);
+}
+.score-bd-total {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.score-bd-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.score-bd-row:last-child { margin-bottom: 0; }
+.score-bd-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 168px;
+  flex-shrink: 0;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-2);
+  flex-wrap: wrap;
+}
+.score-bd-tip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--s3);
+  border: 1px solid var(--border);
+  font-size: 8px;
+  color: var(--text-3);
+  cursor: help;
+  flex-shrink: 0;
+}
+.score-bd-worst {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--danger);
+  background: var(--danger-dim);
+  border: 1px solid rgba(255,59,92,0.25);
+  padding: 1px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.score-bd-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: var(--s4);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.score-bd-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+.score-bd-pct {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  width: 34px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════
    STATUS BAR
 ═══════════════════════════════════════════ */
 .statusbar {
@@ -2741,9 +2835,6 @@ tbody tr:hover .dr-act-btn {
    RESPONSIVE
 ═══════════════════════════════════════════ */
 /* Sidebar ocupa 220px — breakpoints do stat strip deslocados */
-@media (min-width: 769px) and (max-width: 1120px) {
-  .cs-stat-strip { grid-template-columns: repeat(4, 1fr); }
-}
 @media (min-width: 769px) and (max-width: 920px) {
   .cs-stat-strip { grid-template-columns: repeat(3, 1fr); }
 }

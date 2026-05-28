@@ -4,7 +4,7 @@
 const FEATURES = {
   NOVO_VOCABULARIO:         true,  // fase 1 — renomeação de menus e labels
   NOVA_ARQUITETURA_MODULOS: true,  // fase 2 — separadores de grupo + badges de categoria
-  MOTOR_DE_SAUDE:           false, // fase 3 — breakdown do score
+  MOTOR_DE_SAUDE:           true,  // fase 3 — breakdown do score
   DETECCAO_QUEDA:           false, // fase 4 — queda de engajamento como módulo central
   LINHA_DO_TEMPO:           false, // fase 5 — histórico do cliente
   RECEITA_EM_RISCO:         false, // fase 6 — camada financeira
@@ -514,6 +514,104 @@ function calcCompositeScore(aluno, upToWeek) {
 
   // Cap geral: 120% (100 base + 20 bônus)
   return Math.min(Math.round(compositeScore + callsBonus + grupoBonus), 120);
+}
+
+// Motor de Saúde — decomposição do score por componente
+function calcScoreComponentes(aluno, upToWeek) {
+  const novo = isNovo(aluno);
+  const hasEspTabs = aluno.especialidades && aluno.especialidades.length > 0;
+  let weightedTabs = [];
+  if (aluno.turma === 'Winners') {
+    weightedTabs = [
+      { tab: 'Winners Encontro',   w: 30 },
+      { tab: 'Master',             w: 25 },
+      { tab: 'Mentoria',           w: 20 },
+      { tab: 'Hotseat',            w: 15 },
+      { tab: 'Hotseat Simultâneo', w: (novo && hasEspTabs) ? 5 : 10 }
+    ];
+    if (novo && hasEspTabs) for (const esp of aluno.especialidades) {
+      const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
+      if (spec) weightedTabs.push({ tab: spec, w: 5 });
+    }
+  } else if (aluno.turma === 'Master') {
+    weightedTabs = [
+      { tab: 'Master',             w: 35 },
+      { tab: 'Mentoria',           w: 25 },
+      { tab: 'Hotseat',            w: 20 },
+      { tab: 'Hotseat Simultâneo', w: (novo && hasEspTabs) ? 8 : 20 }
+    ];
+    if (novo && hasEspTabs) for (const esp of aluno.especialidades) {
+      const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
+      if (spec) weightedTabs.push({ tab: spec, w: 12 });
+    }
+  } else {
+    weightedTabs = [
+      { tab: 'Mentoria',           w: 35 },
+      { tab: 'Hotseat',            w: 30 },
+      { tab: 'Hotseat Simultâneo', w: (novo && hasEspTabs) ? 15 : 35 }
+    ];
+    if (novo && hasEspTabs) for (const esp of aluno.especialidades) {
+      const spec = ESPECIALIDADES.find(e=>norm(e)===norm(esp));
+      if (spec) weightedTabs.push({ tab: spec, w: 20 });
+    }
+  }
+  const totalW = weightedTabs.reduce((s,t)=>s+t.w, 0);
+
+  let pContrib=0, cContrib=0, vfContrib=0;
+  let pValW=0, cValW=0, vValW=0, activeW=0;
+
+  for (const { tab, w } of weightedTabs) {
+    const entry = getKvEntry(tab, norm(aluno.name));
+    const isEspTab = isEspecialidade(tab);
+    let pHit=0, cHit=0, vHit=0, fHit=0, slots=0;
+    for (let i=0; i<upToWeek; i++) {
+      const h = entry && entry.history[i] ? entry.history[i] : { P:false, C:false, F:false, V:false };
+      slots++;
+      if (h.P) pHit++;
+      if (h.P && h.C) cHit++;
+      if (h.P && h.V) vHit++;
+      if (isEspTab && h.P && h.F) fHit++;
+    }
+    if (!slots) continue;
+    const pS = pHit/slots;
+    const wNorm = w/totalW;
+    if (isEspTab) {
+      const cS=cHit/slots, vS=vHit/slots, fS=fHit/Math.max(pHit,1);
+      pContrib  += pS*50*wNorm;
+      cContrib  += cS*15*wNorm;
+      vfContrib += (vS*15 + fS*20)*wNorm;
+    } else {
+      const cS=cHit/slots, vS=vHit/slots;
+      pContrib  += pS*50*wNorm;
+      cContrib  += cS*25*wNorm;
+      vfContrib += vS*25*wNorm;
+    }
+    pValW += pS*wNorm;
+    cValW += (pHit>0 ? cHit/pHit : 0)*wNorm;
+    vValW += (pHit>0 ? vHit/pHit : 0)*wNorm;
+    activeW += wNorm;
+  }
+
+  const callsData = (kvPresenca['__calls__']||{})[norm(aluno.name)] || { leonardo:0, bruno:0 };
+  const callsBonus = Math.min(((callsData.leonardo||0)+(callsData.bruno||0))*5, 10);
+  const grupoData  = kvGrupoScores[norm(aluno.name)] || null;
+  const grupoBonus = grupoData ? Math.min(grupoData.total||0, 15) : 0;
+
+  const rawTotal = pContrib+cContrib+vfContrib+callsBonus+grupoBonus;
+  const score    = Math.min(Math.round(rawTotal), 120);
+  const scale    = rawTotal > 120 ? 120/rawTotal : 1;
+  const ww       = activeW > 0 ? activeW : 1;
+
+  return {
+    score,
+    componentes: {
+      indice_presenca:        { valor: Math.round(pValW/ww*100),            contribuicao: Math.round(pContrib*scale*10)/10   },
+      presenca_camera:        { valor: Math.round(cValW/ww*100),            contribuicao: Math.round(cContrib*scale*10)/10   },
+      dinamica_conquistas:    { valor: Math.round(vValW/ww*100),            contribuicao: Math.round(vfContrib*scale*10)/10  },
+      engajamento_comunidade: { valor: Math.round(grupoBonus/15*100),        contribuicao: Math.round(grupoBonus*scale*10)/10 },
+      indice_consistencia:    { valor: Math.round(callsBonus/10*100),        contribuicao: Math.round(callsBonus*scale*10)/10 },
+    }
+  };
 }
 
 // Risk = inverse of composite score, weighted by consecutive absences
@@ -1709,6 +1807,52 @@ function renderProfiles() {
 }
 
 // ═══════════════════════════════════════════
+// Motor de Saúde — renderiza breakdown visual do score
+function renderScoreBreakdown(componentes, score, isAtRisk) {
+  const META = {
+    indice_presenca:        { label: 'Índice de Presença',        cor: 'var(--safe)',   tooltip: 'Taxa de presença ponderada entre todas as sessões que o aluno frequenta. Cada falta reduz diretamente este índice.' },
+    presenca_camera:        { label: 'Presença com Câmera',       cor: 'var(--warn)',   tooltip: 'Percentual de aulas com câmera ligada, calculado apenas nas sessões com presença confirmada.' },
+    dinamica_conquistas:    { label: 'Dinâmica de Conquistas',    cor: 'var(--blue)',   tooltip: 'Frequência com que o aluno compartilha vitórias e feedbacks. Reflete envolvimento emocional na jornada.' },
+    engajamento_comunidade: { label: 'Engajamento em Comunidade', cor: 'var(--purple)', tooltip: 'Participação no grupo de WhatsApp: resultados, pedidos de ajuda e dúvidas (últimas 4 semanas). Bônus máximo: +15 pts.' },
+    indice_consistencia:    { label: 'Índice de Consistência',    cor: 'var(--acc)',    tooltip: 'Calls realizadas com especialistas. Cada call vale +5 pontos. Máximo: +10 pts.' },
+  };
+
+  let worstKey = null;
+  if (isAtRisk) {
+    let minValor = 101;
+    for (const [k, comp] of Object.entries(componentes)) {
+      if (comp.valor < minValor) { minValor = comp.valor; worstKey = k; }
+    }
+  }
+
+  const rows = Object.entries(componentes).map(([key, comp]) => {
+    const meta = META[key];
+    const isWorst = key === worstKey;
+    const worstBadge = isWorst ? `<span class="score-bd-worst">↓ impacto principal</span>` : '';
+    return `
+      <div class="score-bd-row">
+        <div class="score-bd-label">
+          <span>${meta.label}</span>
+          <span class="score-bd-tip" title="${meta.tooltip}">?</span>
+          ${worstBadge}
+        </div>
+        <div class="score-bd-bar-wrap">
+          <div class="score-bd-bar" style="width:${comp.valor}%;background:${meta.cor}"></div>
+        </div>
+        <span class="score-bd-pct" style="color:${meta.cor}">${comp.valor}%</span>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="score-bd-section">
+      <div class="score-bd-head">
+        <span class="score-bd-title">Composição do Score</span>
+        <span class="score-bd-total">${score} pts</span>
+      </div>
+      ${rows}
+    </div>`;
+}
+
 // DR MODAL — visão completa do mês
 // ═══════════════════════════════════════════
 function openDrModal(name, showMsgs=true) {
@@ -1917,6 +2061,14 @@ function openDrModal(name, showMsgs=true) {
   window._aiAlunoTotalWeeks = totalWeeks;
   window._aiAlunoScore = engScore;
   window._aiAlunoTrend = trendLabel;
+
+  // Motor de Saúde — breakdown do score
+  const mBreakdown = document.getElementById('mScoreBreakdown');
+  if (FEATURES.MOTOR_DE_SAUDE && mBreakdown) {
+    const { score: bdScore, componentes } = calcScoreComponentes(aluno, totalWeeks);
+    mBreakdown.style.display = 'block';
+    mBreakdown.innerHTML = renderScoreBreakdown(componentes, bdScore, bdScore < 70);
+  }
 
   // ── Calls com Especialistas ──────────────
   renderCallsSection(name);
