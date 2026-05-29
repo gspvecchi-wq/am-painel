@@ -359,14 +359,13 @@ function buildDoctors(tab, week) {
   const sheetTab = getKvTab(tab);
   const pool = getPool(tab);
   const w = week-1;
+  const rolling = getRollingWindow(5); // janela real cross-ciclo
   return pool.map(aluno=>{
     const entry = sheetTab[norm(aluno.name)]||null;
     const history = Array.from({length:5},(_,i)=>{
       return entry&&entry.history[i] ? entry.history[i] : {P:false,C:false,F:false,V:false};
     });
     const cur = history[w];
-    let consAbs=0;
-    for (let i=w; i>=0; i--) { if (!history[i].P) consAbs++; else break; }
     const isEsp = isEspecialidade(tab);
     const motivos=[];
     if (!cur.P) { motivos.push('ausente'); }
@@ -375,9 +374,58 @@ function buildDoctors(tab, week) {
       if (!cur.F && isEsp) motivos.push('feedback');
       if (!cur.V) motivos.push('vitoria');
     }
-    const risk = calcRisk(history, week);
+
+    // consAbs e risk: usam rolling window cross-ciclo sobre TODAS as abas do aluno
+    const consAbs = calcConsAbsRolling(aluno, rolling);
+    const risk    = calcRiskRolling(aluno, rolling);
     return {...aluno, history, cur, consAbs, motivos, risk};
   });
+}
+
+// Conta faltas consecutivas reais: percorre rolling window do mais recente ao mais antigo,
+// verifica se o aluno estava ausente em TODAS as abas que frequenta naquele slot.
+function calcConsAbsRolling(aluno, slots) {
+  const alunoTabs = aluno.turma==='Winners'
+    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro']
+    : aluno.turma==='Master'
+    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master']
+    : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+
+  let consAbs = 0;
+  for (let i = slots.length - 1; i >= 0; i--) {
+    const slot = slots[i];
+    const presenteEmAlguma = alunoTabs.some(t => {
+      const e = getKvEntry(t, norm(aluno.name), slot.ciclo);
+      return e?.history?.[slot.weekIdx]?.P;
+    });
+    if (!presenteEmAlguma) consAbs++;
+    else break;
+  }
+  return consAbs;
+}
+
+// Risk score usando rolling window: mede ausência, câmera e vitória reais das últimas 5 semanas
+function calcRiskRolling(aluno, slots) {
+  const alunoTabs = aluno.turma==='Winners'
+    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro']
+    : aluno.turma==='Master'
+    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master']
+    : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+
+  const weeks = slots.map(slot => {
+    const present = alunoTabs.some(t => getKvEntry(t, norm(aluno.name), slot.ciclo)?.history?.[slot.weekIdx]?.P);
+    const camera  = alunoTabs.some(t => getKvEntry(t, norm(aluno.name), slot.ciclo)?.history?.[slot.weekIdx]?.C);
+    const vit     = alunoTabs.some(t => getKvEntry(t, norm(aluno.name), slot.ciclo)?.history?.[slot.weekIdx]?.V);
+    return { P: present, C: camera, V: vit };
+  });
+
+  let consAbs = 0;
+  for (let i = weeks.length - 1; i >= 0; i--) { if (!weeks[i].P) consAbs++; else break; }
+  const absRate = weeks.filter(w=>!w.P).length / weeks.length;
+  const pres    = weeks.filter(w=>w.P);
+  const camRate = pres.length ? pres.filter(w=>!w.C).length / pres.length : 1;
+  const vitRate = pres.length ? pres.filter(w=>!w.V).length / pres.length : 1;
+  return Math.min(Math.round(consAbs*18 + absRate*35 + camRate*12 + vitRate*8), 100);
 }
 
 // Used for gestão evolution charts
@@ -804,25 +852,34 @@ function calcRenewalScore(aluno, upToWeek) {
 // ── ALERT LEVEL ───────────────────────────────────────────
 // Retorna { level:'urgente'|'atencao'|'silencioso', label, color, icon } ou null
 function calcAlertLevel(aluno, upToWeek) {
-  if (!upToWeek || upToWeek < 1) return null;
-  const kvTab = getKvTab(currentTab || 'Mentoria');
-  const entry = kvTab[norm(aluno.name)];
-  const history = Array.from({length: upToWeek}, (_,i) =>
-    entry?.history?.[i] || {P:false,C:false,F:false,V:false}
-  );
+  // Sempre usa rolling window real — ignora upToWeek para não depender do dropdown
+  const rolling = getRollingWindow(5);
+  const consAbs = calcConsAbsRolling(aluno, rolling);
+
   // 3+ faltas consecutivas → urgente
-  let consAbs = 0;
-  for (let i = history.length-1; i >= 0; i--) {
-    if (!history[i].P) consAbs++; else break;
-  }
   if (consAbs >= 3) return { level:'urgente', icon:'🔴', label:`${consAbs} faltas seguidas`, color:'var(--danger)' };
-  // Queda acelerada → atenção
-  if (isQuedaAcelerada(aluno, upToWeek))
+
+  // Queda acelerada → atenção (usa detectMaxWeek como antes)
+  const mw = detectMaxWeek();
+  if (mw >= 2 && isQuedaAcelerada(aluno, mw))
     return { level:'atencao', icon:'🟡', label:'Queda acelerada', color:'var(--warn)' };
-  // Presente mas câmera + vitórias zeradas → silencioso
-  const presences = history.filter(h=>h.P);
-  if (presences.length >= 2 && presences.every(h=>!h.C && !h.V))
+
+  // Presente mas câmera + vitórias zeradas → silencioso (via rolling window)
+  const alunoTabs = aluno.turma==='Winners'
+    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master','Winners Encontro']
+    : aluno.turma==='Master'
+    ? ['Mentoria','Hotseat','Hotseat Simultâneo','Master']
+    : ['Mentoria','Hotseat','Hotseat Simultâneo'];
+  const weeksPres = rolling.filter(slot =>
+    alunoTabs.some(t => getKvEntry(t, norm(aluno.name), slot.ciclo)?.history?.[slot.weekIdx]?.P)
+  );
+  const semCamVit = weeksPres.every(slot =>
+    !alunoTabs.some(t => getKvEntry(t, norm(aluno.name), slot.ciclo)?.history?.[slot.weekIdx]?.C) &&
+    !alunoTabs.some(t => getKvEntry(t, norm(aluno.name), slot.ciclo)?.history?.[slot.weekIdx]?.V)
+  );
+  if (weeksPres.length >= 2 && semCamVit)
     return { level:'silencioso', icon:'⚪', label:'Presente, desengajado', color:'var(--sub)' };
+
   return null;
 }
 
