@@ -4553,41 +4553,126 @@ body.light-theme .mobile-nav-overlay.open {
 body.light-theme .mobile-hamburger span { background: var(--text-2); }
 
 /* ═══════════════════════════════════════════
-   RENOVAÇÃO — Summary Cards
+   OVERVIEW — Quadrant Chart
 ═══════════════════════════════════════════ */
-.ren-summary-cards {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 28px;
-}
-@media (max-width: 600px) { .ren-summary-cards { grid-template-columns: 1fr; } }
-.ren-summary-card {
-  background: var(--s2);
+.ov-chart-wrap {
+  background: var(--s1);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 22px 24px;
-  border-top-width: 2px;
+  border-radius: 16px;
+  padding: 24px;
+  position: relative;
 }
-.ren-summary-warn   { border-top-color: var(--warn); }
-.ren-summary-danger { border-top-color: var(--danger); }
-.ren-summary-num {
-  font-family: 'Syne', sans-serif;
-  font-size: 2.4rem;
-  font-weight: 800;
-  line-height: 1;
-  margin-bottom: 6px;
+.ov-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
-.ren-summary-warn   .ren-summary-num { color: var(--warn); }
-.ren-summary-danger .ren-summary-num { color: var(--danger); }
-.ren-summary-lbl {
+.ov-chart-title {
   font-family: 'DM Sans', sans-serif;
-  font-size: 0.72rem;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+.ov-chart-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.ov-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
   color: var(--text-2);
+}
+.ov-legend-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ov-chart-area {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ov-axis-label-x, .ov-axis-label-y {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px;
+  color: var(--text-3);
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+.ov-axis-label-y { writing-mode: horizontal-tb; }
+.ov-chart-inner {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/9;
+  min-height: 320px;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: crosshair;
+}
+.ov-chart-inner svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* Quadrant background regions — filled via JS setAttribute */
+.ov-q-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  pointer-events: none;
+  user-select: none;
 }
+/* Pulse animations */
+@keyframes ov-pulse-red {
+  0%,100% { r: 8; opacity: .9; }
+  50%      { r: 13; opacity: .3; }
+}
+@keyframes ov-pulse-amber {
+  0%,100% { r: 8; opacity: .8; }
+  50%      { r: 12; opacity: .25; }
+}
+.ov-pulse-red   { animation: ov-pulse-red   1.6s ease-in-out infinite; }
+.ov-pulse-amber { animation: ov-pulse-amber 2.2s ease-in-out infinite; }
+
+/* Tooltip */
+.ov-tooltip {
+  position: fixed;
+  background: var(--s4);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  pointer-events: none;
+  z-index: 9999;
+  min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+}
+.ov-tt-name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.ov-tt-row {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  color: var(--text-2);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ov-tt-val { color: var(--text); font-weight: 600; }
 
 /* ═══════════════════════════════════════════
    ALUNO TABS (não mais usadas — mantido por compatibilidade)

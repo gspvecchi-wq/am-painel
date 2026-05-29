@@ -89,7 +89,12 @@
 <div class="mobile-nav-drawer" id="mobileNavDrawer" aria-hidden="true">
   <div class="mobile-nav-overlay" onclick="closeMobileNav()"></div>
   <nav class="mobile-nav-panel">
-    <button class="mobile-nav-item active" data-view="cs" onclick="switchView('cs',this);closeMobileNav()">
+    <button class="mobile-nav-item active" data-view="overview" onclick="switchView('overview',this);closeMobileNav()">
+      <span class="mobile-nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+      <span class="mobile-nav-label">Overview</span>
+      <span class="mobile-nav-chevron"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </button>
+    <button class="mobile-nav-item" data-view="cs" onclick="switchView('cs',this);closeMobileNav()">
       <span class="mobile-nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
       <span class="mobile-nav-label">Inteligência de Risco</span>
       <span class="mobile-nav-chevron"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></span>
@@ -126,8 +131,15 @@
 <!-- SIDEBAR — desktop only -->
 <aside class="sidebar" id="mainSidebar">
   <div class="sidebar-group">
+    <div class="sidebar-group-label">Visão Geral</div>
+    <button class="sidebar-item active" data-view="overview" onclick="switchView('overview',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Overview
+    </button>
+  </div>
+  <div class="sidebar-group">
     <div class="sidebar-group-label">Análise</div>
-    <button class="sidebar-item active" data-view="cs" onclick="switchView('cs',this)">
+    <button class="sidebar-item" data-view="cs" onclick="switchView('cs',this)">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       Inteligência de Risco
     </button>
@@ -161,7 +173,72 @@
 </aside>
 <div class="layout-main">
 
-<div class="view active" id="view-cs">
+<!-- OVERVIEW VIEW -->
+<div class="view active" id="view-overview">
+  <div class="view-page-header">
+    <div class="view-page-title-group">
+      <div class="view-page-eyebrow">Visão Geral</div>
+      <h1 class="view-page-title">Overview <span class="view-page-title-accent">da Base</span></h1>
+    </div>
+    <div class="view-page-controls">
+      <div id="ovUpdatedAt" style="font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-3)"></div>
+    </div>
+  </div>
+
+  <!-- 5 cards de indicadores -->
+  <div class="cs-stat-strip cs-stat-strip-5" id="ovStats" style="display:none">
+    <div class="cs-stat-card cs-stat-acc card-spotlight">
+      <div class="cs-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <div class="cs-stat-num" id="ovTotal">—</div>
+      <div class="cs-stat-lbl">Total de alunos</div>
+    </div>
+    <div class="cs-stat-card cs-stat-red card-spotlight">
+      <div class="cs-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+      <div class="cs-stat-num" id="ovRisco">—</div>
+      <div class="cs-stat-lbl">Em risco</div>
+    </div>
+    <div class="cs-stat-card cs-stat-grn card-spotlight">
+      <div class="cs-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="cs-stat-num" id="ovSaudaveis">—</div>
+      <div class="cs-stat-lbl">Saudáveis</div>
+    </div>
+    <div class="cs-stat-card cs-stat-org card-spotlight">
+      <div class="cs-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div>
+      <div class="cs-stat-num" id="ovRenovacao">—</div>
+      <div class="cs-stat-lbl">Renovação (90d)</div>
+    </div>
+    <div class="cs-stat-card cs-stat-blu card-spotlight">
+      <div class="cs-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+      <div class="cs-stat-num" id="ovUpsell">—</div>
+      <div class="cs-stat-lbl">Upsell (→ Master)</div>
+    </div>
+  </div>
+
+  <!-- Quadrant chart -->
+  <div class="ov-chart-wrap" id="ovChartWrap" style="display:none">
+    <div class="ov-chart-header">
+      <div class="ov-chart-title">Mapa de Posicionamento</div>
+      <div class="ov-chart-legend" id="ovLegend"></div>
+    </div>
+    <div class="ov-chart-area">
+      <div class="ov-axis-label-y">← Ciclo expirando · Ciclo longo →</div>
+      <div class="ov-chart-inner" id="ovChartInner">
+        <!-- SVG renderizado via JS -->
+      </div>
+      <div class="ov-axis-label-x">← Baixo engajamento · Alto engajamento →</div>
+    </div>
+    <!-- Tooltip -->
+    <div class="ov-tooltip" id="ovTooltip" style="display:none"></div>
+  </div>
+
+  <div id="ovEmpty" class="center-msg">
+    <div class="cs-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+    <h3 class="cs-empty-title">Carregando dados</h3>
+    <p class="cs-empty-desc">Aguardando base de alunos.</p>
+  </div>
+</div>
+
+<div class="view" id="view-cs">
 
   <div class="view-page-header">
     <div class="view-page-title-group">
@@ -632,14 +709,16 @@
   </div>
 
   <!-- Cards de resumo -->
-  <div class="ren-summary-cards">
-    <div class="ren-summary-card ren-summary-warn">
-      <div class="ren-summary-num" id="renCardFuturoNum">—</div>
-      <div class="ren-summary-lbl">Vencem em até 90 dias</div>
+  <div class="cs-stat-strip" style="grid-template-columns:repeat(2,1fr);max-width:520px;margin-bottom:28px">
+    <div class="cs-stat-card cs-stat-org card-spotlight">
+      <div class="cs-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div>
+      <div class="cs-stat-num" id="renCardFuturoNum">—</div>
+      <div class="cs-stat-lbl">Vencem em até 90 dias</div>
     </div>
-    <div class="ren-summary-card ren-summary-danger">
-      <div class="ren-summary-num" id="renCardPassadoNum">—</div>
-      <div class="ren-summary-lbl">Vencidos nos últimos 365 dias</div>
+    <div class="cs-stat-card cs-stat-red card-spotlight">
+      <div class="cs-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+      <div class="cs-stat-num" id="renCardPassadoNum">—</div>
+      <div class="cs-stat-lbl">Vencidos nos últimos 365 dias</div>
     </div>
   </div>
 

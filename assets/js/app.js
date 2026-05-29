@@ -191,6 +191,17 @@ window.addEventListener('DOMContentLoaded', () => {
   updateBadge();
   reloadAll();
 
+  // Re-renderiza o quadrant chart ao redimensionar
+  let _ovResizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(_ovResizeTimer);
+    _ovResizeTimer = setTimeout(() => {
+      if (loaded && document.getElementById('view-overview').classList.contains('active')) {
+        renderQuadrantChart(getRollingWindow(5));
+      }
+    }, 200);
+  });
+
   // Glass scroll effect on topbar
   const _nav = document.getElementById('mainNav');
   window.addEventListener('scroll', () => {
@@ -329,10 +340,11 @@ async function reloadAll() {
     const now = new Date().toLocaleTimeString('pt-BR');
     setStatus(true,`${allAlunos.length} alunos`,`Atualizado ${now}`);
     updateBadge();
-    csLoad();
     const av = document.querySelector('.view.active').id;
+    if (av==='view-overview' || av==='view-cs') { renderOverview(); csLoad(); }
     if (av==='view-gest')    renderGest();
     if (av==='view-aluno')   renderAlunoView();
+    if (av==='view-renovacao') renderRenovacao();
     if (av==='view-chamada') initChamada();
   } catch(e) {
     setStatus(false,'Erro ao carregar: '+e.message);
@@ -2638,6 +2650,167 @@ function closeMobileNav() {
 }
 
 // ═══════════════════════════════════════════
+// OVERVIEW
+// ═══════════════════════════════════════════
+function renderOverview() {
+  if (!loaded || !allAlunos.length) return;
+
+  const rolling = getRollingWindow(5);
+  const today   = Date.now();
+  const D90     = 90  * 86400000;
+  const D365    = 365 * 86400000;
+
+  // ── Calcular indicadores ──────────────────
+  let risco = 0, saudaveis = 0, renovacao = 0, upsell = 0;
+  for (const a of allAlunos) {
+    const eng    = calcCompositeScoreRolling(a, rolling);
+    const cAbs   = calcConsAbsRolling(a, rolling);
+    if (cAbs >= 3 || eng < 30) risco++;
+    else if (eng >= 70)        saudaveis++;
+    if (a.cycleEnd) {
+      const diff = new Date(a.cycleEnd + 'T12:00:00').getTime() - today;
+      if (diff >= 0 && diff <= D90) renovacao++;
+    }
+    if (calcAscensaoScore(a, detectMaxWeek()) > 0) upsell++;
+  }
+
+  document.getElementById('ovTotal').textContent     = allAlunos.length;
+  document.getElementById('ovRisco').textContent     = risco;
+  document.getElementById('ovSaudaveis').textContent = saudaveis;
+  document.getElementById('ovRenovacao').textContent = renovacao;
+  document.getElementById('ovUpsell').textContent    = upsell;
+  document.getElementById('ovStats').style.display   = '';
+  document.getElementById('ovEmpty').style.display   = 'none';
+  document.getElementById('ovChartWrap').style.display = '';
+
+  const ts = new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+  document.getElementById('ovUpdatedAt').textContent = `Atualizado às ${ts}`;
+
+  renderQuadrantChart(rolling);
+}
+
+function renderQuadrantChart(rolling) {
+  const el = document.getElementById('ovChartInner');
+  const W = el.offsetWidth  || 800;
+  const H = el.offsetHeight || 400;
+
+  // ── Margens e área de plot ──
+  const ML = 12, MR = 12, MT = 12, MB = 12;
+  const PW = W - ML - MR;
+  const PH = H - MT - MB;
+
+  // ── Escalas ──
+  // X: engagement 0–100
+  // Y: dias restantes, range [-180, 400] → clamped
+  const Y_MIN = -180, Y_MAX = 400;
+  const X_MID = 50;  // linha divisória X (engagement 50%)
+  const Y_MID = 90;  // linha divisória Y (90 dias)
+
+  function xPos(eng)  { return ML + (Math.min(Math.max(eng,0),100) / 100) * PW; }
+  function yPos(days) { const clamped = Math.min(Math.max(days, Y_MIN), Y_MAX);
+                        return MT + (1 - (clamped - Y_MIN) / (Y_MAX - Y_MIN)) * PH; }
+
+  const xMidPx = xPos(X_MID);
+  const yMidPx = yPos(Y_MID);
+
+  // ── Quadrant fills ──
+  const qFills = [
+    { x:ML,      y:MT,      w:xMidPx-ML,   h:yMidPx-MT,   fill:'rgba(255,140,0,0.06)',   label:'⚠️ ATENÇÃO',   lx:ML+8,          ly:MT+18 },
+    { x:xMidPx,  y:MT,      w:PW-(xMidPx-ML), h:yMidPx-MT, fill:'rgba(34,217,138,0.06)', label:'✦ CAMPEÕES',   lx:xMidPx+8,     ly:MT+18 },
+    { x:ML,      y:yMidPx,  w:xMidPx-ML,   h:PH-(yMidPx-MT), fill:'rgba(255,59,92,0.07)', label:'🚨 CRÍTICOS',  lx:ML+8,         ly:yMidPx+18 },
+    { x:xMidPx,  y:yMidPx,  w:PW-(xMidPx-ML), h:PH-(yMidPx-MT), fill:'rgba(249,183,1,0.06)', label:'🔄 RENOVAÇÃO', lx:xMidPx+8, ly:yMidPx+18 },
+  ];
+
+  // ── Cores por turma ──
+  const TURMA_COLOR = { 'Winners':'#F9B701', 'Master':'#A855F7', 'Mentoria':'#4D8EFF' };
+
+  // ── Construir dados dos pontos ──
+  const today = Date.now();
+  const dots  = allAlunos.map(a => {
+    const eng    = calcCompositeScoreRolling(a, rolling);
+    const cAbs   = calcConsAbsRolling(a, rolling);
+    const days   = a.cycleEnd
+      ? Math.round((new Date(a.cycleEnd + 'T12:00:00').getTime() - today) / 86400000)
+      : 200;
+    const color  = TURMA_COLOR[a.turma] || '#4D8EFF';
+    const pulse  = cAbs >= 3 ? 'red' : (eng < 30 && days < 90) ? 'amber' : null;
+    return { name: a.name, turma: a.turma, eng, days, color, pulse };
+  });
+
+  // ── SVG ──
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">`;
+
+  // Background
+  svg += `<rect width="${W}" height="${H}" fill="transparent"/>`;
+
+  // Quadrant fills + labels
+  for (const q of qFills) {
+    svg += `<rect x="${q.x}" y="${q.y}" width="${q.w}" height="${q.h}" fill="${q.fill}" rx="0"/>`;
+    svg += `<text x="${q.lx}" y="${q.ly}" class="ov-q-label" fill="rgba(255,255,255,0.22)" font-size="10" font-family="DM Sans,sans-serif" font-weight="700" letter-spacing="0.08em">${q.label}</text>`;
+  }
+
+  // Divider lines
+  svg += `<line x1="${xMidPx}" y1="${MT}" x2="${xMidPx}" y2="${MT+PH}" stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="4,4"/>`;
+  svg += `<line x1="${ML}" y1="${yMidPx}" x2="${ML+PW}" y2="${yMidPx}" stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="4,4"/>`;
+
+  // Pulse rings (behind dots)
+  for (const d of dots) {
+    if (!d.pulse) continue;
+    const cx = xPos(d.eng), cy = yPos(d.days);
+    const clr = d.pulse === 'red' ? 'rgba(255,59,92,0.35)' : 'rgba(255,140,0,0.3)';
+    const cls = d.pulse === 'red' ? 'ov-pulse-red' : 'ov-pulse-amber';
+    svg += `<circle cx="${cx}" cy="${cy}" r="8" fill="${clr}" class="${cls}"/>`;
+  }
+
+  // Dots
+  for (const d of dots) {
+    const cx  = xPos(d.eng);
+    const cy  = yPos(d.days);
+    const esc = (d.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    svg += `<circle cx="${cx}" cy="${cy}" r="5.5" fill="${d.color}" fill-opacity="0.88" stroke="rgba(0,0,0,0.3)" stroke-width="1"
+      data-name="${esc}" data-turma="${d.turma}" data-eng="${d.eng}" data-days="${d.days}"
+      style="cursor:pointer" onmouseenter="ovShowTip(event,this)" onmouseleave="ovHideTip()"
+      onclick="openDrModal('${(d.name||'').replace(/'/g,"\\\\'")}')" />`;
+  }
+
+  svg += `</svg>`;
+  el.innerHTML = svg;
+
+  // ── Legend ──
+  const lg = document.getElementById('ovLegend');
+  lg.innerHTML = Object.entries(TURMA_COLOR).map(([t,c])=>
+    `<div class="ov-legend-item"><div class="ov-legend-dot" style="background:${c}"></div>${t}</div>`
+  ).join('') + `<div class="ov-legend-item"><div class="ov-legend-dot" style="background:rgba(255,59,92,0.6);box-shadow:0 0 6px rgba(255,59,92,0.8)"></div>Em risco (pulsa)</div>`;
+}
+
+function ovShowTip(e, el) {
+  const tip   = document.getElementById('ovTooltip');
+  const name  = el.dataset.name;
+  const turma = el.dataset.turma;
+  const eng   = el.dataset.eng;
+  const days  = parseInt(el.dataset.days);
+  const dLabel = days >= 0 ? `${days}d restantes` : `${Math.abs(days)}d vencido`;
+  tip.innerHTML = `
+    <div class="ov-tt-name">${name.replace(/\s*\d[ªº°]\s*cadeira.*/i,'').trim()}</div>
+    <div class="ov-tt-row"><span>${turma}</span></div>
+    <div class="ov-tt-row"><span>Engajamento</span><span class="ov-tt-val">${eng}%</span></div>
+    <div class="ov-tt-row"><span>Ciclo</span><span class="ov-tt-val">${dLabel}</span></div>`;
+  tip.style.display = 'block';
+  ovMoveTip(e);
+  el.addEventListener('mousemove', ovMoveTip);
+}
+function ovMoveTip(e) {
+  const tip = document.getElementById('ovTooltip');
+  if (!tip) return;
+  tip.style.left = (e.clientX + 14) + 'px';
+  tip.style.top  = (e.clientY - 10) + 'px';
+}
+function ovHideTip() {
+  const tip = document.getElementById('ovTooltip');
+  if (tip) tip.style.display = 'none';
+}
+
+// ═══════════════════════════════════════════
 // NAV
 // ═══════════════════════════════════════════
 function switchView(id,el) {
@@ -2647,6 +2820,7 @@ function switchView(id,el) {
   if (el) el.classList.add('active');
   // Sync counterpart (desktop ↔ mobile)
   document.querySelectorAll(`[data-view="${id}"]`).forEach(btn=>btn.classList.add('active'));
+  if (id==='overview'      && loaded) renderOverview();
   if (id==='gest'          && loaded) renderGest();
   if (id==='aluno'         && loaded) renderAlunoView();
   if (id==='renovacao'     && loaded) renderRenovacao();
