@@ -637,13 +637,32 @@ function isNovo(aluno) {
   return (Date.now() - d.getTime()) < 60*24*60*60*1000;
 }
 
-// Detect accelerated drop — cumulative score fell ≥12pp AND recent score still < 70
+// Detect accelerated drop — cumulative score fell ≥10pp AND student is genuinely at-risk (<70).
+// IMPORTANT: we compute the student's own data horizon (dataWeeks) to avoid dilution.
+// detectMaxWeek() is global; if a student has 3 weeks of data but detectMaxWeek()=5,
+// calcCompositeScore would count weeks 4–5 as absences, artificially lowering the score.
 function isQuedaAcelerada(aluno, upToWeek) {
   if (upToWeek < 2) return false;
-  const older  = calcCompositeScore(aluno, upToWeek - 1);
-  const recent = calcCompositeScore(aluno, upToWeek);
-  const drop   = older - recent;
-  return drop >= 12 && recent < 70;
+
+  // Determine how many weeks this student actually has data for
+  const coreTabs = aluno.turma === 'Winners'
+    ? ['Winners Encontro', 'Master', 'Mentoria', 'Hotseat', 'Hotseat Simultâneo']
+    : aluno.turma === 'Master'
+    ? ['Master', 'Mentoria', 'Hotseat', 'Hotseat Simultâneo']
+    : ['Mentoria', 'Hotseat', 'Hotseat Simultâneo'];
+  let dataWeeks = 1;
+  for (const tab of coreTabs) {
+    const e = getKvEntry(tab, norm(aluno.name));
+    if (e && e.history && e.history.length > dataWeeks) dataWeeks = e.history.length;
+  }
+
+  const eff = Math.min(upToWeek, dataWeeks); // use student's own horizon
+  if (eff < 2) return false;
+
+  const older  = calcCompositeScore(aluno, eff - 1);
+  const recent = calcCompositeScore(aluno, eff);
+  if (recent >= 70) return false; // student is healthy — no alert needed
+  return (older - recent) >= 10;
 }
 
 // ── DETECÇÃO DE QUEDA — Fase 4 ────────────────────────────
