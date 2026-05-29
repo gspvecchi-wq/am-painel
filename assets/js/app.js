@@ -637,12 +637,13 @@ function isNovo(aluno) {
   return (Date.now() - d.getTime()) < 60*24*60*60*1000;
 }
 
-// Detect accelerated drop — composite score fell >30pp in last 2 weeks
+// Detect accelerated drop — cumulative score fell ≥12pp AND recent score still < 70
 function isQuedaAcelerada(aluno, upToWeek) {
-  if (upToWeek < 3) return false;
-  const recent = calcCompositeScoreWeek(aluno, upToWeek-1);
-  const older  = calcCompositeScoreWeek(aluno, upToWeek-2);
-  return (older - recent) >= 30;
+  if (upToWeek < 2) return false;
+  const older  = calcCompositeScore(aluno, upToWeek - 1);
+  const recent = calcCompositeScore(aluno, upToWeek);
+  const drop   = older - recent;
+  return drop >= 12 && recent < 70;
 }
 
 // ── DETECÇÃO DE QUEDA — Fase 4 ────────────────────────────
