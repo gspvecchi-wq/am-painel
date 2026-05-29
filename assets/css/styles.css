@@ -4553,7 +4553,44 @@ body.light-theme .mobile-nav-overlay.open {
 body.light-theme .mobile-hamburger span { background: var(--text-2); }
 
 /* ═══════════════════════════════════════════
-   ALUNO TABS (Perfis / Renovação)
+   RENOVAÇÃO — Summary Cards
+═══════════════════════════════════════════ */
+.ren-summary-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+@media (max-width: 600px) { .ren-summary-cards { grid-template-columns: 1fr; } }
+.ren-summary-card {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 24px;
+  border-top-width: 2px;
+}
+.ren-summary-warn   { border-top-color: var(--warn); }
+.ren-summary-danger { border-top-color: var(--danger); }
+.ren-summary-num {
+  font-family: 'Syne', sans-serif;
+  font-size: 2.4rem;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.ren-summary-warn   .ren-summary-num { color: var(--warn); }
+.ren-summary-danger .ren-summary-num { color: var(--danger); }
+.ren-summary-lbl {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ═══════════════════════════════════════════
+   ALUNO TABS (não mais usadas — mantido por compatibilidade)
 ═══════════════════════════════════════════ */
 .aluno-tabs {
   display: flex;

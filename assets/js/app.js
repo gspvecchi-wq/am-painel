@@ -2058,17 +2058,6 @@ function renderEvolutionChart(elId, weeks, color, totalAlunos) {
 // ═══════════════════════════════════════════
 // ALUNO VIEW
 // ═══════════════════════════════════════════
-let _alunoTab = 'perfis'; // 'perfis' | 'renovacao'
-
-function switchAlunoTab(tab) {
-  _alunoTab = tab;
-  document.getElementById('alunoTabPerfis').classList.toggle('active',    tab==='perfis');
-  document.getElementById('alunoTabRenovacao').classList.toggle('active', tab==='renovacao');
-  document.getElementById('alunoSectionPerfis').style.display    = tab==='perfis'    ? '' : 'none';
-  document.getElementById('alunoSectionRenovacao').style.display = tab==='renovacao' ? '' : 'none';
-  if (tab==='renovacao') renderRenovacao();
-}
-
 function renderAlunoView() {
   if (!loaded||!allAlunos.length) {
     document.getElementById('alunoContent').style.display='none';
@@ -2077,8 +2066,7 @@ function renderAlunoView() {
   }
   document.getElementById('alunoContent').style.display='block';
   document.getElementById('alunoEmpty').style.display='none';
-  if (_alunoTab==='renovacao') renderRenovacao();
-  else renderProfiles();
+  renderProfiles();
 }
 
 // ── Renovação ────────────────────────────────────────────────
@@ -2111,6 +2099,8 @@ function renderRenovacao() {
 
   document.getElementById('renFuturoCount').textContent  = futuro.length;
   document.getElementById('renPassadoCount').textContent = passado.length;
+  document.getElementById('renCardFuturoNum').textContent  = futuro.length;
+  document.getElementById('renCardPassadoNum').textContent = passado.length;
 
   renderRenList('renFuturoList',  'renFuturoPag',  futuro,  _renFuturoPage,  'futuro',  rolling);
   renderRenList('renPassadoList', 'renPassadoPag', passado, _renPassadoPage, 'passado', rolling);
@@ -2659,6 +2649,7 @@ function switchView(id,el) {
   document.querySelectorAll(`[data-view="${id}"]`).forEach(btn=>btn.classList.add('active'));
   if (id==='gest'          && loaded) renderGest();
   if (id==='aluno'         && loaded) renderAlunoView();
+  if (id==='renovacao'     && loaded) renderRenovacao();
   if (id==='chamada'       && loaded) initChamada();
   if (id==='acionamentos')           initAcionamentos();
 }

@@ -104,6 +104,11 @@
       <span class="mobile-nav-label">Jornada do Cliente</span>
       <span class="mobile-nav-chevron"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></span>
     </button>
+    <button class="mobile-nav-item" data-view="renovacao" onclick="switchView('renovacao',this);closeMobileNav()">
+      <span class="mobile-nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>
+      <span class="mobile-nav-label">Renovação</span>
+      <span class="mobile-nav-chevron"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </button>
     <button class="mobile-nav-item" data-view="chamada" onclick="switchView('chamada',this);closeMobileNav()">
       <span class="mobile-nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
       <span class="mobile-nav-label">Inteligência de Presença</span>
@@ -136,6 +141,10 @@
     <button class="sidebar-item" data-view="aluno" onclick="switchView('aluno',this)">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
       Jornada do Cliente
+    </button>
+    <button class="sidebar-item" data-view="renovacao" onclick="switchView('renovacao',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Renovação
     </button>
     <button class="sidebar-item" data-view="chamada" onclick="switchView('chamada',this)">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
@@ -600,56 +609,64 @@
         <h1 class="view-page-title">Jornada <span class="view-page-title-accent">do Cliente</span></h1>
       </div>
     </div>
-
-    <!-- Tabs internas -->
-    <div class="aluno-tabs">
-      <button class="aluno-tab active" id="alunoTabPerfis"   onclick="switchAlunoTab('perfis')">Perfis</button>
-      <button class="aluno-tab"        id="alunoTabRenovacao" onclick="switchAlunoTab('renovacao')">🔄 Renovação</button>
+    <div class="profile-search">
+      <svg class="profile-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="searchInput" placeholder="Buscar médico pelo nome..." oninput="renderProfiles()"/>
     </div>
-
-    <!-- Perfis -->
-    <div id="alunoSectionPerfis">
-      <div class="profile-search">
-        <svg class="profile-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="searchInput" placeholder="Buscar médico pelo nome..." oninput="renderProfiles()"/>
-      </div>
-      <div class="profile-results" id="profileGrid"></div>
-    </div>
-
-    <!-- Renovação -->
-    <div id="alunoSectionRenovacao" style="display:none">
-      <!-- D+90: vence nos próximos 90 dias -->
-      <div class="ren-section">
-        <div class="ren-section-header">
-          <div class="ren-section-title">
-            <span class="ren-dot ren-dot-warn"></span>
-            Vencem nos próximos 90 dias
-            <span class="ren-badge" id="renFuturoCount">—</span>
-          </div>
-        </div>
-        <div id="renFuturoList" class="ren-list"></div>
-        <div class="ren-pagination" id="renFuturoPag"></div>
-      </div>
-
-      <!-- D-365: venceram nos últimos 365 dias -->
-      <div class="ren-section" style="margin-top:28px">
-        <div class="ren-section-header">
-          <div class="ren-section-title">
-            <span class="ren-dot ren-dot-danger"></span>
-            Vencidos nos últimos 365 dias
-            <span class="ren-badge" id="renPassadoCount">—</span>
-          </div>
-        </div>
-        <div id="renPassadoList" class="ren-list"></div>
-        <div class="ren-pagination" id="renPassadoPag"></div>
-      </div>
-    </div>
+    <div class="profile-results" id="profileGrid"></div>
   </div>
-
   <div id="alunoEmpty" class="center-msg">
     <div class="cs-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg></div>
     <h3 class="cs-empty-title">Nenhum dado carregado</h3>
     <p class="cs-empty-desc">Aguardando carregamento da base de alunos.</p>
+  </div>
+</div>
+
+<!-- RENOVAÇÃO VIEW -->
+<div class="view" id="view-renovacao">
+  <div class="view-page-header">
+    <div class="view-page-title-group">
+      <div class="view-page-eyebrow">Gestão de Contratos</div>
+      <h1 class="view-page-title">Renovação <span class="view-page-title-accent">de Ciclos</span></h1>
+    </div>
+  </div>
+
+  <!-- Cards de resumo -->
+  <div class="ren-summary-cards">
+    <div class="ren-summary-card ren-summary-warn">
+      <div class="ren-summary-num" id="renCardFuturoNum">—</div>
+      <div class="ren-summary-lbl">Vencem em até 90 dias</div>
+    </div>
+    <div class="ren-summary-card ren-summary-danger">
+      <div class="ren-summary-num" id="renCardPassadoNum">—</div>
+      <div class="ren-summary-lbl">Vencidos nos últimos 365 dias</div>
+    </div>
+  </div>
+
+  <!-- Lista D+90 -->
+  <div class="ren-section">
+    <div class="ren-section-header">
+      <div class="ren-section-title">
+        <span class="ren-dot ren-dot-warn"></span>
+        Vencem nos próximos 90 dias
+        <span class="ren-badge" id="renFuturoCount">—</span>
+      </div>
+    </div>
+    <div id="renFuturoList" class="ren-list"></div>
+    <div class="ren-pagination" id="renFuturoPag"></div>
+  </div>
+
+  <!-- Lista D-365 -->
+  <div class="ren-section" style="margin-top:24px">
+    <div class="ren-section-header">
+      <div class="ren-section-title">
+        <span class="ren-dot ren-dot-danger"></span>
+        Vencidos nos últimos 365 dias
+        <span class="ren-badge" id="renPassadoCount">—</span>
+      </div>
+    </div>
+    <div id="renPassadoList" class="ren-list"></div>
+    <div class="ren-pagination" id="renPassadoPag"></div>
   </div>
 </div>
 
