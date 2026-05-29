@@ -2058,6 +2058,17 @@ function renderEvolutionChart(elId, weeks, color, totalAlunos) {
 // ═══════════════════════════════════════════
 // ALUNO VIEW
 // ═══════════════════════════════════════════
+let _alunoTab = 'perfis'; // 'perfis' | 'renovacao'
+
+function switchAlunoTab(tab) {
+  _alunoTab = tab;
+  document.getElementById('alunoTabPerfis').classList.toggle('active',    tab==='perfis');
+  document.getElementById('alunoTabRenovacao').classList.toggle('active', tab==='renovacao');
+  document.getElementById('alunoSectionPerfis').style.display    = tab==='perfis'    ? '' : 'none';
+  document.getElementById('alunoSectionRenovacao').style.display = tab==='renovacao' ? '' : 'none';
+  if (tab==='renovacao') renderRenovacao();
+}
+
 function renderAlunoView() {
   if (!loaded||!allAlunos.length) {
     document.getElementById('alunoContent').style.display='none';
@@ -2066,7 +2077,102 @@ function renderAlunoView() {
   }
   document.getElementById('alunoContent').style.display='block';
   document.getElementById('alunoEmpty').style.display='none';
-  renderProfiles();
+  if (_alunoTab==='renovacao') renderRenovacao();
+  else renderProfiles();
+}
+
+// ── Renovação ────────────────────────────────────────────────
+const REN_PAGE_SIZE = 10;
+let _renFuturoPage  = 0;
+let _renPassadoPage = 0;
+
+function renderRenovacao() {
+  const today = Date.now();
+  const D90   =  90 * 24 * 60 * 60 * 1000;
+  const D365  = 365 * 24 * 60 * 60 * 1000;
+  const rolling = getRollingWindow(5);
+
+  // Filtra e classifica
+  const futuro  = []; // vence em até 90 dias (daysLeft 0..90)
+  const passado = []; // venceu nos últimos 365 dias (daysLeft -365..−1)
+
+  for (const a of allAlunos) {
+    if (!a.cycleEnd) continue;
+    const end      = new Date(a.cycleEnd + 'T12:00:00').getTime();
+    const diffMs   = end - today;
+    const daysLeft = Math.round(diffMs / (24 * 60 * 60 * 1000));
+    if (daysLeft >= 0 && daysLeft <= 90)   futuro.push({ ...a, daysLeft });
+    else if (daysLeft < 0 && daysLeft >= -365) passado.push({ ...a, daysLeft });
+  }
+
+  // Ordena: futuros = mais próximo primeiro; passados = mais recente primeiro
+  futuro.sort((a,b)  => a.daysLeft - b.daysLeft);
+  passado.sort((a,b) => b.daysLeft - a.daysLeft);
+
+  document.getElementById('renFuturoCount').textContent  = futuro.length;
+  document.getElementById('renPassadoCount').textContent = passado.length;
+
+  renderRenList('renFuturoList',  'renFuturoPag',  futuro,  _renFuturoPage,  'futuro',  rolling);
+  renderRenList('renPassadoList', 'renPassadoPag', passado, _renPassadoPage, 'passado', rolling);
+}
+
+function renderRenList(listId, pagId, items, page, tipo, rolling) {
+  const total  = items.length;
+  const pages  = Math.ceil(total / REN_PAGE_SIZE);
+  const start  = page * REN_PAGE_SIZE;
+  const slice  = items.slice(start, start + REN_PAGE_SIZE);
+
+  const listEl = document.getElementById(listId);
+  const pagEl  = document.getElementById(pagId);
+
+  if (!total) {
+    listEl.innerHTML = `<div style="padding:20px;color:var(--text-3);font-size:13px;font-family:'DM Sans',sans-serif">Nenhum aluno nessa janela.</div>`;
+    pagEl.innerHTML  = '';
+    return;
+  }
+
+  listEl.innerHTML = slice.map(a => {
+    const eng   = calcCompositeScoreRolling(a, rolling);
+    const eClr  = eng < 40 ? 'var(--danger)' : eng < 70 ? 'var(--warn)' : 'var(--safe)';
+    const dl    = a.daysLeft;
+    let dLabel, dCls;
+    if (dl >= 0) {
+      dLabel = dl === 0 ? 'Vence hoje' : `${dl}d restantes`;
+      dCls   = dl <= 15 ? 'ren-days-crit' : dl <= 45 ? 'ren-days-warn' : 'ren-days-ok';
+    } else {
+      const ago = Math.abs(dl);
+      dLabel = ago === 1 ? 'Venceu ontem' : `${ago}d atrás`;
+      dCls   = 'ren-days-past';
+    }
+    const dateStr = fmtCycleDate(a.cycleEnd);
+    const dn      = displayName(a.name);
+    return `<div class="ren-row" onclick="openDrModal('${esc(a.name)}',false)">
+      <div class="ren-row-name">${tit(a.gender)}. ${esc(dn)}</div>
+      <div class="ren-row-turma">${a.turma}</div>
+      <div class="ren-row-date">${dateStr}</div>
+      <div class="ren-row-days ${dCls}">${dLabel}</div>
+      <div class="ren-row-eng" style="color:${eClr}">${eng}%</div>
+    </div>`;
+  }).join('');
+
+  // Paginação
+  if (pages <= 1) { pagEl.innerHTML = ''; return; }
+  let pHtml = `<span class="ren-page-info">${start+1}–${Math.min(start+REN_PAGE_SIZE, total)} de ${total}</span>`;
+  if (page > 0)
+    pHtml += `<button class="ren-page-btn" onclick="renGoPage('${tipo}',${page-1})">‹ Anterior</button>`;
+  // Números de página (até 5 botões)
+  const from = Math.max(0, page-2), to = Math.min(pages-1, from+4);
+  for (let p = from; p <= to; p++)
+    pHtml += `<button class="ren-page-btn${p===page?' active':''}" onclick="renGoPage('${tipo}',${p})">${p+1}</button>`;
+  if (page < pages-1)
+    pHtml += `<button class="ren-page-btn" onclick="renGoPage('${tipo}',${page+1})">Próximo ›</button>`;
+  pagEl.innerHTML = pHtml;
+}
+
+function renGoPage(tipo, page) {
+  if (tipo === 'futuro')  { _renFuturoPage  = page; }
+  else                    { _renPassadoPage = page; }
+  renderRenovacao();
 }
 function renderProfiles() {
   const q=(document.getElementById('searchInput').value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
