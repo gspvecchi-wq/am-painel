@@ -2641,6 +2641,9 @@ function getContratosData(normName) {
 // Rascunhos de edição em andamento: { normName: { idx: {turma,data,valor} } }
 const _contratosRascunho = {};
 
+// Converte normName em string segura para usar em IDs HTML (sem espaços)
+function safeId(normName) { return normName.replace(/\s+/g, '_'); }
+
 function renderContratosSection(name) {
   const section = document.getElementById('mContratosSection');
   if (!section) return;
@@ -2657,22 +2660,23 @@ function renderContratosSection(name) {
 
     if (editando) {
       // ── Modo edição ─────────────────────────
+      const sid = safeId(normName);
       return `<div style="background:var(--s3);border:1px solid var(--border-acc);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
         <div style="font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">${label} — editando</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
           <div>
             <div style="font-size:10px;color:var(--text-3);margin-bottom:3px;">Turma</div>
-            <select id="ctr-turma-${normName}-${i}" class="contratos-input" style="width:110px">
+            <select id="ctr-turma-${sid}-${i}" class="contratos-input" style="width:110px">
               ${turmasOpcoes.map(t => `<option value="${t}" ${draft.turma===t?'selected':''}>${t}</option>`).join('')}
             </select>
           </div>
           <div>
             <div style="font-size:10px;color:var(--text-3);margin-bottom:3px;">Data de assinatura</div>
-            <input id="ctr-data-${normName}-${i}" type="date" class="contratos-input" value="${draft.data||''}"/>
+            <input id="ctr-data-${sid}-${i}" type="date" class="contratos-input" value="${draft.data||''}"/>
           </div>
           <div>
             <div style="font-size:10px;color:var(--text-3);margin-bottom:3px;">Valor (R$)</div>
-            <input id="ctr-valor-${normName}-${i}" type="text" class="contratos-input" placeholder="ex: 15000" value="${draft.valor||''}" style="width:100px"/>
+            <input id="ctr-valor-${sid}-${i}" type="text" class="contratos-input" placeholder="ex: 15000" value="${draft.valor||''}" style="width:100px"/>
           </div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -2737,9 +2741,10 @@ function cancelarEdicaoContrato(normName, idx) {
 }
 
 function salvarContrato(normName, idx) {
-  const turma = document.getElementById(`ctr-turma-${normName}-${idx}`)?.value || '';
-  const data  = document.getElementById(`ctr-data-${normName}-${idx}`)?.value  || '';
-  const valor = document.getElementById(`ctr-valor-${normName}-${idx}`)?.value || '';
+  const sid = safeId(normName);
+  const turma = document.getElementById(`ctr-turma-${sid}-${idx}`)?.value || '';
+  const data  = document.getElementById(`ctr-data-${sid}-${idx}`)?.value  || '';
+  const valor = document.getElementById(`ctr-valor-${sid}-${idx}`)?.value || '';
 
   _ensureContratos(normName);
   kvPresenca['__contratos__'][normName].contratos[idx] = { turma, data, valor };
