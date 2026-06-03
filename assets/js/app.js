@@ -2593,7 +2593,12 @@ function getContratosData(normName) {
 }
 
 // Duração em anos por turma do contrato
-const DURACAO_CONTRATO = { Master: 1, Mentoria: 1, Winners: 4 };
+// Duração padrão em meses por turma (usado só como sugestão inicial)
+const DURACAO_PADRAO_MESES = { Master: 12, Mentoria: 12, Winners: 48 };
+
+function duracaoPadrao(turma) {
+  return DURACAO_PADRAO_MESES[turma] || 12;
+}
 
 function calcCycleEndFromContratos(contratos) {
   if (!contratos.length) return null;
@@ -2601,17 +2606,20 @@ function calcCycleEndFromContratos(contratos) {
   if (!last.data) return null;
   const d = new Date(last.data + 'T12:00:00');
   if (isNaN(d)) return null;
-  const anos = DURACAO_CONTRATO[last.turma] || 1;
-  d.setFullYear(d.getFullYear() + anos);
+  const meses = parseInt(last.duracao) || duracaoPadrao(last.turma);
+  d.setMonth(d.getMonth() + meses);
   return d.toISOString().slice(0, 10);
 }
 
 // Migra formato antigo (array de strings) para novo (array de objetos)
 function migrateContratos(raw) {
   if (!raw || !raw.length) return [];
-  return raw.map(item =>
-    typeof item === 'string' ? { data: item, turma: 'Master', valor: '' } : item
-  );
+  return raw.map(item => {
+    if (typeof item === 'string') return { data: item, turma: 'Master', valor: '', duracao: '12' };
+    // Garante campo duracao em contratos antigos sem ele
+    if (!item.duracao) item.duracao = String(duracaoPadrao(item.turma));
+    return item;
+  });
 }
 
 // Soma total investido em todos os contratos
@@ -2661,12 +2669,14 @@ function renderContratosSection(name) {
     if (editando) {
       // ── Modo edição ─────────────────────────
       const sid = safeId(normName);
+      const durPad = duracaoPadrao(draft.turma);
       return `<div style="background:var(--s3);border:1px solid var(--border-acc);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
         <div style="font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">${label} — editando</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
           <div>
             <div style="font-size:10px;color:var(--text-3);margin-bottom:3px;">Turma</div>
-            <select id="ctr-turma-${sid}-${i}" class="contratos-input" style="width:110px">
+            <select id="ctr-turma-${sid}-${i}" class="contratos-input" style="width:100px"
+              onchange="atualizarDuracaoPadrao('${sid}',${i},this.value)">
               ${turmasOpcoes.map(t => `<option value="${t}" ${draft.turma===t?'selected':''}>${t}</option>`).join('')}
             </select>
           </div>
@@ -2675,8 +2685,13 @@ function renderContratosSection(name) {
             <input id="ctr-data-${sid}-${i}" type="date" class="contratos-input" value="${draft.data||''}"/>
           </div>
           <div>
+            <div style="font-size:10px;color:var(--text-3);margin-bottom:3px;">Duração (meses)</div>
+            <input id="ctr-dur-${sid}-${i}" type="number" min="1" max="60" class="contratos-input"
+              value="${draft.duracao || durPad}" style="width:80px"/>
+          </div>
+          <div>
             <div style="font-size:10px;color:var(--text-3);margin-bottom:3px;">Valor (R$)</div>
-            <input id="ctr-valor-${sid}-${i}" type="text" class="contratos-input" placeholder="ex: 15000" value="${draft.valor||''}" style="width:100px"/>
+            <input id="ctr-valor-${sid}-${i}" type="text" class="contratos-input" placeholder="ex: 15000" value="${draft.valor||''}" style="width:90px"/>
           </div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -2688,6 +2703,8 @@ function renderContratosSection(name) {
     } else {
       // ── Modo leitura ─────────────────────────
       const vFmt = c.valor ? fmtInvestido(parseFloat(String(c.valor).replace(/[^0-9.,]/g,'').replace(',','.'))) : '—';
+      const dur = parseInt(c.duracao) || duracaoPadrao(c.turma);
+      const durStr = dur === 1 ? '1 mês' : `${dur} meses`;
       const editBtn = canEdit
         ? `<button class="contratos-btn-edit" onclick="iniciarEdicaoContrato('${normName}',${i})">Editar</button>`
         : '';
@@ -2695,6 +2712,7 @@ function renderContratosSection(name) {
         <span class="contratos-label" style="min-width:80px">${label}</span>
         <span style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--blue)">${c.turma||'—'}</span>
         <span class="contratos-date">${c.data ? fmtCycleDate(c.data) : '—'}</span>
+        <span style="font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-3);">${durStr}</span>
         <span style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--purple)">${vFmt}</span>
         <span style="margin-left:auto">${editBtn}</span>
       </div>`;
@@ -2703,7 +2721,8 @@ function renderContratosSection(name) {
 
   const cycleEnd = calcCycleEndFromContratos(contratos);
   const last = contratos[contratos.length - 1];
-  const durLabel = last ? `${DURACAO_CONTRATO[last.turma]||1} ano${(DURACAO_CONTRATO[last.turma]||1)>1?'s':''}` : '';
+  const durMeses = last ? (parseInt(last.duracao) || duracaoPadrao(last.turma)) : 12;
+  const durLabel = durMeses === 1 ? '1 mês' : `${durMeses} meses`;
   const endHtml = cycleEnd
     ? `<div style="margin-top:10px;font-size:11px;color:var(--text-2);font-family:'DM Sans',sans-serif;">
         Término estimado (${durLabel}): <strong style="color:var(--acc)">${fmtCycleDate(cycleEnd)}</strong>
@@ -2740,14 +2759,21 @@ function cancelarEdicaoContrato(normName, idx) {
   if (aluno) renderContratosSection(aluno.name);
 }
 
+// Quando turma muda no select, atualiza o campo duração com o padrão da nova turma
+function atualizarDuracaoPadrao(sid, idx, turma) {
+  const durEl = document.getElementById(`ctr-dur-${sid}-${idx}`);
+  if (durEl) durEl.value = duracaoPadrao(turma);
+}
+
 function salvarContrato(normName, idx) {
   const sid = safeId(normName);
-  const turma = document.getElementById(`ctr-turma-${sid}-${idx}`)?.value || '';
-  const data  = document.getElementById(`ctr-data-${sid}-${idx}`)?.value  || '';
-  const valor = document.getElementById(`ctr-valor-${sid}-${idx}`)?.value || '';
+  const turma   = document.getElementById(`ctr-turma-${sid}-${idx}`)?.value || '';
+  const data    = document.getElementById(`ctr-data-${sid}-${idx}`)?.value  || '';
+  const duracao = document.getElementById(`ctr-dur-${sid}-${idx}`)?.value   || String(duracaoPadrao(turma));
+  const valor   = document.getElementById(`ctr-valor-${sid}-${idx}`)?.value || '';
 
   _ensureContratos(normName);
-  kvPresenca['__contratos__'][normName].contratos[idx] = { turma, data, valor };
+  kvPresenca['__contratos__'][normName].contratos[idx] = { turma, data, duracao, valor };
   if (_contratosRascunho[normName]) delete _contratosRascunho[normName][idx];
 
   const aluno = allAlunos.find(a => norm(a.name) === normName);
@@ -2789,11 +2815,13 @@ function _ensureContratos(normName) {
 
 function addContrato(normName, turma) {
   _ensureContratos(normName);
+  const t = turma || 'Master';
   const idx = kvPresenca['__contratos__'][normName].contratos.length;
-  kvPresenca['__contratos__'][normName].contratos.push({ data: '', turma: turma || 'Master', valor: '' });
+  const novoContrato = { data: '', turma: t, duracao: String(duracaoPadrao(t)), valor: '' };
+  kvPresenca['__contratos__'][normName].contratos.push(novoContrato);
   // Abre já em modo edição e salva o slot vazio no KV imediatamente
   if (!_contratosRascunho[normName]) _contratosRascunho[normName] = {};
-  _contratosRascunho[normName][idx] = { data: '', turma: turma || 'Master', valor: '' };
+  _contratosRascunho[normName][idx] = { ...novoContrato };
   const aluno = allAlunos.find(a => norm(a.name) === normName);
   if (aluno) renderContratosSection(aluno.name);
   saveContratos(normName);
