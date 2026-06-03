@@ -698,16 +698,20 @@ function calcClassificacao(aluno) {
   const contratos = getContratosData(norm(aluno.name));
   const renovacoes = Math.max(0, contratos.length - 1);
 
+  const totalInv = calcTotalInvestido(norm(aluno.name)) || 0;
+  const altoLTV  = totalInv >= 30000; // LTV alto: >= R$30k investidos
+
   const fatIni = aluno.fatInicial ? parseFloat(String(aluno.fatInicial).replace(/[^0-9.,]/g,'').replace(',','.')) : null;
   const fatAtu = aluno.fatAtual   ? parseFloat(String(aluno.fatAtual).replace(/[^0-9.,]/g,'').replace(',','.'))   : null;
   const fatCresceu = (fatIni && fatAtu && fatIni > 0) ? fatAtu > fatIni : false;
 
-  // A: ao menos 1 renovação E (engajamento ≥ 70 OU fat. cresceu)
-  if (renovacoes >= 1 && (eng >= 70 || fatCresceu)) return 'A';
+  // A: ao menos 1 renovação E (engajamento ≥ 70 OU fat. cresceu OU LTV alto)
+  if (renovacoes >= 1 && (eng >= 70 || fatCresceu || altoLTV)) return 'A';
 
-  // B: tem renovação mas eng. caiu, OU fat. cresceu sem renovação com eng. razoável
+  // B: tem renovação mas eng. caiu, OU fat. cresceu sem renovação com eng. razoável, OU LTV alto sem renovação ainda
   if (renovacoes >= 1) return 'B';
   if (fatCresceu && eng >= 50) return 'B';
+  if (altoLTV && eng >= 50) return 'B';
 
   // C: sem renovação, sem crescimento de fat. ou eng. baixo
   return 'C';
@@ -2264,7 +2268,10 @@ function renderProfiles() {
       </div>
       <div class="pc-sub">${a.turma}${espLabel(a)?' · '+espLabel(a):''}</div>
       <div class="pc-bar"><div class="pc-bar-fill" style="width:${eng}%;background:${color}"></div></div>
-      <div class="pc-pct" style="color:${color}">${eng}% engajamento</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="pc-pct" style="color:${color}">${eng}% engajamento</div>
+        ${(()=>{ const inv=calcTotalInvestido(norm(a.name)); return inv ? `<span style="font-family:'DM Sans',sans-serif;font-size:10px;color:var(--purple);font-weight:600;">${fmtInvestido(inv)}</span>` : ''; })()}
+      </div>
     </div>`;
   }).join('');
 }
@@ -2497,6 +2504,7 @@ function openDrModal(name, showMsgs=true) {
     ${fatIni ? `<div class="mstat"><div class="mstat-v" style="color:var(--sub);font-size:13px">${fmtR(fatIni)}</div><div class="mstat-l">Fat. inicial</div></div>` : ''}
     ${fatAtu ? `<div class="mstat"><div class="mstat-v" style="color:var(--sub);font-size:13px">${fmtR(fatAtu)}</div><div class="mstat-l">Fat. atual</div></div>` : ''}
     ${fatDelta !== null ? `<div class="mstat"><div class="mstat-v" style="color:${fatColor};font-size:13px">${fatDelta >= 0 ? '+' : ''}${fatDelta}%${fatDeltaR ? ' · ' + (fatDeltaR >= 0 ? '+' : '') + fmtR(fatDeltaR) : ''}</div><div class="mstat-l">Crescimento</div></div>` : ''}
+    ${(()=>{ const inv=calcTotalInvestido(norm(aluno.name)); return inv ? `<div class="mstat"><div class="mstat-v" style="color:var(--purple);font-size:13px">${fmtInvestido(inv)}</div><div class="mstat-l">Total investido</div></div>` : ''; })()}
     ${(()=>{ const g=kvGrupoScores[norm(aluno.name)]; if(!g||!g.msgs) return '<div class="mstat"><div class="mstat-v" style="color:var(--sub);font-size:13px">—</div><div class="mstat-l">Grupo</div></div>'; const icons=[g.resultado?'🏆'+g.resultado:'',g.ajuda?'🤝'+g.ajuda:'',g.duvida?'❓'+g.duvida:''].filter(Boolean).join(' '); return '<div class="mstat"><div class="mstat-v" style="color:var(--acc);font-size:13px">+'+g.total+'pts</div><div class="mstat-l">Grupo '+(icons||'💬'+g.msgs)+'</div></div>'; })()}`;
 
   // Seção IA — visível sempre que autenticado
@@ -2602,8 +2610,26 @@ function calcCycleEndFromContratos(contratos) {
 function migrateContratos(raw) {
   if (!raw || !raw.length) return [];
   return raw.map(item =>
-    typeof item === 'string' ? { data: item, turma: 'Master' } : item
+    typeof item === 'string' ? { data: item, turma: 'Master', valor: '' } : item
   );
+}
+
+// Soma total investido em todos os contratos
+function calcTotalInvestido(normName) {
+  const contratos = getContratosData(normName);
+  let total = 0;
+  for (const c of contratos) {
+    const v = parseFloat(String(c.valor||'').replace(/[^0-9.,]/g,'').replace(',','.'));
+    if (!isNaN(v) && v > 0) total += v;
+  }
+  return total > 0 ? total : null;
+}
+
+function fmtInvestido(v) {
+  if (!v) return null;
+  if (v >= 1000000) return 'R$ ' + (v/1000000).toFixed(1).replace('.0','') + 'M';
+  if (v >= 1000)    return 'R$ ' + (v/1000).toFixed(0) + 'k';
+  return 'R$ ' + v.toLocaleString('pt-BR');
 }
 
 function getContratosData(normName) {
@@ -2626,16 +2652,21 @@ function renderContratosSection(name) {
     const label = i === 0 ? '1º Contrato' : `${i + 1}º Contrato`;
     const isLast = i === contratos.length - 1;
     const turmaSelect = canEdit
-      ? `<select class="contratos-input" style="width:100px" onchange="updateContratoTurma('${normName}',${i},this.value)">
+      ? `<select class="contratos-input" style="width:90px" onchange="updateContratoTurma('${normName}',${i},this.value)">
           ${turmasOpcoes.map(t => `<option value="${t}" ${c.turma===t?'selected':''}>${t}</option>`).join('')}
         </select>`
       : `<span class="contratos-date">${c.turma||''}</span>`;
-    return `<div class="contratos-row" style="grid-template-columns:auto 1fr auto auto;">
+    const valorInput = canEdit
+      ? `<input type="text" class="contratos-input" placeholder="R$ valor" value="${c.valor||''}" style="width:90px"
+           onchange="updateContratoValor('${normName}',${i},this.value)"/>`
+      : (c.valor ? `<span class="contratos-date">${fmtInvestido(parseFloat(String(c.valor).replace(/[^0-9.,]/g,'').replace(',','.')))}</span>` : '');
+    return `<div class="contratos-row" style="grid-template-columns:auto auto auto 1fr auto;">
       <span class="contratos-label" style="white-space:nowrap">${label}</span>
       ${turmaSelect}
       ${canEdit
         ? `<input type="date" class="contratos-input" value="${c.data||''}" onchange="updateContratoData('${normName}',${i},this.value)"/>`
         : `<span class="contratos-date">${fmtCycleDate(c.data||'')}</span>`}
+      ${valorInput}
       ${canEdit && isLast && i > 0
         ? `<button class="contratos-btn-rm" onclick="removeContrato('${normName}')">✕</button>`
         : '<span></span>'}
@@ -2650,6 +2681,12 @@ function renderContratosSection(name) {
         Término estimado (${durLabel}): <strong style="color:var(--acc)">${fmtCycleDate(cycleEnd)}</strong>
        </div>`
     : '';
+  const totalInv = calcTotalInvestido(norm(name));
+  const totalInvHtml = totalInv
+    ? `<div style="margin-top:8px;font-size:12px;color:var(--text-2);font-family:'DM Sans',sans-serif;">
+        Total investido: <strong style="color:var(--purple)">${fmtInvestido(totalInv)}</strong>
+       </div>`
+    : '';
 
   // Sugestão de turma para próximo contrato
   const proximaTurma = aluno?.turma || 'Master';
@@ -2661,6 +2698,7 @@ function renderContratosSection(name) {
     <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);margin-bottom:10px;font-weight:700;">Contratos</div>
     ${rows || '<div style="font-size:12px;color:var(--text-3);font-family:\'DM Sans\',sans-serif;">Nenhum contrato registrado.</div>'}
     ${endHtml}
+    ${totalInvHtml}
     ${addBtn}`;
 }
 
@@ -2698,6 +2736,14 @@ function updateContratoTurma(normName, idx, val) {
   kvPresenca['__contratos__'][normName].contratos[idx].turma = val;
   const aluno = allAlunos.find(a => norm(a.name) === normName);
   if (aluno) renderContratosSection(aluno.name);
+  saveContratos(normName);
+}
+
+function updateContratoValor(normName, idx, val) {
+  _ensureContratos(normName);
+  kvPresenca['__contratos__'][normName].contratos[idx].valor = val;
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  if (aluno) { renderContratosSection(aluno.name); renderProfiles(); }
   saveContratos(normName);
 }
 
