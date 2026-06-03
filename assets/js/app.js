@@ -334,6 +334,7 @@ async function reloadAll() {
     csLoad();
     const av = document.querySelector('.view.active').id;
     if (av==='view-gest')    renderGest();
+    if (av==='view-receita') renderReceita();
     if (av==='view-aluno')   renderAlunoView();
     if (av==='view-renovacao') renderRenovacao();
     if (av==='view-chamada') initChamada();
