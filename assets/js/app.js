@@ -2638,6 +2638,9 @@ function getContratosData(normName) {
   return migrateContratos(raw);
 }
 
+// Rascunhos de edição em andamento: { normName: { idx: {turma,data,valor} } }
+const _contratosRascunho = {};
+
 function renderContratosSection(name) {
   const section = document.getElementById('mContratosSection');
   if (!section) return;
@@ -2645,32 +2648,53 @@ function renderContratosSection(name) {
   const normName = norm(name);
   const contratos = getContratosData(normName);
   const canEdit = csAuthenticated;
-
   const turmasOpcoes = ['Master', 'Mentoria', 'Winners'];
 
   let rows = contratos.map((c, i) => {
     const label = i === 0 ? '1º Contrato' : `${i + 1}º Contrato`;
-    const isLast = i === contratos.length - 1;
-    const turmaSelect = canEdit
-      ? `<select class="contratos-input" style="width:90px" onchange="updateContratoTurma('${normName}',${i},this.value)">
-          ${turmasOpcoes.map(t => `<option value="${t}" ${c.turma===t?'selected':''}>${t}</option>`).join('')}
-        </select>`
-      : `<span class="contratos-date">${c.turma||''}</span>`;
-    const valorInput = canEdit
-      ? `<input type="text" class="contratos-input" placeholder="R$ valor" value="${c.valor||''}" style="width:90px"
-           onchange="updateContratoValor('${normName}',${i},this.value)"/>`
-      : (c.valor ? `<span class="contratos-date">${fmtInvestido(parseFloat(String(c.valor).replace(/[^0-9.,]/g,'').replace(',','.')))}</span>` : '');
-    return `<div class="contratos-row" style="grid-template-columns:auto auto auto 1fr auto;">
-      <span class="contratos-label" style="white-space:nowrap">${label}</span>
-      ${turmaSelect}
-      ${canEdit
-        ? `<input type="date" class="contratos-input" value="${c.data||''}" onchange="updateContratoData('${normName}',${i},this.value)"/>`
-        : `<span class="contratos-date">${fmtCycleDate(c.data||'')}</span>`}
-      ${valorInput}
-      ${canEdit && isLast && i > 0
-        ? `<button class="contratos-btn-rm" onclick="removeContrato('${normName}')">✕</button>`
-        : '<span></span>'}
-    </div>`;
+    const editando = canEdit && _contratosRascunho[normName]?.[i] !== undefined;
+    const draft = editando ? _contratosRascunho[normName][i] : c;
+
+    if (editando) {
+      // ── Modo edição ─────────────────────────
+      return `<div style="background:var(--s3);border:1px solid var(--border-acc);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">${label} — editando</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+          <div>
+            <div style="font-size:10px;color:var(--text-3);margin-bottom:3px;">Turma</div>
+            <select id="ctr-turma-${normName}-${i}" class="contratos-input" style="width:110px">
+              ${turmasOpcoes.map(t => `<option value="${t}" ${draft.turma===t?'selected':''}>${t}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text-3);margin-bottom:3px;">Data de assinatura</div>
+            <input id="ctr-data-${normName}-${i}" type="date" class="contratos-input" value="${draft.data||''}"/>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text-3);margin-bottom:3px;">Valor (R$)</div>
+            <input id="ctr-valor-${normName}-${i}" type="text" class="contratos-input" placeholder="ex: 15000" value="${draft.valor||''}" style="width:100px"/>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="contratos-btn-save" onclick="salvarContrato('${normName}',${i})">✓ Salvar</button>
+          <button class="contratos-btn-cancel" onclick="cancelarEdicaoContrato('${normName}',${i})">Cancelar</button>
+          <button class="contratos-btn-rm" style="margin-left:auto" onclick="apagarContrato('${normName}',${i})">🗑 Apagar</button>
+        </div>
+      </div>`;
+    } else {
+      // ── Modo leitura ─────────────────────────
+      const vFmt = c.valor ? fmtInvestido(parseFloat(String(c.valor).replace(/[^0-9.,]/g,'').replace(',','.'))) : '—';
+      const editBtn = canEdit
+        ? `<button class="contratos-btn-edit" onclick="iniciarEdicaoContrato('${normName}',${i})">Editar</button>`
+        : '';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+        <span class="contratos-label" style="min-width:80px">${label}</span>
+        <span style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--blue)">${c.turma||'—'}</span>
+        <span class="contratos-date">${c.data ? fmtCycleDate(c.data) : '—'}</span>
+        <span style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--purple)">${vFmt}</span>
+        <span style="margin-left:auto">${editBtn}</span>
+      </div>`;
+    }
   }).join('');
 
   const cycleEnd = calcCycleEndFromContratos(contratos);
@@ -2679,16 +2703,13 @@ function renderContratosSection(name) {
   const endHtml = cycleEnd
     ? `<div style="margin-top:10px;font-size:11px;color:var(--text-2);font-family:'DM Sans',sans-serif;">
         Término estimado (${durLabel}): <strong style="color:var(--acc)">${fmtCycleDate(cycleEnd)}</strong>
-       </div>`
-    : '';
-  const totalInv = calcTotalInvestido(norm(name));
+       </div>` : '';
+  const totalInv = calcTotalInvestido(normName);
   const totalInvHtml = totalInv
-    ? `<div style="margin-top:8px;font-size:12px;color:var(--text-2);font-family:'DM Sans',sans-serif;">
+    ? `<div style="margin-top:6px;font-size:12px;color:var(--text-2);font-family:'DM Sans',sans-serif;">
         Total investido: <strong style="color:var(--purple)">${fmtInvestido(totalInv)}</strong>
-       </div>`
-    : '';
+       </div>` : '';
 
-  // Sugestão de turma para próximo contrato
   const proximaTurma = aluno?.turma || 'Master';
   const addBtn = canEdit
     ? `<button class="contratos-btn-add" onclick="addContrato('${normName}','${proximaTurma}')">+ Adicionar contrato</button>`
@@ -2697,9 +2718,46 @@ function renderContratosSection(name) {
   section.innerHTML = `
     <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);margin-bottom:10px;font-weight:700;">Contratos</div>
     ${rows || '<div style="font-size:12px;color:var(--text-3);font-family:\'DM Sans\',sans-serif;">Nenhum contrato registrado.</div>'}
-    ${endHtml}
-    ${totalInvHtml}
+    ${endHtml}${totalInvHtml}
     ${addBtn}`;
+}
+
+function iniciarEdicaoContrato(normName, idx) {
+  const contratos = getContratosData(normName);
+  if (!_contratosRascunho[normName]) _contratosRascunho[normName] = {};
+  _contratosRascunho[normName][idx] = { ...contratos[idx] };
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  if (aluno) renderContratosSection(aluno.name);
+}
+
+function cancelarEdicaoContrato(normName, idx) {
+  if (_contratosRascunho[normName]) delete _contratosRascunho[normName][idx];
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  if (aluno) renderContratosSection(aluno.name);
+}
+
+function salvarContrato(normName, idx) {
+  const turma = document.getElementById(`ctr-turma-${normName}-${idx}`)?.value || '';
+  const data  = document.getElementById(`ctr-data-${normName}-${idx}`)?.value  || '';
+  const valor = document.getElementById(`ctr-valor-${normName}-${idx}`)?.value || '';
+
+  _ensureContratos(normName);
+  kvPresenca['__contratos__'][normName].contratos[idx] = { turma, data, valor };
+  if (_contratosRascunho[normName]) delete _contratosRascunho[normName][idx];
+
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  if (aluno) { renderContratosSection(aluno.name); renderProfiles(); }
+  saveContratos(normName);
+}
+
+function apagarContrato(normName, idx) {
+  if (!confirm('Apagar este contrato? Esta ação não pode ser desfeita.')) return;
+  _ensureContratos(normName);
+  kvPresenca['__contratos__'][normName].contratos.splice(idx, 1);
+  if (_contratosRascunho[normName]) delete _contratosRascunho[normName][idx];
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  if (aluno) { renderContratosSection(aluno.name); renderProfiles(); }
+  saveContratos(normName);
 }
 
 async function saveContratos(normName) {
@@ -2723,29 +2781,6 @@ function _ensureContratos(normName) {
     migrateContratos(kvPresenca['__contratos__'][normName].contratos);
 }
 
-function updateContratoData(normName, idx, val) {
-  _ensureContratos(normName);
-  kvPresenca['__contratos__'][normName].contratos[idx].data = val;
-  const aluno = allAlunos.find(a => norm(a.name) === normName);
-  if (aluno) renderContratosSection(aluno.name);
-  saveContratos(normName);
-}
-
-function updateContratoTurma(normName, idx, val) {
-  _ensureContratos(normName);
-  kvPresenca['__contratos__'][normName].contratos[idx].turma = val;
-  const aluno = allAlunos.find(a => norm(a.name) === normName);
-  if (aluno) renderContratosSection(aluno.name);
-  saveContratos(normName);
-}
-
-function updateContratoValor(normName, idx, val) {
-  _ensureContratos(normName);
-  kvPresenca['__contratos__'][normName].contratos[idx].valor = val;
-  const aluno = allAlunos.find(a => norm(a.name) === normName);
-  if (aluno) { renderContratosSection(aluno.name); renderProfiles(); }
-  saveContratos(normName);
-}
 
 function addContrato(normName, turma) {
   _ensureContratos(normName);
