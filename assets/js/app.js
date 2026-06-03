@@ -2697,7 +2697,6 @@ function renderContratosSection(name) {
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <button class="contratos-btn-save" onclick="salvarContrato('${normName}',${i})">✓ Salvar</button>
           <button class="contratos-btn-cancel" onclick="cancelarEdicaoContrato('${normName}',${i})">Cancelar</button>
-          <span id="ctr-fb-${sid}-${i}" style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;"></span>
           <button class="contratos-btn-rm" style="margin-left:auto" onclick="apagarContrato('${normName}',${i})">🗑 Apagar</button>
         </div>
       </div>`;
@@ -2776,23 +2775,24 @@ function salvarContrato(normName, idx) {
   _ensureContratos(normName);
   kvPresenca['__contratos__'][normName].contratos[idx] = { turma, data, duracao, valor };
 
-  // Mostra ⏳ enquanto salva (ainda em modo edição)
-  const fbEl = document.getElementById(`ctr-fb-${sid}-${idx}`);
-  if (fbEl) { fbEl.textContent = '⏳ Salvando...'; fbEl.style.color = 'var(--text-3)'; }
-
+  // Sai do modo edição imediatamente
+  if (_contratosRascunho[normName]) delete _contratosRascunho[normName][idx];
   const aluno = allAlunos.find(a => norm(a.name) === normName);
+  const alunoName = aluno ? aluno.name : allAlunos.find(a => norm(a.name).startsWith(normName.slice(0,8)))?.name;
+  if (alunoName) renderContratosSection(alunoName);
+  renderProfiles();
 
+  // Salva no servidor em background e mostra toast
   saveContratos(normName).then(ok => {
-    if (ok) {
-      // Sai do modo edição só após confirmação do servidor
-      if (_contratosRascunho[normName]) delete _contratosRascunho[normName][idx];
-      if (aluno) { renderContratosSection(aluno.name); renderProfiles(); }
-    } else {
-      // Mantém em edição e mostra erro
-      const el = document.getElementById(`ctr-fb-${sid}-${idx}`);
-      if (el) { el.textContent = '✗ Erro ao salvar'; el.style.color = 'var(--danger)'; }
-    }
-  });
+    const toast = document.getElementById('contratosToast');
+    if (!toast) return;
+    toast.textContent = ok ? '✓ Contrato salvo' : '✗ Erro ao salvar — tente novamente';
+    toast.style.background = ok ? 'var(--safe-dim)' : 'var(--danger-dim)';
+    toast.style.color = ok ? 'var(--safe)' : 'var(--danger)';
+    toast.style.border = ok ? '1px solid var(--safe)' : '1px solid var(--danger)';
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 3000);
+  }).catch(() => {});
 }
 
 function apagarContrato(normName, idx) {
