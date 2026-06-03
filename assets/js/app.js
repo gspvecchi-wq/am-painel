@@ -2214,36 +2214,29 @@ function renderClasseSummary() {
   for (const a of allAlunos) counts[calcClassificacao(a)]++;
   const total = allAlunos.length;
 
-  const todos = `<button onclick="toggleClasseFiltro(null)" style="
-      display:flex;align-items:center;gap:10px;
-      background:${classeFiltro === null ? 'var(--s3)' : 'var(--s2)'};
-      border:1px solid ${classeFiltro === null ? 'var(--border2)' : 'var(--border)'};
-      border-radius:12px;padding:10px 16px;cursor:pointer;transition:all .18s;flex:1;min-width:110px;">
-    <span style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:var(--text)">${total}</span>
-    <div style="text-align:left">
-      <div style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;color:var(--text);letter-spacing:.04em;">Todos</div>
-      <div style="font-family:'DM Sans',sans-serif;font-size:10px;color:var(--text-3);">Ver base completa</div>
-    </div>
-  </button>`;
+  const clsColor = { A: 'cs-stat-grn', B: 'cs-stat-blu', C: '' };
+
+  const todos = `
+    <div class="cs-stat-card${classeFiltro === null ? '' : ''}" onclick="toggleClasseFiltro(null)"
+         style="cursor:pointer;flex:1;min-width:110px;border-color:${classeFiltro === null ? 'var(--border2)' : 'var(--border)'};">
+      <div class="cs-stat-num" style="color:var(--text)">${total}</div>
+      <div class="cs-stat-lbl">Todos</div>
+      <div style="font-size:10px;color:var(--text-3);margin-top:2px;">Ver base completa</div>
+    </div>`;
 
   const items = ['A','B','C'].map(cls => {
     const m = CLASS_META[cls];
     const ativo = classeFiltro === cls;
-    return `<button onclick="toggleClasseFiltro('${cls}')" style="
-        display:flex;align-items:center;gap:10px;
-        background:${ativo ? m.bg : 'var(--s2)'};
-        border:1px solid ${ativo ? m.cor : 'var(--border)'};
-        border-radius:12px;padding:10px 16px;cursor:pointer;
-        transition:all .18s;flex:1;min-width:110px;">
-      <span style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:${m.cor}">${counts[cls]}</span>
-      <div style="text-align:left">
-        <div style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;color:${m.cor};letter-spacing:.04em;">Classe ${cls}</div>
-        <div style="font-family:'DM Sans',sans-serif;font-size:10px;color:var(--text-3);">${m.desc}</div>
-      </div>
-    </button>`;
+    return `
+      <div class="cs-stat-card ${clsColor[cls]||''}" onclick="toggleClasseFiltro('${cls}')"
+           style="cursor:pointer;flex:1;min-width:110px;border-color:${ativo ? m.cor+'88' : 'var(--border)'};background:${ativo ? m.bg : ''}">
+        <div class="cs-stat-num" style="color:${m.cor}">${counts[cls]}</div>
+        <div class="cs-stat-lbl" style="color:${m.cor}">Classe ${cls}</div>
+        <div style="font-size:10px;color:var(--text-3);margin-top:2px;">${m.desc}</div>
+      </div>`;
   }).join('');
 
-  summary.innerHTML = todos + items;
+  summary.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap;width:100%;">${todos}${items}</div>`;
 }
 
 function toggleClasseFiltro(cls) {
