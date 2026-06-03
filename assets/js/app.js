@@ -141,6 +141,7 @@ let csFilter       = 'todos';
 let currentTab     = 'Mentoria';
 let currentWeek    = 1;
 let loaded         = false;
+let classeFiltro   = null; // null | 'A' | 'B' | 'C'
 let _csDoctors     = [];
 let gestTurmaFilter = 'todos'; // 'todos' | 'Master' | 'Mentoria'
 
@@ -2206,9 +2207,56 @@ function renGoPage(tipo, page) {
   else                    { _renPassadoPage = page; }
   renderRenovacao();
 }
+function renderClasseSummary() {
+  const summary = document.getElementById('classeSummary');
+  if (!summary) return;
+  const counts = { A: 0, B: 0, C: 0 };
+  for (const a of allAlunos) counts[calcClassificacao(a)]++;
+  const total = allAlunos.length;
+
+  const todos = `<button onclick="toggleClasseFiltro(null)" style="
+      display:flex;align-items:center;gap:10px;
+      background:${classeFiltro === null ? 'var(--s3)' : 'var(--s2)'};
+      border:1px solid ${classeFiltro === null ? 'var(--border2)' : 'var(--border)'};
+      border-radius:12px;padding:10px 16px;cursor:pointer;transition:all .18s;flex:1;min-width:110px;">
+    <span style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:var(--text)">${total}</span>
+    <div style="text-align:left">
+      <div style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;color:var(--text);letter-spacing:.04em;">Todos</div>
+      <div style="font-family:'DM Sans',sans-serif;font-size:10px;color:var(--text-3);">Ver base completa</div>
+    </div>
+  </button>`;
+
+  const items = ['A','B','C'].map(cls => {
+    const m = CLASS_META[cls];
+    const ativo = classeFiltro === cls;
+    return `<button onclick="toggleClasseFiltro('${cls}')" style="
+        display:flex;align-items:center;gap:10px;
+        background:${ativo ? m.bg : 'var(--s2)'};
+        border:1px solid ${ativo ? m.cor : 'var(--border)'};
+        border-radius:12px;padding:10px 16px;cursor:pointer;
+        transition:all .18s;flex:1;min-width:110px;">
+      <span style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:${m.cor}">${counts[cls]}</span>
+      <div style="text-align:left">
+        <div style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;color:${m.cor};letter-spacing:.04em;">Classe ${cls}</div>
+        <div style="font-family:'DM Sans',sans-serif;font-size:10px;color:var(--text-3);">${m.desc}</div>
+      </div>
+    </button>`;
+  }).join('');
+
+  summary.innerHTML = todos + items;
+}
+
+function toggleClasseFiltro(cls) {
+  classeFiltro = cls;
+  renderClasseSummary();
+  renderProfiles();
+}
+
 function renderProfiles() {
+  renderClasseSummary();
   const q=(document.getElementById('searchInput').value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  const list=allAlunos.filter(a=>!q||norm(a.name).includes(q));
+  let list=allAlunos.filter(a=>!q||norm(a.name).includes(q));
+  if (classeFiltro) list = list.filter(a => calcClassificacao(a) === classeFiltro);
   const grid=document.getElementById('profileGrid');
   if (!list.length) { grid.innerHTML=`<div style="color:var(--sub);font-size:12px">Nenhum resultado.</div>`; return; }
   const _rollingSlots = getRollingWindow(5);
@@ -2543,42 +2591,77 @@ function getContratosData(normName) {
   return (kv[normName] && kv[normName].contratos) ? kv[normName].contratos : [];
 }
 
+// Duração em anos por turma do contrato
+const DURACAO_CONTRATO = { Master: 1, Mentoria: 1, Winners: 4 };
+
 function calcCycleEndFromContratos(contratos) {
   if (!contratos.length) return null;
   const last = contratos[contratos.length - 1];
-  const d = new Date(last + 'T12:00:00');
+  if (!last.data) return null;
+  const d = new Date(last.data + 'T12:00:00');
   if (isNaN(d)) return null;
-  d.setFullYear(d.getFullYear() + 1);
+  const anos = DURACAO_CONTRATO[last.turma] || 1;
+  d.setFullYear(d.getFullYear() + anos);
   return d.toISOString().slice(0, 10);
+}
+
+// Migra formato antigo (array de strings) para novo (array de objetos)
+function migrateContratos(raw) {
+  if (!raw || !raw.length) return [];
+  return raw.map(item =>
+    typeof item === 'string' ? { data: item, turma: 'Master' } : item
+  );
+}
+
+function getContratosData(normName) {
+  const kv = kvPresenca['__contratos__'] || {};
+  const raw = (kv[normName] && kv[normName].contratos) ? kv[normName].contratos : [];
+  return migrateContratos(raw);
 }
 
 function renderContratosSection(name) {
   const section = document.getElementById('mContratosSection');
   if (!section) return;
+  const aluno = allAlunos.find(a => a.name === name);
   const normName = norm(name);
   const contratos = getContratosData(normName);
   const canEdit = csAuthenticated;
 
-  let rows = contratos.map((dt, i) => {
-    const label = i === 0 ? '1º Contrato' : `${i + 1}º Contrato (renovação)`;
-    return `<div class="contratos-row">
-      <span class="contratos-label">${label}</span>
+  const turmasOpcoes = ['Master', 'Mentoria', 'Winners'];
+
+  let rows = contratos.map((c, i) => {
+    const label = i === 0 ? '1º Contrato' : `${i + 1}º Contrato`;
+    const isLast = i === contratos.length - 1;
+    const turmaSelect = canEdit
+      ? `<select class="contratos-input" style="width:100px" onchange="updateContratoTurma('${normName}',${i},this.value)">
+          ${turmasOpcoes.map(t => `<option value="${t}" ${c.turma===t?'selected':''}>${t}</option>`).join('')}
+        </select>`
+      : `<span class="contratos-date">${c.turma||''}</span>`;
+    return `<div class="contratos-row" style="grid-template-columns:auto 1fr auto auto;">
+      <span class="contratos-label" style="white-space:nowrap">${label}</span>
+      ${turmaSelect}
       ${canEdit
-        ? `<input type="date" class="contratos-input" value="${dt}" onchange="updateContrato('${normName}',${i},this.value)"/>`
-        : `<span class="contratos-date">${fmtCycleDate(dt)}</span>`}
-      ${canEdit && i === contratos.length - 1 && i > 0
+        ? `<input type="date" class="contratos-input" value="${c.data||''}" onchange="updateContratoData('${normName}',${i},this.value)"/>`
+        : `<span class="contratos-date">${fmtCycleDate(c.data||'')}</span>`}
+      ${canEdit && isLast && i > 0
         ? `<button class="contratos-btn-rm" onclick="removeContrato('${normName}')">✕</button>`
         : '<span></span>'}
     </div>`;
   }).join('');
 
   const cycleEnd = calcCycleEndFromContratos(contratos);
+  const last = contratos[contratos.length - 1];
+  const durLabel = last ? `${DURACAO_CONTRATO[last.turma]||1} ano${(DURACAO_CONTRATO[last.turma]||1)>1?'s':''}` : '';
   const endHtml = cycleEnd
-    ? `<div style="margin-top:10px;font-size:11px;color:var(--text-2);font-family:'DM Sans',sans-serif;">Término estimado: <strong style="color:var(--acc)">${fmtCycleDate(cycleEnd)}</strong></div>`
+    ? `<div style="margin-top:10px;font-size:11px;color:var(--text-2);font-family:'DM Sans',sans-serif;">
+        Término estimado (${durLabel}): <strong style="color:var(--acc)">${fmtCycleDate(cycleEnd)}</strong>
+       </div>`
     : '';
 
+  // Sugestão de turma para próximo contrato
+  const proximaTurma = aluno?.turma || 'Master';
   const addBtn = canEdit
-    ? `<button class="contratos-btn-add" onclick="addContrato('${normName}')">+ Adicionar contrato</button>`
+    ? `<button class="contratos-btn-add" onclick="addContrato('${normName}','${proximaTurma}')">+ Adicionar contrato</button>`
     : '';
 
   section.innerHTML = `
@@ -2601,25 +2684,40 @@ async function saveContratos(normName) {
   } catch(e) { console.error('Erro ao salvar contratos:', e); }
 }
 
-function updateContrato(normName, idx, val) {
+function _ensureContratos(normName) {
   if (!kvPresenca['__contratos__']) kvPresenca['__contratos__'] = {};
   if (!kvPresenca['__contratos__'][normName]) kvPresenca['__contratos__'][normName] = { contratos: [] };
-  kvPresenca['__contratos__'][normName].contratos[idx] = val;
+  // Migra formato antigo se necessário
+  kvPresenca['__contratos__'][normName].contratos =
+    migrateContratos(kvPresenca['__contratos__'][normName].contratos);
+}
+
+function updateContratoData(normName, idx, val) {
+  _ensureContratos(normName);
+  kvPresenca['__contratos__'][normName].contratos[idx].data = val;
   const aluno = allAlunos.find(a => norm(a.name) === normName);
   if (aluno) renderContratosSection(aluno.name);
   saveContratos(normName);
 }
 
-function addContrato(normName) {
-  if (!kvPresenca['__contratos__']) kvPresenca['__contratos__'] = {};
-  if (!kvPresenca['__contratos__'][normName]) kvPresenca['__contratos__'][normName] = { contratos: [] };
-  kvPresenca['__contratos__'][normName].contratos.push('');
+function updateContratoTurma(normName, idx, val) {
+  _ensureContratos(normName);
+  kvPresenca['__contratos__'][normName].contratos[idx].turma = val;
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  if (aluno) renderContratosSection(aluno.name);
+  saveContratos(normName);
+}
+
+function addContrato(normName, turma) {
+  _ensureContratos(normName);
+  kvPresenca['__contratos__'][normName].contratos.push({ data: '', turma: turma || 'Master' });
   const aluno = allAlunos.find(a => norm(a.name) === normName);
   if (aluno) renderContratosSection(aluno.name);
 }
 
 function removeContrato(normName) {
-  const arr = (kvPresenca['__contratos__'] || {})[normName]?.contratos;
+  _ensureContratos(normName);
+  const arr = kvPresenca['__contratos__'][normName].contratos;
   if (!arr || arr.length <= 1) return;
   arr.pop();
   const aluno = allAlunos.find(a => norm(a.name) === normName);
