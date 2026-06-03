@@ -2694,9 +2694,10 @@ function renderContratosSection(name) {
             <input id="ctr-valor-${sid}-${i}" type="text" class="contratos-input" placeholder="ex: 15000" value="${draft.valor||''}" style="width:90px"/>
           </div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <button class="contratos-btn-save" onclick="salvarContrato('${normName}',${i})">✓ Salvar</button>
           <button class="contratos-btn-cancel" onclick="cancelarEdicaoContrato('${normName}',${i})">Cancelar</button>
+          <span id="ctr-fb-${sid}-${i}" style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;"></span>
           <button class="contratos-btn-rm" style="margin-left:auto" onclick="apagarContrato('${normName}',${i})">🗑 Apagar</button>
         </div>
       </div>`;
@@ -2774,11 +2775,24 @@ function salvarContrato(normName, idx) {
 
   _ensureContratos(normName);
   kvPresenca['__contratos__'][normName].contratos[idx] = { turma, data, duracao, valor };
-  if (_contratosRascunho[normName]) delete _contratosRascunho[normName][idx];
+
+  // Mostra ⏳ enquanto salva (ainda em modo edição)
+  const fbEl = document.getElementById(`ctr-fb-${sid}-${idx}`);
+  if (fbEl) { fbEl.textContent = '⏳ Salvando...'; fbEl.style.color = 'var(--text-3)'; }
 
   const aluno = allAlunos.find(a => norm(a.name) === normName);
-  if (aluno) { renderContratosSection(aluno.name); renderProfiles(); }
-  saveContratos(normName);
+
+  saveContratos(normName).then(ok => {
+    if (ok) {
+      // Sai do modo edição só após confirmação do servidor
+      if (_contratosRascunho[normName]) delete _contratosRascunho[normName][idx];
+      if (aluno) { renderContratosSection(aluno.name); renderProfiles(); }
+    } else {
+      // Mantém em edição e mostra erro
+      const el = document.getElementById(`ctr-fb-${sid}-${idx}`);
+      if (el) { el.textContent = '✗ Erro ao salvar'; el.style.color = 'var(--danger)'; }
+    }
+  });
 }
 
 function apagarContrato(normName, idx) {
@@ -2793,15 +2807,20 @@ function apagarContrato(normName, idx) {
 
 async function saveContratos(normName) {
   const pwd = localStorage.getItem('am_cs_pwd');
-  if (!pwd) return;
+  if (!pwd) return false;
   const contratos = getContratosData(normName);
   try {
-    await fetch(`${WORKER_BASE}/presenca`, {
+    const res = await fetch(`${WORKER_BASE}/presenca`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd, 'X-CS-Nome': localStorage.getItem('am_cs_nome') || csNomeAtual || 'CS', 'X-CS-Email': localStorage.getItem('am_cs_email') || '' },
       body: JSON.stringify({ tab: '__contratos__', semana: 1, registros: { [normName]: { contratos } } })
     });
-  } catch(e) { console.error('Erro ao salvar contratos:', e); }
+    if (!res.ok) console.error('Erro ao salvar contratos:', await res.text());
+    return res.ok;
+  } catch(e) {
+    console.error('Erro ao salvar contratos:', e);
+    return false;
+  }
 }
 
 function _ensureContratos(normName) {
