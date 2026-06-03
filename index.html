@@ -825,12 +825,17 @@
 <div class="ov" id="drOv" onclick="ovClick(event,'drOv')">
   <div class="dr-modal">
     <button class="modal-x" onclick="closeOv('drOv')">✕</button>
-    <div class="modal-dr" id="mName"></div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div class="modal-dr" id="mName" style="flex:1;min-width:0;"></div>
+      <div id="mClassBadge"></div>
+    </div>
     <div class="modal-meta" id="mMeta"></div>
     <div class="hist-row" id="mHist"></div>
     <div class="mstats" id="mStats"></div>
     <div id="mSinalDeRisco" style="display:none;margin:16px 0 0;"></div>
     <div id="mScoreBreakdown" style="display:none;margin:16px 0 0;"></div>
+    <div id="mContratosSection" style="margin:16px 0 0;"></div>
+    <div id="mOnboardingSection" style="display:none;margin:16px 0 0;"></div>
     <div id="mCallsSection" style="display:none;margin:16px 0 0;">
       <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);margin-bottom:10px;font-weight:700;">Calls com Especialistas</div>
       <div id="mCallsContent"></div>

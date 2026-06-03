@@ -687,6 +687,46 @@ function isNovo(aluno) {
   return (Date.now() - d.getTime()) < 60*24*60*60*1000;
 }
 
+// ── CLASSIFICAÇÃO A / B / C ─────────────────────────────────
+// A = alto LTV, ao menos 1 renovação confirmada + bom engajamento ou fat. crescendo
+// B = renovou até 1x OU tem crescimento de fat., mas sem histórico sólido de renovação
+// C = novo, sem renovação, sem crescimento de fat. ou engajamento baixo
+function calcClassificacao(aluno) {
+  const eng = calcCompositeScore(aluno, detectMaxWeek());
+
+  const contratos = getContratosData(norm(aluno.name));
+  const renovacoes = Math.max(0, contratos.length - 1);
+
+  const fatIni = aluno.fatInicial ? parseFloat(String(aluno.fatInicial).replace(/[^0-9.,]/g,'').replace(',','.')) : null;
+  const fatAtu = aluno.fatAtual   ? parseFloat(String(aluno.fatAtual).replace(/[^0-9.,]/g,'').replace(',','.'))   : null;
+  const fatCresceu = (fatIni && fatAtu && fatIni > 0) ? fatAtu > fatIni : false;
+
+  // A: ao menos 1 renovação E (engajamento ≥ 70 OU fat. cresceu)
+  if (renovacoes >= 1 && (eng >= 70 || fatCresceu)) return 'A';
+
+  // B: tem renovação mas eng. caiu, OU fat. cresceu sem renovação com eng. razoável
+  if (renovacoes >= 1) return 'B';
+  if (fatCresceu && eng >= 50) return 'B';
+
+  // C: sem renovação, sem crescimento de fat. ou eng. baixo
+  return 'C';
+}
+
+const CLASS_META = {
+  A: { label: 'A', cor: 'var(--safe)',     bg: 'var(--safe-dim)',        desc: 'Alto LTV · Renovação confirmada' },
+  B: { label: 'B', cor: 'var(--blue)',     bg: 'var(--blue-dim)',        desc: 'Em desenvolvimento' },
+  C: { label: 'C', cor: 'var(--text-3)',   bg: 'rgba(90,90,114,.15)',    desc: 'Novo ou sem tração ainda' },
+};
+
+function classeBadgeHtml(aluno, small = false) {
+  const cls = calcClassificacao(aluno);
+  const m = CLASS_META[cls];
+  const sz = small
+    ? 'font-size:10px;padding:1px 7px;border-radius:5px;'
+    : 'font-size:11px;padding:2px 9px;border-radius:6px;';
+  return `<span style="${sz}background:${m.bg};color:${m.cor};font-family:'DM Sans',sans-serif;font-weight:700;letter-spacing:.04em;border:1px solid ${m.cor}33;" title="${m.desc}">${m.label}</span>`;
+}
+
 // Detect accelerated drop — cumulative score fell ≥12pp AND recent score still < 70
 function isQuedaAcelerada(aluno, upToWeek) {
   if (upToWeek < 2) return false;
@@ -1306,7 +1346,7 @@ function popularCicloSelector() {
   // Coleta todos os ciclos disponíveis no KV
   const ciclosSet = new Set();
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo)) ciclosSet.add(ciclo);
     }
@@ -1362,7 +1402,7 @@ function toggleModoComparacao() {
 function popularCicloSelectComparacao() {
   const ciclos = [];
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
     }
@@ -2177,7 +2217,10 @@ function renderProfiles() {
     const color=eng<40?'var(--danger)':eng<70?'var(--warn)':'var(--safe)';
     const dn=displayName(a.name);
     return `<div class="profile-card" onclick="openDrModal('${esc(a.name)}', false)">
-      <div class="pc-name">${tit(a.gender)}. ${esc(dn)}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+        <div class="pc-name" style="margin-bottom:0">${tit(a.gender)}. ${esc(dn)}</div>
+        ${classeBadgeHtml(a, true)}
+      </div>
       <div class="pc-sub">${a.turma}${espLabel(a)?' · '+espLabel(a):''}</div>
       <div class="pc-bar"><div class="pc-bar-fill" style="width:${eng}%;background:${color}"></div></div>
       <div class="pc-pct" style="color:${color}">${eng}% engajamento</div>
@@ -2458,6 +2501,24 @@ function openDrModal(name, showMsgs=true) {
   // ── Calls com Especialistas ──────────────
   renderCallsSection(name);
 
+  // ── Contratos ────────────────────────────
+  renderContratosSection(name);
+
+  // ── Onboarding (só para alunos novos) ───
+  const mOnb = document.getElementById('mOnboardingSection');
+  if (mOnb) {
+    if (isNovo(aluno)) {
+      mOnb.style.display = 'block';
+      renderOnboardingSection(name);
+    } else {
+      mOnb.style.display = 'none';
+    }
+  }
+
+  // ── Badge de classificação no nome ───────
+  const mClassBadge = document.getElementById('mClassBadge');
+  if (mClassBadge) mClassBadge.innerHTML = classeBadgeHtml(aluno);
+
   document.getElementById('drOv').classList.add('open');
 }
 
@@ -2471,6 +2532,180 @@ function getCallsData(normName) {
   // Lê do kvPresenca sob a chave especial 'calls'
   const callsKv = kvPresenca['__calls__'] || {};
   return callsKv[normName] || { leonardo: 0, bruno: 0 };
+}
+
+// ── CONTRATOS ────────────────────────────────────────────────
+// Armazenados no KV sob tab='__contratos__'
+// { normName: { contratos: ['YYYY-MM-DD', 'YYYY-MM-DD', ...] } }
+
+function getContratosData(normName) {
+  const kv = kvPresenca['__contratos__'] || {};
+  return (kv[normName] && kv[normName].contratos) ? kv[normName].contratos : [];
+}
+
+function calcCycleEndFromContratos(contratos) {
+  if (!contratos.length) return null;
+  const last = contratos[contratos.length - 1];
+  const d = new Date(last + 'T12:00:00');
+  if (isNaN(d)) return null;
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function renderContratosSection(name) {
+  const section = document.getElementById('mContratosSection');
+  if (!section) return;
+  const normName = norm(name);
+  const contratos = getContratosData(normName);
+  const canEdit = csAuthenticated;
+
+  let rows = contratos.map((dt, i) => {
+    const label = i === 0 ? '1º Contrato' : `${i + 1}º Contrato (renovação)`;
+    return `<div class="contratos-row">
+      <span class="contratos-label">${label}</span>
+      ${canEdit
+        ? `<input type="date" class="contratos-input" value="${dt}" onchange="updateContrato('${normName}',${i},this.value)"/>`
+        : `<span class="contratos-date">${fmtCycleDate(dt)}</span>`}
+      ${canEdit && i === contratos.length - 1 && i > 0
+        ? `<button class="contratos-btn-rm" onclick="removeContrato('${normName}')">✕</button>`
+        : '<span></span>'}
+    </div>`;
+  }).join('');
+
+  const cycleEnd = calcCycleEndFromContratos(contratos);
+  const endHtml = cycleEnd
+    ? `<div style="margin-top:10px;font-size:11px;color:var(--text-2);font-family:'DM Sans',sans-serif;">Término estimado: <strong style="color:var(--acc)">${fmtCycleDate(cycleEnd)}</strong></div>`
+    : '';
+
+  const addBtn = canEdit
+    ? `<button class="contratos-btn-add" onclick="addContrato('${normName}')">+ Adicionar contrato</button>`
+    : '';
+
+  section.innerHTML = `
+    <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);margin-bottom:10px;font-weight:700;">Contratos</div>
+    ${rows || '<div style="font-size:12px;color:var(--text-3);font-family:\'DM Sans\',sans-serif;">Nenhum contrato registrado.</div>'}
+    ${endHtml}
+    ${addBtn}`;
+}
+
+async function saveContratos(normName) {
+  const pwd = localStorage.getItem('am_cs_pwd');
+  if (!pwd) return;
+  const contratos = getContratosData(normName);
+  try {
+    await fetch(`${WORKER_BASE}/presenca`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd, 'X-CS-Nome': localStorage.getItem('am_cs_nome') || csNomeAtual || 'CS', 'X-CS-Email': localStorage.getItem('am_cs_email') || '' },
+      body: JSON.stringify({ tab: '__contratos__', semana: 1, registros: { [normName]: { contratos } } })
+    });
+  } catch(e) { console.error('Erro ao salvar contratos:', e); }
+}
+
+function updateContrato(normName, idx, val) {
+  if (!kvPresenca['__contratos__']) kvPresenca['__contratos__'] = {};
+  if (!kvPresenca['__contratos__'][normName]) kvPresenca['__contratos__'][normName] = { contratos: [] };
+  kvPresenca['__contratos__'][normName].contratos[idx] = val;
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  if (aluno) renderContratosSection(aluno.name);
+  saveContratos(normName);
+}
+
+function addContrato(normName) {
+  if (!kvPresenca['__contratos__']) kvPresenca['__contratos__'] = {};
+  if (!kvPresenca['__contratos__'][normName]) kvPresenca['__contratos__'][normName] = { contratos: [] };
+  kvPresenca['__contratos__'][normName].contratos.push('');
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  if (aluno) renderContratosSection(aluno.name);
+}
+
+function removeContrato(normName) {
+  const arr = (kvPresenca['__contratos__'] || {})[normName]?.contratos;
+  if (!arr || arr.length <= 1) return;
+  arr.pop();
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  if (aluno) renderContratosSection(aluno.name);
+  saveContratos(normName);
+}
+
+// ── ONBOARDING ───────────────────────────────────────────────
+// Armazenado no KV sob tab='__onboarding__'
+
+const ONBOARDING_STEPS = [
+  { key: 'aguardando_onboarding', label: 'Aguardando onboarding',         hasDate: false },
+  { key: 'onboarding_agendado',   label: 'Onboarding agendado',           hasDate: true  },
+  { key: 'onboarding_realizado',  label: 'Onboarding realizado',          hasDate: true  },
+  { key: 'aguardando_call',       label: 'Aguardando 1ª call individual', hasDate: false },
+  { key: 'call_agendada',         label: '1ª call individual agendada',   hasDate: true  },
+  { key: 'call_realizada',        label: '1ª call individual realizada',  hasDate: true  },
+];
+
+function getOnboardingData(normName) {
+  const kv = kvPresenca['__onboarding__'] || {};
+  return kv[normName] || {};
+}
+
+function renderOnboardingSection(name) {
+  const section = document.getElementById('mOnboardingSection');
+  if (!section) return;
+  const normName = norm(name);
+  const data = getOnboardingData(normName);
+  const canEdit = csAuthenticated;
+
+  const rows = ONBOARDING_STEPS.map(step => {
+    const val = data[step.key];
+    const checked = val && val !== false && val !== '';
+    const dateVal = (step.hasDate && checked && val !== true) ? val : '';
+
+    const checkbox = canEdit
+      ? `<input type="checkbox" style="accent-color:var(--acc);width:14px;height:14px;cursor:pointer;" ${checked ? 'checked' : ''}
+           onchange="toggleOnboarding('${normName}','${step.key}',this.checked,${step.hasDate})">`
+      : `<span style="display:inline-block;width:14px;height:14px;border-radius:3px;border:1px solid var(--border2);background:${checked ? 'var(--acc)' : 'transparent'};"></span>`;
+
+    const dateInput = (step.hasDate && canEdit)
+      ? `<input type="date" class="contratos-input" value="${dateVal}" style="margin-left:8px;"
+           onchange="setOnboardingDate('${normName}','${step.key}',this.value)">`
+      : (step.hasDate && dateVal ? `<span style="margin-left:8px;color:var(--text-2);font-size:11px;">${fmtCycleDate(dateVal)}</span>` : '');
+
+    const labelColor = checked ? 'var(--text)' : 'var(--text-3)';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
+      ${checkbox}
+      <span style="font-family:'DM Sans',sans-serif;font-size:12px;color:${labelColor};flex:1;">${step.label}</span>
+      ${dateInput}
+    </div>`;
+  }).join('');
+
+  section.innerHTML = `
+    <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);margin-bottom:10px;font-weight:700;">Onboarding</div>
+    ${rows}`;
+}
+
+async function saveOnboarding(normName) {
+  const pwd = localStorage.getItem('am_cs_pwd');
+  if (!pwd) return;
+  const data = getOnboardingData(normName);
+  try {
+    await fetch(`${WORKER_BASE}/presenca`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd, 'X-CS-Nome': localStorage.getItem('am_cs_nome') || csNomeAtual || 'CS', 'X-CS-Email': localStorage.getItem('am_cs_email') || '' },
+      body: JSON.stringify({ tab: '__onboarding__', semana: 1, registros: { [normName]: data } })
+    });
+  } catch(e) { console.error('Erro ao salvar onboarding:', e); }
+}
+
+function toggleOnboarding(normName, key, checked, hasDate) {
+  if (!kvPresenca['__onboarding__']) kvPresenca['__onboarding__'] = {};
+  if (!kvPresenca['__onboarding__'][normName]) kvPresenca['__onboarding__'][normName] = {};
+  kvPresenca['__onboarding__'][normName][key] = checked ? (hasDate ? '' : true) : false;
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  if (aluno) renderOnboardingSection(aluno.name);
+  saveOnboarding(normName);
+}
+
+function setOnboardingDate(normName, key, val) {
+  if (!kvPresenca['__onboarding__']) kvPresenca['__onboarding__'] = {};
+  if (!kvPresenca['__onboarding__'][normName]) kvPresenca['__onboarding__'][normName] = {};
+  kvPresenca['__onboarding__'][normName][key] = val;
+  saveOnboarding(normName);
 }
 
 function renderCallsSection(name) {
@@ -2662,7 +2897,7 @@ function popularCicloSelectorChamada() {
   if (!sel) return;
   const ciclos = [];
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
     }
@@ -2682,7 +2917,7 @@ function popularCicloSelectorCS() {
   if (!sel) return;
   const ciclos = [];
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
     }
