@@ -3114,10 +3114,148 @@ function switchView(id,el) {
   // Sync counterpart (desktop ↔ mobile)
   document.querySelectorAll(`[data-view="${id}"]`).forEach(btn=>btn.classList.add('active'));
   if (id==='gest'          && loaded) renderGest();
+  if (id==='receita'       && loaded) renderReceita();
   if (id==='aluno'         && loaded) renderAlunoView();
   if (id==='renovacao'     && loaded) renderRenovacao();
   if (id==='chamada'       && loaded) initChamada();
   if (id==='acionamentos')           initAcionamentos();
+}
+
+// ═══════════════════════════════════════════
+// SAÚDE DE RECEITA
+// ═══════════════════════════════════════════
+function calcReceitaMetrics() {
+  const hoje = Date.now();
+  const msAno = 365 * 24 * 60 * 60 * 1000;
+  const msMes = 30.44 * 24 * 60 * 60 * 1000;
+
+  let arrTotal = 0;
+  let ltvRealizado = 0;
+  let ltvProjetado = 0;
+  let totalComContrato = 0;
+  let totalRenovaram = 0;
+  let totalChurn = 0;
+  let fatIniSoma = 0, fatAtuSoma = 0, fatCount = 0;
+
+  const porTurma = { Master: { arr: 0, alunos: 0 }, Mentoria: { arr: 0, alunos: 0 }, Winners: { arr: 0, alunos: 0 } };
+
+  for (const aluno of allAlunos) {
+    const contratos = getContratosData(norm(aluno.name));
+    if (!contratos.length) continue;
+    totalComContrato++;
+
+    // LTV realizado — soma de todos os contratos
+    let ltvAluno = 0;
+    for (const c of contratos) {
+      const v = parseFloat(String(c.valor || '').replace(/[^0-9.,]/g, '').replace(',', '.'));
+      if (!isNaN(v) && v > 0) { ltvRealizado += v; ltvAluno += v; }
+    }
+
+    // Renovação
+    if (contratos.length >= 2) totalRenovaram++;
+
+    // ARR — contratos ativos (término no futuro ou sem término definido)
+    const ultimo = contratos[contratos.length - 1];
+    const cycleEnd = calcCycleEndFromContratos(contratos);
+    const ativo = !cycleEnd || new Date(cycleEnd + 'T12:00:00').getTime() > hoje;
+    if (ativo && ultimo.valor) {
+      const v = parseFloat(String(ultimo.valor).replace(/[^0-9.,]/g, '').replace(',', '.'));
+      if (!isNaN(v) && v > 0) {
+        const meses = parseInt(ultimo.duracao) || duracaoPadrao(ultimo.turma);
+        const arrContrib = (v / meses) * 12; // anualiza
+        arrTotal += arrContrib;
+        const turma = ultimo.turma || 'Master';
+        if (porTurma[turma]) { porTurma[turma].arr += arrContrib; porTurma[turma].alunos++; }
+      }
+    }
+
+    // Churn — contrato vencido há mais de 30 dias e sem renovação
+    if (cycleEnd) {
+      const endMs = new Date(cycleEnd + 'T12:00:00').getTime();
+      if (endMs < hoje - msMes && contratos.length === 1) totalChurn++;
+    }
+
+    // LTV projetado — realizado + próxima renovação estimada (mesmo valor do último)
+    if (ativo && ultimo.valor) {
+      const v = parseFloat(String(ultimo.valor).replace(/[^0-9.,]/g, '').replace(',', '.'));
+      if (!isNaN(v) && v > 0) ltvProjetado += ltvAluno + v;
+      else ltvProjetado += ltvAluno;
+    } else {
+      ltvProjetado += ltvAluno;
+    }
+
+    // Crescimento de faturamento
+    const fatIni = aluno.fatInicial ? parseFloat(String(aluno.fatInicial).replace(/[^0-9.,]/g, '').replace(',', '.')) : null;
+    const fatAtu = aluno.fatAtual   ? parseFloat(String(aluno.fatAtual).replace(/[^0-9.,]/g, '').replace(',', '.'))   : null;
+    if (fatIni && fatAtu && fatIni > 0) { fatIniSoma += fatIni; fatAtuSoma += fatAtu; fatCount++; }
+  }
+
+  const taxaRenovacao = totalComContrato > 0 ? Math.round(totalRenovaram / totalComContrato * 100) : 0;
+  const taxaChurn     = totalComContrato > 0 ? Math.round(totalChurn / totalComContrato * 100) : 0;
+  const roiMedio      = fatCount > 0 ? Math.round(((fatAtuSoma - fatIniSoma) / fatIniSoma) * 100) : null;
+  const ltvMedio      = totalComContrato > 0 ? ltvRealizado / totalComContrato : 0;
+  const mrr           = arrTotal / 12;
+
+  return { arrTotal, mrr, ltvRealizado, ltvProjetado, ltvMedio, taxaRenovacao, taxaChurn, roiMedio, totalComContrato, totalRenovaram, totalChurn, porTurma, fatCount };
+}
+
+function renderReceita() {
+  if (!loaded || !allAlunos.length) {
+    document.getElementById('receitaContent').style.display = 'none';
+    document.getElementById('receitaEmpty').style.display = 'block';
+    return;
+  }
+  document.getElementById('receitaContent').style.display = 'block';
+  document.getElementById('receitaEmpty').style.display = 'none';
+
+  const m = calcReceitaMetrics();
+  const fmt = fmtInvestido;
+  const pct = v => v !== null ? (v >= 0 ? '+' : '') + v + '%' : '—';
+  const roiColor = m.roiMedio === null ? 'var(--text-3)' : m.roiMedio >= 0 ? 'var(--safe)' : 'var(--danger)';
+
+  const aviso = m.totalComContrato === 0
+    ? `<div style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--warn);margin-bottom:16px;padding:10px 14px;background:var(--warn-dim);border-radius:8px;border:1px solid var(--warn)33;">
+        ⚠️ Nenhum contrato cadastrado ainda. Preencha os contratos na Jornada do Cliente para ver as métricas.
+       </div>` : '';
+
+  const cardsPrincipais = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:24px;">
+      ${kpiCard('ARR', fmt(m.arrTotal) || '—', 'Receita recorrente anual (contratos ativos)', '--acc')}
+      ${kpiCard('MRR', fmt(m.mrr) || '—', 'Receita recorrente mensal', '--blue')}
+      ${kpiCard('LTV Realizado', fmt(m.ltvRealizado) || '—', 'Total já investido por todos os alunos', '--purple')}
+      ${kpiCard('LTV Projetado', fmt(m.ltvProjetado) || '—', 'Realizado + próxima renovação estimada', '--purple', true)}
+      ${kpiCard('LTV Médio', fmt(m.ltvMedio) || '—', 'Investimento médio por aluno com contrato', '--text-2')}
+      ${kpiCard('ROI Médio', pct(m.roiMedio), 'Crescimento médio de faturamento da base', roiColor.replace('var(','').replace(')',''))}
+    </div>`;
+
+  const cardsRetencao = `
+    <div style="margin-bottom:8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);font-family:'DM Sans',sans-serif;font-weight:700;">Retenção</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px;">
+      ${kpiCard('Taxa de Renovação', m.taxaRenovacao + '%', `${m.totalRenovaram} de ${m.totalComContrato} alunos renovaram`, '--safe')}
+      ${kpiCard('Churn', m.taxaChurn + '%', `${m.totalChurn} contratos vencidos sem renovação`, m.taxaChurn > 20 ? '--danger' : m.taxaChurn > 10 ? '--warn' : '--text-2')}
+      ${kpiCard('Alunos c/ contrato', String(m.totalComContrato), `de ${allAlunos.length} alunos totais`, '--text-2')}
+    </div>`;
+
+  const turmas = ['Master', 'Mentoria', 'Winners'];
+  const cardsTurma = `
+    <div style="margin-bottom:8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);font-family:'DM Sans',sans-serif;font-weight:700;">ARR por Turma</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px;">
+      ${turmas.map(t => {
+        const cor = t === 'Master' ? '--acc' : t === 'Winners' ? '--purple' : '--blue';
+        return kpiCard(t, fmt(m.porTurma[t].arr) || '—', `${m.porTurma[t].alunos} aluno${m.porTurma[t].alunos !== 1 ? 's' : ''} ativo${m.porTurma[t].alunos !== 1 ? 's' : ''}`, cor);
+      }).join('')}
+    </div>`;
+
+  document.getElementById('receitaGrid').innerHTML = aviso + cardsPrincipais + cardsRetencao + cardsTurma;
+}
+
+function kpiCard(label, value, sub, corVar, dimmed = false) {
+  const cor = corVar.startsWith('--') ? `var(${corVar})` : corVar;
+  return `<div class="cs-stat-card" style="opacity:${dimmed ? '.75' : '1'}">
+    <div class="cs-stat-num" style="color:${cor};font-size:1.6rem">${value}</div>
+    <div class="cs-stat-lbl">${label}</div>
+    <div style="font-size:10px;color:var(--text-3);margin-top:4px;font-family:'DM Sans',sans-serif;">${sub}</div>
+  </div>`;
 }
 
 // ── Chamada: seletor de ciclo ────────────────
