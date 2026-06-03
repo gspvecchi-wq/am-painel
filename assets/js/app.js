@@ -2784,9 +2784,14 @@ function _ensureContratos(normName) {
 
 function addContrato(normName, turma) {
   _ensureContratos(normName);
-  kvPresenca['__contratos__'][normName].contratos.push({ data: '', turma: turma || 'Master' });
+  const idx = kvPresenca['__contratos__'][normName].contratos.length;
+  kvPresenca['__contratos__'][normName].contratos.push({ data: '', turma: turma || 'Master', valor: '' });
+  // Abre já em modo edição e salva o slot vazio no KV imediatamente
+  if (!_contratosRascunho[normName]) _contratosRascunho[normName] = {};
+  _contratosRascunho[normName][idx] = { data: '', turma: turma || 'Master', valor: '' };
   const aluno = allAlunos.find(a => norm(a.name) === normName);
   if (aluno) renderContratosSection(aluno.name);
+  saveContratos(normName);
 }
 
 function removeContrato(normName) {
