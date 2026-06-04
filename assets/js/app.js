@@ -1370,7 +1370,7 @@ function popularCicloSelector() {
   // Coleta todos os ciclos disponíveis no KV
   const ciclosSet = new Set();
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo)) ciclosSet.add(ciclo);
     }
@@ -1426,7 +1426,7 @@ function toggleModoComparacao() {
 function popularCicloSelectComparacao() {
   const ciclos = [];
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
     }
@@ -2590,6 +2590,10 @@ function openDrModal(name, showMsgs=true) {
   const mClassBadge = document.getElementById('mClassBadge');
   if (mClassBadge) mClassBadge.innerHTML = classeBadgeHtml(aluno);
 
+  // ── Seção de cancelamento ─────────────────
+  _cancelAlunoAtual = aluno;
+  renderCancelSection(aluno);
+
   document.getElementById('drOv').classList.add('open');
 }
 
@@ -3135,9 +3139,10 @@ function switchView(id,el) {
   if (el) el.classList.add('active');
   // Sync counterpart (desktop ↔ mobile)
   document.querySelectorAll(`[data-view="${id}"]`).forEach(btn=>btn.classList.add('active'));
-  if (id==='gest'          && loaded) renderGest();
-  if (id==='receita'       && loaded) renderReceita();
-  if (id==='aluno'         && loaded) renderAlunoView();
+  if (id==='gest'           && loaded) renderGest();
+  if (id==='receita'        && loaded) renderReceita();
+  if (id==='aluno'          && loaded) renderAlunoView();
+  if (id==='cancelamentos'  && loaded) renderCancelamentos();
   if (id==='renovacao'     && loaded) renderRenovacao();
   if (id==='chamada'       && loaded) initChamada();
   if (id==='acionamentos')           initAcionamentos();
@@ -3280,13 +3285,202 @@ function kpiCard(label, value, sub, corVar, dimmed = false) {
   </div>`;
 }
 
+// ═══════════════════════════════════════════
+// PIPELINE DE CANCELAMENTOS
+// ═══════════════════════════════════════════
+
+const CANCEL_STATUS = {
+  em_tratativa:      { label: 'Em tratativa de retenção',           cor: 'var(--warn)',   bg: 'var(--warn-dim)'   },
+  aguardando_calculo:{ label: 'Aguardando cálculo',                 cor: 'var(--blue)',   bg: 'var(--blue-dim)'   },
+  calculo_enviado:   { label: 'Cálculo enviado',                    cor: 'var(--acc)',    bg: 'var(--acc-dim)'    },
+  sem_retorno:       { label: 'Sem retorno após envio do cálculo',  cor: 'var(--text-3)', bg: 'rgba(90,90,114,.15)'},
+  rescisao_assinada: { label: 'Contrato de rescisão assinado',      cor: 'var(--danger)', bg: 'var(--danger-dim)' },
+  finalizado:        { label: 'Processo finalizado',                cor: 'var(--text-3)', bg: 'rgba(90,90,114,.15)'},
+};
+
+let _cancelAlunoAtual = null;
+
+function getCancelamentoData(normName) {
+  return (kvPresenca['__cancelamentos__'] || {})[normName] || null;
+}
+
+function getCancelamentos() {
+  return kvPresenca['__cancelamentos__'] || {};
+}
+
+async function saveCancelamento(normName, dados) {
+  const pwd = localStorage.getItem('am_cs_pwd');
+  if (!pwd) return false;
+  if (!kvPresenca['__cancelamentos__']) kvPresenca['__cancelamentos__'] = {};
+  kvPresenca['__cancelamentos__'][normName] = dados;
+  try {
+    const res = await fetch(`${WORKER_BASE}/presenca`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd, 'X-CS-Nome': localStorage.getItem('am_cs_nome') || csNomeAtual || 'CS', 'X-CS-Email': localStorage.getItem('am_cs_email') || '' },
+      body: JSON.stringify({ tab: '__cancelamentos__', semana: 1, registros: { [normName]: dados } })
+    });
+    return res.ok;
+  } catch(e) { console.error('Erro ao salvar cancelamento:', e); return false; }
+}
+
+function abrirModalCancelamento() {
+  const aluno = _cancelAlunoAtual;
+  if (!aluno) return;
+  const existing = getCancelamentoData(norm(aluno.name));
+  document.getElementById('cancelModalNome').textContent = `${tit(aluno.gender)}. ${displayName(aluno.name)} · ${aluno.turma}`;
+  document.getElementById('cancelMotivo').value = existing?.motivo || '';
+  document.getElementById('cancelStatus').value = existing?.status || 'em_tratativa';
+  document.getElementById('cancelFeedback').style.display = 'none';
+  document.getElementById('cancelOv').classList.add('open');
+}
+
+async function confirmarCancelamento() {
+  const aluno = _cancelAlunoAtual;
+  if (!aluno) return;
+  const motivo = document.getElementById('cancelMotivo').value.trim();
+  const status = document.getElementById('cancelStatus').value;
+  const fb = document.getElementById('cancelFeedback');
+
+  const dados = {
+    nome: aluno.name,
+    turma: aluno.turma,
+    email: aluno.email || '',
+    telefone: aluno.phone || '',
+    motivo,
+    status,
+    dataEntrada: getCancelamentoData(norm(aluno.name))?.dataEntrada || new Date().toISOString().slice(0,10),
+    dataAtualizacao: new Date().toISOString().slice(0,10),
+  };
+
+  const ok = await saveCancelamento(norm(aluno.name), dados);
+  fb.style.display = 'block';
+  if (ok) {
+    fb.textContent = '✓ Cancelamento registrado';
+    fb.style.background = 'var(--safe-dim)';
+    fb.style.color = 'var(--safe)';
+    fb.style.border = '1px solid var(--safe)';
+    renderCancelSection(aluno);
+    if (document.querySelector('.view.active')?.id === 'view-cancelamentos') renderCancelamentos();
+    setTimeout(() => closeOv('cancelOv'), 1500);
+  } else {
+    fb.textContent = '✗ Erro ao salvar';
+    fb.style.background = 'var(--danger-dim)';
+    fb.style.color = 'var(--danger)';
+    fb.style.border = '1px solid var(--danger)';
+  }
+}
+
+function renderCancelSection(aluno) {
+  const section = document.getElementById('mCancelSection');
+  const statusEl = document.getElementById('mCancelStatus');
+  if (!section) return;
+  section.style.display = csAuthenticated ? 'block' : 'none';
+  const c = getCancelamentoData(norm(aluno.name));
+  if (c) {
+    const s = CANCEL_STATUS[c.status] || CANCEL_STATUS.em_tratativa;
+    statusEl.innerHTML = `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:${s.bg};border-radius:7px;border:1px solid ${s.cor}33;">
+      <span style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;color:${s.cor};">${s.label}</span>
+      <span style="font-family:'DM Sans',sans-serif;font-size:10px;color:var(--text-3);margin-left:auto;">${c.dataAtualizacao||''}</span>
+    </div>`;
+  } else {
+    statusEl.innerHTML = '';
+  }
+}
+
+function renderCancelamentos() {
+  const view = document.getElementById('view-cancelamentos');
+  if (!view) return;
+
+  const cancelamentos = getCancelamentos();
+  const lista = Object.entries(cancelamentos).map(([normName, c]) => {
+    const aluno = allAlunos.find(a => norm(a.name) === normName);
+    return { ...c, normName, aluno };
+  }).sort((a, b) => (b.dataAtualizacao || '').localeCompare(a.dataAtualizacao || ''));
+
+  // Summary por status
+  const counts = {};
+  for (const k of Object.keys(CANCEL_STATUS)) counts[k] = 0;
+  for (const c of lista) counts[c.status] = (counts[c.status] || 0) + 1;
+
+  const summaryBar = document.getElementById('cancelSummaryBar');
+  summaryBar.innerHTML = ['todos', ...Object.keys(CANCEL_STATUS)].map(k => {
+    const isAll = k === 'todos';
+    const s = isAll ? null : CANCEL_STATUS[k];
+    const count = isAll ? lista.length : counts[k];
+    const cor = isAll ? 'var(--text)' : s.cor;
+    const bg = isAll ? 'var(--s2)' : s.bg;
+    return `<button onclick="renderCancelFiltrado('${k}')" id="cancelFilterBtn-${k}"
+      style="display:flex;align-items:center;gap:8px;background:${bg};border:1px solid ${isAll ? 'var(--border2)' : cor+'55'};
+      border-radius:9px;padding:7px 14px;cursor:pointer;font-family:'DM Sans',sans-serif;">
+      <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;color:${cor}">${count}</span>
+      <span style="font-size:11px;font-weight:600;color:${cor}">${isAll ? 'Todos' : s.label}</span>
+    </button>`;
+  }).join('');
+
+  renderCancelFiltrado('todos', lista);
+}
+
+let _cancelFiltroAtual = 'todos';
+function renderCancelFiltrado(filtro, listaBase) {
+  _cancelFiltroAtual = filtro;
+  const cancelamentos = getCancelamentos();
+  const lista = listaBase || Object.entries(cancelamentos).map(([normName, c]) => {
+    const aluno = allAlunos.find(a => norm(a.name) === normName);
+    return { ...c, normName, aluno };
+  }).sort((a, b) => (b.dataAtualizacao || '').localeCompare(a.dataAtualizacao || ''));
+
+  const filtrada = filtro === 'todos' ? lista : lista.filter(c => c.status === filtro);
+  const tabela = document.getElementById('cancelTabela');
+
+  if (!filtrada.length) {
+    tabela.innerHTML = `<div style="font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-3);padding:24px 0;">Nenhum cancelamento ${filtro === 'todos' ? 'registrado' : 'neste status'}.</div>`;
+    return;
+  }
+
+  tabela.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+    <thead><tr>
+      ${['Aluno','Produto','Contato','Motivo','Status','Atualizado',''].map(h =>
+        `<th style="font-family:'DM Sans',sans-serif;font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);">${h}</th>`
+      ).join('')}
+    </tr></thead>
+    <tbody>
+      ${filtrada.map(c => {
+        const s = CANCEL_STATUS[c.status] || CANCEL_STATUS.em_tratativa;
+        const contato = [c.email, c.telefone].filter(Boolean).join(' · ') || '—';
+        const dn = c.aluno ? displayName(c.aluno.name) : c.nome || c.normName;
+        const genero = c.aluno ? tit(c.aluno.gender) : 'Dr';
+        return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="${c.aluno ? `openDrModal('${esc(c.aluno.name)}')` : ''}">
+          <td style="padding:10px 12px;font-family:'DM Sans',sans-serif;font-weight:600;color:var(--text);">${genero}. ${esc(dn)}</td>
+          <td style="padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text-2);">${c.turma||'—'}</td>
+          <td style="padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-3);">${esc(contato)}</td>
+          <td style="padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text-2);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(c.motivo||'—')}</td>
+          <td style="padding:10px 12px;">
+            <span style="font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;color:${s.cor};background:${s.bg};padding:3px 8px;border-radius:5px;white-space:nowrap;">${s.label}</span>
+          </td>
+          <td style="padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-3);">${c.dataAtualizacao||'—'}</td>
+          <td style="padding:10px 12px;">
+            ${csAuthenticated ? `<button onclick="event.stopPropagation();editarCancelamento('${c.normName}')" style="background:transparent;border:1px solid var(--border2);color:var(--text-2);padding:3px 10px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;">Editar</button>` : ''}
+          </td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+}
+
+function editarCancelamento(normName) {
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  if (!aluno) return;
+  _cancelAlunoAtual = aluno;
+  abrirModalCancelamento();
+}
+
 // ── Chamada: seletor de ciclo ────────────────
 function popularCicloSelectorChamada() {
   const sel = document.getElementById('chamadaCiclo');
   if (!sel) return;
   const ciclos = [];
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
     }
@@ -3306,7 +3500,7 @@ function popularCicloSelectorCS() {
   if (!sel) return;
   const ciclos = [];
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
     }
