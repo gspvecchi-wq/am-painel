@@ -680,6 +680,23 @@ function calcRisk(history, upTo) {
   return Math.min(Math.round(score), 100);
 }
 
+// Retorna o cycleEnd efetivo: prioriza contratos da ferramenta, fallback para Monday
+function getEffectiveCycleEnd(aluno) {
+  const contratos = getContratosData(norm(aluno.name));
+  if (contratos.length) {
+    const calc = calcCycleEndFromContratos(contratos);
+    if (calc) return calc;
+  }
+  return aluno.cycleEnd || null;
+}
+
+// Retorna o cycleStart efetivo: primeiro contrato da ferramenta, fallback para Monday
+function getEffectiveCycleStart(aluno) {
+  const contratos = getContratosData(norm(aluno.name));
+  if (contratos.length && contratos[0].data) return contratos[0].data;
+  return aluno.cycleStart || null;
+}
+
 // Detect if aluno is "new" — cycleStart within 60 days
 function isNovo(aluno) {
   const ref = aluno.cycleStart || aluno.entryDate;
@@ -879,8 +896,9 @@ function renderCsAlertPanel() {
 // ── RENEWAL SCORE ─────────────────────────────────────────
 // Retorna { score, daysLeft, label, color } ou null
 function calcRenewalScore(aluno, upToWeek) {
-  if (!aluno.cycleEnd) return null;
-  const endDate = new Date(aluno.cycleEnd);
+  const cycleEnd = getEffectiveCycleEnd(aluno);
+  if (!cycleEnd) return null;
+  const endDate = new Date(cycleEnd);
   if (isNaN(endDate)) return null;
   const daysLeft = Math.round((endDate - Date.now()) / (1000*60*60*24));
   // Só candidato: ciclo ativo, dentro de 90 dias do fim
@@ -2133,8 +2151,9 @@ function renderRenovacao() {
   const passado = []; // venceu nos últimos 365 dias (daysLeft -365..−1)
 
   for (const a of allAlunos) {
-    if (!a.cycleEnd) continue;
-    const end      = new Date(a.cycleEnd + 'T12:00:00').getTime();
+    const aCycleEnd = getEffectiveCycleEnd(a);
+    if (!aCycleEnd) continue;
+    const end      = new Date(aCycleEnd + 'T12:00:00').getTime();
     const diffMs   = end - today;
     const daysLeft = Math.round(diffMs / (24 * 60 * 60 * 1000));
     if (daysLeft >= 0 && daysLeft <= 90)   futuro.push({ ...a, daysLeft });
@@ -2182,7 +2201,7 @@ function renderRenList(listId, pagId, items, page, tipo, rolling) {
       dLabel = ago === 1 ? 'Venceu ontem' : `${ago}d atrás`;
       dCls   = 'ren-days-past';
     }
-    const dateStr = fmtCycleDate(a.cycleEnd);
+    const dateStr = fmtCycleDate(getEffectiveCycleEnd(a));
     const dn      = displayName(a.name);
     return `<div class="ren-row" onclick="openDrModal('${esc(a.name)}',false)">
       <div class="ren-row-name">${tit(a.gender)}. ${esc(dn)}</div>
@@ -2451,10 +2470,12 @@ function openDrModal(name, showMsgs=true) {
     ? `<div class="modal-phone">${PHONE_ICON}${fmtPhone(aluno.phone)}</div>` : '';
   const entryHtml = aluno.entryDate
     ? `<span class="modal-entry">Entrou: ${aluno.entryDate}</span>` : '';
-  const cycleStartHtml = aluno.cycleStart
-    ? `<span class="modal-entry" title="Início do ciclo">📅 Início: ${fmtCycleDate(aluno.cycleStart)}</span>` : '';
-  const cycleEndHtml = aluno.cycleEnd
-    ? `<span class="modal-entry" title="Fim do ciclo">🏁 Fim: ${fmtCycleDate(aluno.cycleEnd)}</span>` : '';
+  const effStart = getEffectiveCycleStart(aluno);
+  const effEnd   = getEffectiveCycleEnd(aluno);
+  const cycleStartHtml = effStart
+    ? `<span class="modal-entry" title="Início do ciclo">📅 Início: ${fmtCycleDate(effStart)}</span>` : '';
+  const cycleEndHtml = effEnd
+    ? `<span class="modal-entry" title="Fim do ciclo">🏁 Fim: ${fmtCycleDate(effEnd)}</span>` : '';
   document.getElementById('mMeta').innerHTML =
     `<div class="modal-meta-badges">${turmaTagsModal}${entryHtml}${cycleStartHtml}${cycleEndHtml}</div>${phoneHtml}`;
 
@@ -3844,8 +3865,9 @@ function buildAlunoPayload() {
 
   // Dias restantes
   let diasRestantes = null;
-  if (aluno.cycleEnd) {
-    diasRestantes = Math.round((new Date(aluno.cycleEnd) - Date.now()) / (1000 * 60 * 60 * 24));
+  const _effEnd = getEffectiveCycleEnd(aluno);
+  if (_effEnd) {
+    diasRestantes = Math.round((new Date(_effEnd) - Date.now()) / (1000 * 60 * 60 * 24));
   }
 
   // Faturamento formatado
