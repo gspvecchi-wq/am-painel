@@ -2579,7 +2579,8 @@ function openDrModal(name, showMsgs=true) {
   // ── Onboarding (só para alunos novos) ───
   const mOnb = document.getElementById('mOnboardingSection');
   if (mOnb) {
-    if (isNovo(aluno)) {
+    const contratosSomente1 = getContratosData(norm(aluno.name)).length <= 1;
+    if (contratosSomente1) {
       mOnb.style.display = 'block';
       renderOnboardingSection(name);
     } else {
@@ -3386,9 +3387,13 @@ const PLAYBOOKS = [
     nome: 'Onboarding Ativo',
     cor: 'var(--blue)',
     bg: 'var(--blue-dim)',
-    descricao: 'Aluno novo (< 60 dias) — período crítico de primeiras impressões.',
+    descricao: 'Aluno com contrato único — ainda não renovou, está na jornada inicial.',
     acao: 'Seguir checklist de onboarding. 3 touchpoints nas primeiras 4 semanas. Garantir primeira vitória documentada.',
-    trigger: (aluno) => isNovo(aluno),
+    trigger: (aluno) => {
+      const contratos = getContratosData(norm(aluno.name));
+      // Contrato único = aluno novo. 2+ contratos = renovou, não entra no onboarding.
+      return contratos.length <= 1;
+    },
   },
 ];
 
