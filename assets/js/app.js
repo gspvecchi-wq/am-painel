@@ -3398,6 +3398,24 @@ function calcPlaybooksAtivos(aluno) {
   });
 }
 
+const PB_PAGE_SIZE = 10;
+const _pbPages = {}; // { playbookId: pageIndex }
+
+function pbGoPage(pbId, page) {
+  _pbPages[pbId] = page;
+  renderPlaybooks();
+  // Rola até o card do playbook
+  setTimeout(() => {
+    const el = document.getElementById('pb-card-' + pbId);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 50);
+}
+
+function scrollToPlaybook(pbId) {
+  const el = document.getElementById('pb-card-' + pbId);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function renderPlaybooks() {
   const grid = document.getElementById('playbooksGrid');
   if (!grid) return;
@@ -3422,24 +3440,33 @@ function renderPlaybooks() {
     return;
   }
 
-  // Barra de resumo usando cs-stat-card
+  // Barra de resumo — cards clicáveis que rolam até o playbook
   const totalAlunos = new Set(grupos.flatMap(g => g.alunos.map(a => norm(a.name)))).size;
   const summaryHtml = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:28px;">
-    <div class="cs-stat-card">
+    <div class="cs-stat-card" style="cursor:default;">
       <div class="cs-stat-num" style="color:var(--text)">${totalAlunos}</div>
       <div class="cs-stat-lbl">Ações pendentes</div>
       <div style="font-size:10px;color:var(--text-3);margin-top:4px;">${grupos.length} playbook${grupos.length>1?'s':''} ativos</div>
     </div>
     ${grupos.map(g => `
-    <div class="cs-stat-card" style="border-left:2px solid ${g.cor};cursor:default;">
+    <div class="cs-stat-card" onclick="scrollToPlaybook('${g.id}')"
+         style="border-left:2px solid ${g.cor};cursor:pointer;transition:border-color .15s,transform .15s;"
+         onmouseover="this.style.borderColor='${g.cor}';this.style.transform='translateY(-2px)'"
+         onmouseout="this.style.borderColor='${g.cor}';this.style.transform=''">
       <div class="cs-stat-num" style="color:${g.cor};font-size:1.8rem;">${g.alunos.length}</div>
       <div class="cs-stat-lbl" style="color:${g.cor}">${g.nome}</div>
+      <div style="font-size:9px;color:var(--text-3);margin-top:4px;">Ver lista ↓</div>
     </div>`).join('')}
   </div>`;
 
-  // Cards por playbook
+  // Cards por playbook com paginação
   const playbooksHtml = grupos.map(g => {
-    const alunosHtml = g.alunos.map(a => {
+    const page  = _pbPages[g.id] || 0;
+    const total = g.alunos.length;
+    const pages = Math.ceil(total / PB_PAGE_SIZE);
+    const slice = g.alunos.slice(page * PB_PAGE_SIZE, (page + 1) * PB_PAGE_SIZE);
+
+    const alunosHtml = slice.map(a => {
       const eng = calcCompositeScoreRolling(a, rolling);
       const engColor = eng < 40 ? 'var(--danger)' : eng < 70 ? 'var(--warn)' : 'var(--safe)';
       const dn = displayName(a.name);
@@ -3475,20 +3502,32 @@ function renderPlaybooks() {
       </div>`;
     }).join('');
 
-    return `<div class="pb-card" style="border-left:3px solid ${g.cor};margin-bottom:16px;">
+    // Paginação
+    const pagHtml = pages > 1 ? `
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 18px;border-top:1px solid var(--border);">
+        <span style="font-size:11px;color:var(--text-3);font-family:'DM Sans',sans-serif;">${page*PB_PAGE_SIZE+1}–${Math.min((page+1)*PB_PAGE_SIZE,total)} de ${total}</span>
+        <div style="display:flex;gap:4px;margin-left:auto;">
+          <button class="ren-page-btn${page===0?' disabled':''}" ${page===0?'disabled':''} onclick="pbGoPage('${g.id}',${page-1})">‹</button>
+          ${Array.from({length:pages},(_,i)=>`<button class="ren-page-btn${i===page?' active':''}" onclick="pbGoPage('${g.id}',${i})">${i+1}</button>`).join('')}
+          <button class="ren-page-btn${page===pages-1?' disabled':''}" ${page===pages-1?'disabled':''} onclick="pbGoPage('${g.id}',${page+1})">›</button>
+        </div>
+      </div>` : '';
+
+    return `<div id="pb-card-${g.id}" class="pb-card" style="border-left:3px solid ${g.cor};margin-bottom:16px;">
       <div class="pb-card-header">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
           <div style="flex:1;min-width:200px;">
             <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${g.cor};margin-bottom:3px;">${g.nome}</div>
             <div style="font-size:12px;color:var(--text-3);">${g.descricao}</div>
           </div>
-          <span class="cs-stat-num" style="color:${g.cor};font-size:2rem;">${g.alunos.length}</span>
+          <span class="cs-stat-num" style="color:${g.cor};font-size:2rem;">${total}</span>
         </div>
         <div style="margin-top:10px;padding:8px 12px;background:${g.bg};border-radius:8px;font-size:11px;color:var(--text-2);border:1px solid ${g.cor}22;">
           <span style="font-weight:700;color:${g.cor};">Ação recomendada —</span> ${g.acao}
         </div>
       </div>
       <div class="pb-aluno-list">${alunosHtml}</div>
+      ${pagHtml}
     </div>`;
   }).join('');
 
