@@ -333,6 +333,7 @@ async function reloadAll() {
     updateBadge();
     csLoad();
     const av = document.querySelector('.view.active').id;
+    if (av==='view-playbooks') renderPlaybooks();
     if (av==='view-gest')    renderGest();
     if (av==='view-receita') renderReceita();
     if (av==='view-aluno')   renderAlunoView();
@@ -3139,6 +3140,7 @@ function switchView(id,el) {
   if (el) el.classList.add('active');
   // Sync counterpart (desktop ↔ mobile)
   document.querySelectorAll(`[data-view="${id}"]`).forEach(btn=>btn.classList.add('active'));
+  if (id==='playbooks'      && loaded) renderPlaybooks();
   if (id==='gest'           && loaded) renderGest();
   if (id==='receita'        && loaded) renderReceita();
   if (id==='aluno'          && loaded) renderAlunoView();
@@ -3283,6 +3285,221 @@ function kpiCard(label, value, sub, corVar, dimmed = false) {
     <div class="cs-stat-lbl">${label}</div>
     <div style="font-size:10px;color:var(--text-3);margin-top:4px;font-family:'DM Sans',sans-serif;">${sub}</div>
   </div>`;
+}
+
+// ═══════════════════════════════════════════
+// PLAYBOOKS
+// ═══════════════════════════════════════════
+
+const PLAYBOOKS = [
+  {
+    id: 'cancelamento_ativo',
+    emoji: '🚨',
+    nome: 'Em processo de cancelamento',
+    cor: 'var(--danger)',
+    bg: 'var(--danger-dim)',
+    descricao: 'Aluno no pipeline de cancelamento — requer ação imediata.',
+    acao: 'Reunião de retenção em até 24h. Calcular ROI real e apresentar proposta de permanência.',
+    trigger: (aluno) => {
+      const c = getCancelamentoData(norm(aluno.name));
+      return c && c.status !== 'finalizado';
+    },
+  },
+  {
+    id: 'queda_engajamento',
+    emoji: '⚡',
+    nome: 'Queda de Engajamento',
+    cor: 'var(--danger)',
+    bg: 'var(--danger-dim)',
+    descricao: 'Score caiu ≥12pp nas últimas semanas — risco de desengajamento.',
+    acao: 'Acionar em até 48h com mensagem personalizada. Investigar causa e propor plano de retomada.',
+    trigger: (aluno) => isQuedaAcelerada(aluno, detectMaxWeek()),
+  },
+  {
+    id: 'faltas_consecutivas',
+    emoji: '📵',
+    nome: 'Faltas Consecutivas',
+    cor: 'var(--danger)',
+    bg: 'var(--danger-dim)',
+    descricao: '3 ou mais semanas sem presença em nenhuma aula.',
+    acao: 'Ligação direta (não WhatsApp). Diagnosticar causa e criar plano de retomada com metas simples.',
+    trigger: (aluno) => {
+      const rolling = getRollingWindow(5);
+      return calcConsAbsRolling(aluno, rolling) >= 3;
+    },
+  },
+  {
+    id: 'renovacao_risco',
+    emoji: '⏰',
+    nome: 'Renovação em Risco',
+    cor: 'var(--warn)',
+    bg: 'var(--warn-dim)',
+    descricao: 'Contrato vence em até 60 dias com engajamento em queda ou Classe C.',
+    acao: 'Reunião de resultados urgente. Apresentar evolução e construir caso de valor antes de chegar no pipeline de cancelamento.',
+    trigger: (aluno) => {
+      const end = getEffectiveCycleEnd(aluno);
+      if (!end) return false;
+      const days = Math.round((new Date(end + 'T12:00:00') - Date.now()) / 86400000);
+      const cls = calcClassificacao(aluno);
+      return days >= 0 && days <= 60 && (cls === 'C' || isQuedaAcelerada(aluno, detectMaxWeek()));
+    },
+  },
+  {
+    id: 'renovacao_90',
+    emoji: '🔄',
+    nome: 'Janela de Renovação',
+    cor: 'var(--acc)',
+    bg: 'var(--acc-dim)',
+    descricao: 'Contrato vence em até 90 dias — momento ideal para conversa proativa.',
+    acao: 'Apresentar resultados acumulados (ROI, faturamento). Conversa sobre próximo ciclo sem pressão.',
+    trigger: (aluno) => {
+      const end = getEffectiveCycleEnd(aluno);
+      if (!end) return false;
+      const days = Math.round((new Date(end + 'T12:00:00') - Date.now()) / 86400000);
+      const cls = calcClassificacao(aluno);
+      // Só mostra aqui se não está no playbook de risco
+      const emRisco = days >= 0 && days <= 60 && (cls === 'C' || isQuedaAcelerada(aluno, detectMaxWeek()));
+      return days >= 0 && days <= 90 && !emRisco;
+    },
+  },
+  {
+    id: 'upgrade',
+    emoji: '🚀',
+    nome: 'Candidato a Upgrade',
+    cor: 'var(--safe)',
+    bg: 'var(--safe-dim)',
+    descricao: 'Classe A com alto engajamento e faturamento crescendo — potencial para produto superior.',
+    acao: 'Apresentar Winners ou próximo nível. Usar resultados concretos como argumento. Timing: 60–120 dias antes do vencimento.',
+    trigger: (aluno) => {
+      const rolling = getRollingWindow(5);
+      const eng = calcCompositeScoreRolling(aluno, rolling);
+      const cls = calcClassificacao(aluno);
+      const fatIni = aluno.fatInicial ? parseFloat(String(aluno.fatInicial).replace(/[^0-9.,]/g,'').replace(',','.')) : null;
+      const fatAtu = aluno.fatAtual   ? parseFloat(String(aluno.fatAtual).replace(/[^0-9.,]/g,'').replace(',','.'))   : null;
+      const fatCresceu = fatIni && fatAtu && fatAtu > fatIni;
+      return cls === 'A' && eng >= 75 && fatCresceu && aluno.turma !== 'Winners';
+    },
+  },
+  {
+    id: 'onboarding',
+    emoji: '🟢',
+    nome: 'Onboarding Ativo',
+    cor: 'var(--blue)',
+    bg: 'var(--blue-dim)',
+    descricao: 'Aluno novo (< 60 dias) — período crítico de primeiras impressões.',
+    acao: 'Seguir checklist de onboarding. 3 touchpoints nas primeiras 4 semanas. Garantir primeira vitória documentada.',
+    trigger: (aluno) => isNovo(aluno),
+  },
+];
+
+function calcPlaybooksAtivos(aluno) {
+  return PLAYBOOKS.filter(p => {
+    try { return p.trigger(aluno); } catch { return false; }
+  });
+}
+
+function renderPlaybooks() {
+  const grid = document.getElementById('playbooksGrid');
+  if (!grid) return;
+  if (!loaded || !allAlunos.length) {
+    grid.innerHTML = `<div style="font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-3);">Aguardando dados...</div>`;
+    return;
+  }
+
+  const rolling = getRollingWindow(5);
+
+  // Agrupa alunos por playbook
+  const grupos = PLAYBOOKS.map(pb => {
+    const alunos = allAlunos.filter(a => {
+      try { return pb.trigger(a); } catch { return false; }
+    });
+    return { ...pb, alunos };
+  }).filter(g => g.alunos.length > 0);
+
+  if (!grupos.length) {
+    grid.innerHTML = `<div style="text-align:center;padding:60px 0;">
+      <div style="font-size:2.5rem;margin-bottom:12px;">✅</div>
+      <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;color:var(--text);">Nenhum playbook ativo</div>
+      <div style="font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-3);margin-top:6px;">Todos os alunos estão dentro dos parâmetros esperados.</div>
+    </div>`;
+    return;
+  }
+
+  // Barra de resumo
+  const totalAlunos = new Set(grupos.flatMap(g => g.alunos.map(a => norm(a.name)))).size;
+  const summaryHtml = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;align-items:center;">
+    <div style="font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-2);">
+      <strong style="color:var(--text);font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;">${totalAlunos}</strong>
+      <span style="margin-left:6px;">aluno${totalAlunos !== 1 ? 's' : ''} com ação pendente</span>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;">
+      ${grupos.map(g => `<span style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;color:${g.cor};background:${g.bg};padding:3px 10px;border-radius:20px;border:1px solid ${g.cor}44;">${g.emoji} ${g.alunos.length} ${g.nome}</span>`).join('')}
+    </div>
+  </div>`;
+
+  // Cards por playbook
+  const playbooksHtml = grupos.map(g => {
+    const alunosHtml = g.alunos.map(a => {
+      const eng = calcCompositeScoreRolling(a, rolling);
+      const engColor = eng < 40 ? 'var(--danger)' : eng < 70 ? 'var(--warn)' : 'var(--safe)';
+      const dn = displayName(a.name);
+      const end = getEffectiveCycleEnd(a);
+      const days = end ? Math.round((new Date(end + 'T12:00:00') - Date.now()) / 86400000) : null;
+      const daysHtml = days !== null ? `<span style="font-size:10px;color:${days <= 30 ? 'var(--danger)' : days <= 60 ? 'var(--warn)' : 'var(--text-3)'};margin-left:auto;">${days >= 0 ? days + 'd restantes' : Math.abs(days) + 'd vencido'}</span>` : '';
+      const cancelData = getCancelamentoData(norm(a.name));
+      const cancelBadge = cancelData ? `<span style="font-size:9px;color:var(--danger);background:var(--danger-dim);padding:1px 6px;border-radius:4px;font-weight:700;">${CANCEL_STATUS[cancelData.status]?.label || cancelData.status}</span>` : '';
+
+      return `<div class="pb-aluno-row" onclick="openDrModal('${esc(a.name)}')">
+        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+          <div>
+            <div style="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${tit(a.gender)}. ${esc(dn)}</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+              <span style="font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-3);">${a.turma}</span>
+              ${cancelBadge}
+            </div>
+          </div>
+          ${daysHtml}
+          <div style="display:flex;align-items:center;gap:5px;margin-left:${days !== null ? '0' : 'auto'};">
+            <div style="width:50px;height:4px;background:var(--s4);border-radius:2px;overflow:hidden;">
+              <div style="width:${Math.min(eng,100)}%;height:100%;background:${engColor};border-radius:2px;"></div>
+            </div>
+            <span style="font-family:'DM Sans',sans-serif;font-size:11px;color:${engColor};font-weight:600;">${eng}%</span>
+          </div>
+        </div>
+        <button onclick="event.stopPropagation();abrirAcaoPlaybook('${esc(a.name)}','${g.id}')" style="background:transparent;border:1px solid ${g.cor}55;color:${g.cor};padding:4px 12px;border-radius:7px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background .15s;" onmouseover="this.style.background='${g.bg}'" onmouseout="this.style.background='transparent'">
+          Acionar IA →
+        </button>
+      </div>`;
+    }).join('');
+
+    return `<div class="pb-card" style="border-left:3px solid ${g.cor};">
+      <div class="pb-card-header">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1.3rem;">${g.emoji}</span>
+          <div>
+            <div style="font-family:'Syne',sans-serif;font-size:0.95rem;font-weight:800;color:${g.cor};">${g.nome}</div>
+            <div style="font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-3);margin-top:2px;">${g.descricao}</div>
+          </div>
+          <span style="margin-left:auto;font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;color:${g.cor};">${g.alunos.length}</span>
+        </div>
+        <div style="margin-top:10px;padding:8px 12px;background:${g.bg};border-radius:7px;font-family:'DM Sans',sans-serif;font-size:11px;color:${g.cor};border:1px solid ${g.cor}33;">
+          <strong>▸ Ação recomendada:</strong> ${g.acao}
+        </div>
+      </div>
+      <div class="pb-aluno-list">${alunosHtml}</div>
+    </div>`;
+  }).join('');
+
+  grid.innerHTML = summaryHtml + playbooksHtml;
+}
+
+function abrirAcaoPlaybook(alunoName, playbookId) {
+  // Abre o modal do aluno e aciona o gerador de mensagem IA
+  openDrModal(alunoName, false);
+  setTimeout(() => {
+    const pb = PLAYBOOKS.find(p => p.id === playbookId);
+    if (pb && typeof gerarAcionamentoIA === 'function') gerarAcionamentoIA(pb.nome);
+  }, 300);
 }
 
 // ═══════════════════════════════════════════

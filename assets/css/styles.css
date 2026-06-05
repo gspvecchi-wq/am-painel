@@ -2486,6 +2486,33 @@ tbody tr:hover .dr-act-btn {
   color: var(--text-3);
 }
 
+/* ── Playbooks ── */
+.pb-card {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.pb-card-header {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.pb-aluno-list {
+  padding: 4px 0;
+}
+.pb-aluno-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background .15s;
+}
+.pb-aluno-row:last-child { border-bottom: none; }
+.pb-aluno-row:hover { background: var(--s2); }
+
 /* ── Contratos ── */
 .contratos-row {
   display: grid;

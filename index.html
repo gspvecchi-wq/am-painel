@@ -136,6 +136,10 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       Inteligência de Risco
     </button>
+    <button class="sidebar-item" data-view="playbooks" onclick="switchView('playbooks',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Playbooks
+    </button>
     <button class="sidebar-item" data-view="gest" onclick="switchView('gest',this)">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       Visão Geral
@@ -851,6 +855,17 @@
       <button class="pag-btn" id="acPagNext" onclick="acChangePage(1)">Próximo ›</button>
     </div>
   </div>
+</div>
+
+<!-- PLAYBOOKS VIEW -->
+<div class="view" id="view-playbooks">
+  <div class="view-page-header">
+    <div class="view-page-title-group">
+      <div class="view-page-eyebrow">Inteligência de CS</div>
+      <h1 class="view-page-title">Playbooks <span class="view-page-title-accent">Ativos</span></h1>
+    </div>
+  </div>
+  <div id="playbooksGrid"></div>
 </div>
 
 <!-- CANCELAMENTOS VIEW -->
