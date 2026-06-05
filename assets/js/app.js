@@ -2579,7 +2579,7 @@ function openDrModal(name, showMsgs=true) {
   // ── Onboarding (só para alunos novos) ───
   const mOnb = document.getElementById('mOnboardingSection');
   if (mOnb) {
-    const contratosSomente1 = getContratosData(norm(aluno.name)).length <= 1;
+    const contratosSomente1 = getContratosData(norm(aluno.name)).length === 1;
     if (contratosSomente1) {
       mOnb.style.display = 'block';
       renderOnboardingSection(name);
@@ -3391,8 +3391,8 @@ const PLAYBOOKS = [
     acao: 'Seguir checklist de onboarding. 3 touchpoints nas primeiras 4 semanas. Garantir primeira vitória documentada.',
     trigger: (aluno) => {
       const contratos = getContratosData(norm(aluno.name));
-      // Contrato único = aluno novo. 2+ contratos = renovou, não entra no onboarding.
-      return contratos.length <= 1;
+      // Exatamente 1 contrato = aluno novo. 0 = sem dados. 2+ = renovou.
+      return contratos.length === 1;
     },
   },
 ];
