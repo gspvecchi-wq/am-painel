@@ -3402,39 +3402,39 @@ function renderPlaybooks() {
   const grid = document.getElementById('playbooksGrid');
   if (!grid) return;
   if (!loaded || !allAlunos.length) {
-    grid.innerHTML = `<div style="font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-3);">Aguardando dados...</div>`;
+    grid.innerHTML = `<div class="cs-empty-desc">Aguardando dados...</div>`;
     return;
   }
 
   const rolling = getRollingWindow(5);
 
-  // Agrupa alunos por playbook
   const grupos = PLAYBOOKS.map(pb => {
-    const alunos = allAlunos.filter(a => {
-      try { return pb.trigger(a); } catch { return false; }
-    });
+    const alunos = allAlunos.filter(a => { try { return pb.trigger(a); } catch { return false; } });
     return { ...pb, alunos };
   }).filter(g => g.alunos.length > 0);
 
   if (!grupos.length) {
     grid.innerHTML = `<div style="text-align:center;padding:60px 0;">
-      <div style="font-size:2.5rem;margin-bottom:12px;">✅</div>
-      <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;color:var(--text);">Nenhum playbook ativo</div>
-      <div style="font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-3);margin-top:6px;">Todos os alunos estão dentro dos parâmetros esperados.</div>
+      <div style="font-size:2rem;margin-bottom:12px;color:var(--safe);">✓</div>
+      <div class="view-page-title" style="font-size:1.1rem;">Nenhum playbook ativo</div>
+      <div class="cs-empty-desc" style="margin-top:6px;">Todos os alunos estão dentro dos parâmetros esperados.</div>
     </div>`;
     return;
   }
 
-  // Barra de resumo
+  // Barra de resumo usando cs-stat-card
   const totalAlunos = new Set(grupos.flatMap(g => g.alunos.map(a => norm(a.name)))).size;
-  const summaryHtml = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;align-items:center;">
-    <div style="font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-2);">
-      <strong style="color:var(--text);font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;">${totalAlunos}</strong>
-      <span style="margin-left:6px;">aluno${totalAlunos !== 1 ? 's' : ''} com ação pendente</span>
+  const summaryHtml = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:28px;">
+    <div class="cs-stat-card">
+      <div class="cs-stat-num" style="color:var(--text)">${totalAlunos}</div>
+      <div class="cs-stat-lbl">Ações pendentes</div>
+      <div style="font-size:10px;color:var(--text-3);margin-top:4px;">${grupos.length} playbook${grupos.length>1?'s':''} ativos</div>
     </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;">
-      ${grupos.map(g => `<span style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;color:${g.cor};background:${g.bg};padding:3px 10px;border-radius:20px;border:1px solid ${g.cor}44;">${g.emoji} ${g.alunos.length} ${g.nome}</span>`).join('')}
-    </div>
+    ${grupos.map(g => `
+    <div class="cs-stat-card" style="border-left:2px solid ${g.cor};cursor:default;">
+      <div class="cs-stat-num" style="color:${g.cor};font-size:1.8rem;">${g.alunos.length}</div>
+      <div class="cs-stat-lbl" style="color:${g.cor}">${g.nome}</div>
+    </div>`).join('')}
   </div>`;
 
   // Cards por playbook
@@ -3445,45 +3445,47 @@ function renderPlaybooks() {
       const dn = displayName(a.name);
       const end = getEffectiveCycleEnd(a);
       const days = end ? Math.round((new Date(end + 'T12:00:00') - Date.now()) / 86400000) : null;
-      const daysHtml = days !== null ? `<span style="font-size:10px;color:${days <= 30 ? 'var(--danger)' : days <= 60 ? 'var(--warn)' : 'var(--text-3)'};margin-left:auto;">${days >= 0 ? days + 'd restantes' : Math.abs(days) + 'd vencido'}</span>` : '';
+      const daysColor = days === null ? '' : days <= 30 ? 'var(--danger)' : days <= 60 ? 'var(--warn)' : 'var(--text-3)';
+      const daysLabel = days === null ? '' : days >= 0 ? `${days}d restantes` : `${Math.abs(days)}d vencido`;
       const cancelData = getCancelamentoData(norm(a.name));
-      const cancelBadge = cancelData ? `<span style="font-size:9px;color:var(--danger);background:var(--danger-dim);padding:1px 6px;border-radius:4px;font-weight:700;">${CANCEL_STATUS[cancelData.status]?.label || cancelData.status}</span>` : '';
+      const cancelBadge = cancelData
+        ? `<span class="b" style="background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,59,92,.3);border-radius:5px;">${CANCEL_STATUS[cancelData.status]?.label || cancelData.status}</span>`
+        : '';
 
       return `<div class="pb-aluno-row" onclick="openDrModal('${esc(a.name)}')">
-        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
-          <div>
-            <div style="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${tit(a.gender)}. ${esc(dn)}</div>
-            <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
-              <span style="font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-3);">${a.turma}</span>
-              ${cancelBadge}
-            </div>
-          </div>
-          ${daysHtml}
-          <div style="display:flex;align-items:center;gap:5px;margin-left:${days !== null ? '0' : 'auto'};">
-            <div style="width:50px;height:4px;background:var(--s4);border-radius:2px;overflow:hidden;">
-              <div style="width:${Math.min(eng,100)}%;height:100%;background:${engColor};border-radius:2px;"></div>
-            </div>
-            <span style="font-family:'DM Sans',sans-serif;font-size:11px;color:${engColor};font-weight:600;">${eng}%</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${tit(a.gender)}. ${esc(dn)}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap;">
+            <span style="font-size:11px;color:var(--text-3);">${a.turma}</span>
+            ${cancelBadge}
+            ${daysLabel ? `<span style="font-size:10px;color:${daysColor};font-weight:600;">${daysLabel}</span>` : ''}
           </div>
         </div>
-        <button onclick="event.stopPropagation();abrirAcaoPlaybook('${esc(a.name)}','${g.id}')" style="background:transparent;border:1px solid ${g.cor}55;color:${g.cor};padding:4px 12px;border-radius:7px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background .15s;" onmouseover="this.style.background='${g.bg}'" onmouseout="this.style.background='transparent'">
-          Acionar IA →
-        </button>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+          <div style="display:flex;align-items:center;gap:5px;">
+            <div style="width:44px;height:3px;background:var(--s4);border-radius:2px;overflow:hidden;">
+              <div style="width:${Math.min(eng,100)}%;height:100%;background:${engColor};border-radius:2px;"></div>
+            </div>
+            <span style="font-size:11px;color:${engColor};font-weight:600;width:32px;">${eng}%</span>
+          </div>
+          <button class="dr-act-btn" onclick="event.stopPropagation();abrirAcaoPlaybook('${esc(a.name)}','${g.id}')">
+            Acionar IA <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
       </div>`;
     }).join('');
 
-    return `<div class="pb-card" style="border-left:3px solid ${g.cor};">
+    return `<div class="pb-card" style="border-left:3px solid ${g.cor};margin-bottom:16px;">
       <div class="pb-card-header">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:1.3rem;">${g.emoji}</span>
-          <div>
-            <div style="font-family:'Syne',sans-serif;font-size:0.95rem;font-weight:800;color:${g.cor};">${g.nome}</div>
-            <div style="font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-3);margin-top:2px;">${g.descricao}</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${g.cor};margin-bottom:3px;">${g.nome}</div>
+            <div style="font-size:12px;color:var(--text-3);">${g.descricao}</div>
           </div>
-          <span style="margin-left:auto;font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;color:${g.cor};">${g.alunos.length}</span>
+          <span class="cs-stat-num" style="color:${g.cor};font-size:2rem;">${g.alunos.length}</span>
         </div>
-        <div style="margin-top:10px;padding:8px 12px;background:${g.bg};border-radius:7px;font-family:'DM Sans',sans-serif;font-size:11px;color:${g.cor};border:1px solid ${g.cor}33;">
-          <strong>▸ Ação recomendada:</strong> ${g.acao}
+        <div style="margin-top:10px;padding:8px 12px;background:${g.bg};border-radius:8px;font-size:11px;color:var(--text-2);border:1px solid ${g.cor}22;">
+          <span style="font-weight:700;color:${g.cor};">Ação recomendada —</span> ${g.acao}
         </div>
       </div>
       <div class="pb-aluno-list">${alunosHtml}</div>
@@ -3605,34 +3607,28 @@ function renderCancelSection(aluno) {
 }
 
 function renderCancelamentos() {
-  const view = document.getElementById('view-cancelamentos');
-  if (!view) return;
-
   const cancelamentos = getCancelamentos();
   const lista = Object.entries(cancelamentos).map(([normName, c]) => {
     const aluno = allAlunos.find(a => norm(a.name) === normName);
     return { ...c, normName, aluno };
   }).sort((a, b) => (b.dataAtualizacao || '').localeCompare(a.dataAtualizacao || ''));
 
-  // Summary por status
   const counts = {};
   for (const k of Object.keys(CANCEL_STATUS)) counts[k] = 0;
   for (const c of lista) counts[c.status] = (counts[c.status] || 0) + 1;
 
   const summaryBar = document.getElementById('cancelSummaryBar');
-  summaryBar.innerHTML = ['todos', ...Object.keys(CANCEL_STATUS)].map(k => {
-    const isAll = k === 'todos';
-    const s = isAll ? null : CANCEL_STATUS[k];
-    const count = isAll ? lista.length : counts[k];
-    const cor = isAll ? 'var(--text)' : s.cor;
-    const bg = isAll ? 'var(--s2)' : s.bg;
-    return `<button onclick="renderCancelFiltrado('${k}')" id="cancelFilterBtn-${k}"
-      style="display:flex;align-items:center;gap:8px;background:${bg};border:1px solid ${isAll ? 'var(--border2)' : cor+'55'};
-      border-radius:9px;padding:7px 14px;cursor:pointer;font-family:'DM Sans',sans-serif;">
-      <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;color:${cor}">${count}</span>
-      <span style="font-size:11px;font-weight:600;color:${cor}">${isAll ? 'Todos' : s.label}</span>
-    </button>`;
-  }).join('');
+  summaryBar.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;width:100%;margin-bottom:4px;">
+    <div class="cs-stat-card" onclick="renderCancelFiltrado('todos')" style="cursor:pointer;">
+      <div class="cs-stat-num" style="color:var(--text)">${lista.length}</div>
+      <div class="cs-stat-lbl">Todos</div>
+    </div>
+    ${Object.entries(CANCEL_STATUS).map(([k, s]) => `
+    <div class="cs-stat-card" onclick="renderCancelFiltrado('${k}')" style="cursor:pointer;border-left:2px solid ${s.cor};">
+      <div class="cs-stat-num" style="color:${s.cor};font-size:1.8rem;">${counts[k]||0}</div>
+      <div class="cs-stat-lbl" style="color:${s.cor}">${s.label}</div>
+    </div>`).join('')}
+  </div>`;
 
   renderCancelFiltrado('todos', lista);
 }
@@ -3650,15 +3646,13 @@ function renderCancelFiltrado(filtro, listaBase) {
   const tabela = document.getElementById('cancelTabela');
 
   if (!filtrada.length) {
-    tabela.innerHTML = `<div style="font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-3);padding:24px 0;">Nenhum cancelamento ${filtro === 'todos' ? 'registrado' : 'neste status'}.</div>`;
+    tabela.innerHTML = `<div class="cs-empty-desc" style="padding:24px 0;">Nenhum cancelamento ${filtro === 'todos' ? 'registrado' : 'neste status'}.</div>`;
     return;
   }
 
-  tabela.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+  tabela.innerHTML = `<table style="margin-top:16px;">
     <thead><tr>
-      ${['Aluno','Produto','Contato','Motivo','Status','Atualizado',''].map(h =>
-        `<th style="font-family:'DM Sans',sans-serif;font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);">${h}</th>`
-      ).join('')}
+      <th>Aluno</th><th>Produto</th><th>Contato</th><th>Motivo</th><th>Status</th><th>Atualizado</th><th></th>
     </tr></thead>
     <tbody>
       ${filtrada.map(c => {
@@ -3666,18 +3660,14 @@ function renderCancelFiltrado(filtro, listaBase) {
         const contato = [c.email, c.telefone].filter(Boolean).join(' · ') || '—';
         const dn = c.aluno ? displayName(c.aluno.name) : c.nome || c.normName;
         const genero = c.aluno ? tit(c.aluno.gender) : 'Dr';
-        return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="${c.aluno ? `openDrModal('${esc(c.aluno.name)}')` : ''}">
-          <td style="padding:10px 12px;font-family:'DM Sans',sans-serif;font-weight:600;color:var(--text);">${genero}. ${esc(dn)}</td>
-          <td style="padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text-2);">${c.turma||'—'}</td>
-          <td style="padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-3);">${esc(contato)}</td>
-          <td style="padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text-2);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(c.motivo||'—')}</td>
-          <td style="padding:10px 12px;">
-            <span style="font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;color:${s.cor};background:${s.bg};padding:3px 8px;border-radius:5px;white-space:nowrap;">${s.label}</span>
-          </td>
-          <td style="padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-3);">${c.dataAtualizacao||'—'}</td>
-          <td style="padding:10px 12px;">
-            ${csAuthenticated ? `<button onclick="event.stopPropagation();editarCancelamento('${c.normName}')" style="background:transparent;border:1px solid var(--border2);color:var(--text-2);padding:3px 10px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;">Editar</button>` : ''}
-          </td>
+        return `<tr onclick="${c.aluno ? `openDrModal('${esc(c.aluno.name)}')` : ''}" style="cursor:pointer;">
+          <td>${genero}. ${esc(dn)}</td>
+          <td style="color:var(--text-2);">${c.turma||'—'}</td>
+          <td style="color:var(--text-3);font-size:11px;">${esc(contato)}</td>
+          <td style="color:var(--text-2);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(c.motivo||'—')}</td>
+          <td><span class="b" style="background:${s.bg};color:${s.cor};border:1px solid ${s.cor}33;border-radius:5px;white-space:nowrap;">${s.label}</span></td>
+          <td style="color:var(--text-3);font-size:11px;">${c.dataAtualizacao||'—'}</td>
+          <td>${csAuthenticated ? `<button class="dr-act-btn" onclick="event.stopPropagation();editarCancelamento('${c.normName}')">Editar</button>` : ''}</td>
         </tr>`;
       }).join('')}
     </tbody>
