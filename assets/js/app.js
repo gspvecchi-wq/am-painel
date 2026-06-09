@@ -721,7 +721,7 @@ function calcClassificacao(aluno) {
   const renovacoes = Math.max(0, contratos.length - 1);
 
   const totalInv = calcTotalInvestido(norm(aluno.name)) || 0;
-  const altoLTV  = totalInv >= 30000; // LTV alto: >= R$30k investidos
+  const altoLTV  = totalInv >= 150000; // LTV alto: >= R$150k investidos
 
   const fatIni = aluno.fatInicial ? parseFloat(String(aluno.fatInicial).replace(/[^0-9.,]/g,'').replace(',','.')) : null;
   const fatAtu = aluno.fatAtual   ? parseFloat(String(aluno.fatAtual).replace(/[^0-9.,]/g,'').replace(',','.'))   : null;
