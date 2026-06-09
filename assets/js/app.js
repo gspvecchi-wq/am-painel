@@ -2609,11 +2609,17 @@ function openDrModal(name, showMsgs=true) {
   // ── Contratos ────────────────────────────
   renderContratosSection(name);
 
-  // ── Onboarding (só para alunos novos) ───
+  // ── Onboarding (só para alunos novos: 1 contrato + data dentro de 30 dias) ───
   const mOnb = document.getElementById('mOnboardingSection');
   if (mOnb) {
-    const contratosSomente1 = getContratosData(norm(aluno.name)).length === 1;
-    if (contratosSomente1) {
+    const _cOnb = getContratosData(norm(aluno.name));
+    const _isOnboarding = _cOnb.length === 1 && (() => {
+      const d = _cOnb[0].data;
+      if (!d) return false;
+      const diff = Date.now() - new Date(d + 'T12:00:00').getTime();
+      return diff >= 0 && diff <= 30 * 24 * 60 * 60 * 1000;
+    })();
+    if (_isOnboarding) {
       mOnb.style.display = 'block';
       renderOnboardingSection(name);
     } else {
@@ -3421,8 +3427,11 @@ const PLAYBOOKS = [
     acao: 'Seguir checklist de onboarding. 3 touchpoints nas primeiras 4 semanas. Garantir primeira vitória documentada.',
     trigger: (aluno) => {
       const contratos = getContratosData(norm(aluno.name));
-      // Exatamente 1 contrato = aluno novo. 0 = sem dados. 2+ = renovou.
-      return contratos.length === 1;
+      if (contratos.length !== 1) return false;
+      const d = contratos[0].data;
+      if (!d) return false;
+      const diff = Date.now() - new Date(d + 'T12:00:00').getTime();
+      return diff >= 0 && diff <= 30 * 24 * 60 * 60 * 1000;
     },
   },
 ];
