@@ -3238,13 +3238,10 @@ function calcReceitaMetrics() {
       if (endMs < hoje - msMes && contratos.length === 1) totalChurn++;
     }
 
-    // LTV projetado — realizado + próxima renovação estimada (mesmo valor do último)
+    // LTV projetado — soma do último contrato de cada aluno ativo (próxima renovação estimada)
     if (ativo && ultimo.valor) {
       const v = parseFloat(String(ultimo.valor).replace(/[^0-9.,]/g, '').replace(',', '.'));
-      if (!isNaN(v) && v > 0) ltvProjetado += ltvAluno + v;
-      else ltvProjetado += ltvAluno;
-    } else {
-      ltvProjetado += ltvAluno;
+      if (!isNaN(v) && v > 0) ltvProjetado += v;
     }
 
     // Crescimento de faturamento
@@ -3286,7 +3283,7 @@ function renderReceita() {
       ${kpiCard('ARR', fmt(m.arrTotal) || '—', 'Receita recorrente anual (contratos ativos)', '--acc')}
       ${kpiCard('MRR', fmt(m.mrr) || '—', 'Receita recorrente mensal', '--blue')}
       ${kpiCard('LTV Realizado', fmt(m.ltvRealizado) || '—', 'Total já investido por todos os alunos', '--purple')}
-      ${kpiCard('LTV Projetado', fmt(m.ltvProjetado) || '—', 'Realizado + próxima renovação estimada', '--purple', true)}
+      ${kpiCard('LTV Projetado', fmt(m.ltvProjetado) || '—', 'Soma do último contrato de cada aluno ativo', '--purple', true)}
       ${kpiCard('LTV Médio', fmt(m.ltvMedio) || '—', 'Investimento médio por aluno com contrato', '--text-2')}
       ${kpiCard('ROI Médio', pct(m.roiMedio), 'Crescimento médio de faturamento da base', roiColor.replace('var(','').replace(')',''))}
     </div>`;
