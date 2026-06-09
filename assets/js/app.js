@@ -142,6 +142,8 @@ let currentTab     = 'Mentoria';
 let currentWeek    = 1;
 let loaded         = false;
 let classeFiltro   = null; // null | 'A' | 'B' | 'C'
+const JORNADA_PAGE_SIZE = 12;
+let _jornadaPage = 0; // zero-based
 let _csDoctors     = [];
 let gestTurmaFilter = 'todos'; // 'todos' | 'Master' | 'Mentoria'
 
@@ -2266,8 +2268,16 @@ function renderClasseSummary() {
 
 function toggleClasseFiltro(cls) {
   classeFiltro = cls;
+  _jornadaPage = 0;
   renderClasseSummary();
   renderProfiles();
+}
+
+function jornadaGoPage(page) {
+  _jornadaPage = page;
+  renderProfiles();
+  const grid = document.getElementById('profileGrid');
+  if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function renderProfiles() {
@@ -2277,8 +2287,13 @@ function renderProfiles() {
   if (classeFiltro) list = list.filter(a => calcClassificacao(a) === classeFiltro);
   const grid=document.getElementById('profileGrid');
   if (!list.length) { grid.innerHTML=`<div style="color:var(--sub);font-size:12px">Nenhum resultado.</div>`; return; }
+  const total = list.length;
+  const pages = Math.ceil(total / JORNADA_PAGE_SIZE);
+  if (_jornadaPage >= pages) _jornadaPage = 0;
+  const slice = list.slice(_jornadaPage * JORNADA_PAGE_SIZE, (_jornadaPage + 1) * JORNADA_PAGE_SIZE);
+
   const _rollingSlots = getRollingWindow(5);
-  grid.innerHTML=list.slice(0,80).map(a=>{
+  const cards = slice.map(a=>{
     const eng=calcCompositeScoreRolling(a, _rollingSlots);
     const color=eng<40?'var(--danger)':eng<70?'var(--warn)':'var(--safe)';
     const dn=displayName(a.name);
@@ -2295,6 +2310,24 @@ function renderProfiles() {
       </div>
     </div>`;
   }).join('');
+
+  let paginacao = '';
+  if (pages > 1) {
+    const btnStyle = (active) => `style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;padding:5px 11px;border-radius:7px;border:1px solid ${active ? 'var(--acc)' : 'var(--border)'};background:${active ? 'var(--acc-dim)' : 'transparent'};color:${active ? 'var(--acc)' : 'var(--text-2)'};cursor:pointer;"`;
+    const btns = [];
+    if (_jornadaPage > 0) btns.push(`<button onclick="jornadaGoPage(${_jornadaPage-1})" ${btnStyle(false)}>← Anterior</button>`);
+    for (let i = 0; i < pages; i++) {
+      btns.push(`<button onclick="jornadaGoPage(${i})" ${btnStyle(i === _jornadaPage)}>${i+1}</button>`);
+    }
+    if (_jornadaPage < pages - 1) btns.push(`<button onclick="jornadaGoPage(${_jornadaPage+1})" ${btnStyle(false)}>Próximo →</button>`);
+    paginacao = `
+      <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:8px;flex-wrap:wrap;">
+        ${btns.join('')}
+        <span style="font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-3);margin-left:8px;">${_jornadaPage*JORNADA_PAGE_SIZE+1}–${Math.min((_jornadaPage+1)*JORNADA_PAGE_SIZE,total)} de ${total}</span>
+      </div>`;
+  }
+
+  grid.innerHTML = cards + paginacao;
 }
 
 // ═══════════════════════════════════════════
