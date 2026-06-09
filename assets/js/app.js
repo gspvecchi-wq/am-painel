@@ -3283,7 +3283,7 @@ function renderReceita() {
       ${kpiCard('ARR', fmt(m.arrTotal) || '—', 'Receita recorrente anual (contratos ativos)', '--acc')}
       ${kpiCard('MRR', fmt(m.mrr) || '—', 'Receita recorrente mensal', '--blue')}
       ${kpiCard('LTV Realizado', fmt(m.ltvRealizado) || '—', 'Total já investido por todos os alunos', '--purple')}
-      ${kpiCard('LTV Projetado', fmt(m.ltvProjetado) || '—', 'Soma do último contrato de cada aluno ativo', '--purple', true)}
+      ${kpiCard('Receita em Jogo', fmt(m.ltvProjetado) || '—', 'Potencial de renovação dos alunos ativos', '--purple', true)}
       ${kpiCard('LTV Médio', fmt(m.ltvMedio) || '—', 'Investimento médio por aluno com contrato', '--text-2')}
       ${kpiCard('ROI Médio', pct(m.roiMedio), 'Crescimento médio de faturamento da base', roiColor.replace('var(','').replace(')',''))}
     </div>`;
