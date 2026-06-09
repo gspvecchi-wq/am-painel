@@ -700,13 +700,14 @@ function getEffectiveCycleStart(aluno) {
   return aluno.cycleStart || null;
 }
 
-// Detect if aluno is "new" — cycleStart within 60 days
+// Detect if aluno is "new" — exatamente 1 contrato com data nos últimos 30 dias
 function isNovo(aluno) {
-  const ref = aluno.cycleStart || aluno.entryDate;
-  if (!ref) return false;
-  const d = new Date(ref);
-  if (isNaN(d)) return false;
-  return (Date.now() - d.getTime()) < 60*24*60*60*1000;
+  const contratos = getContratosData(norm(aluno.name));
+  if (contratos.length !== 1) return false;
+  const d = contratos[0].data;
+  if (!d) return false;
+  const diff = Date.now() - new Date(d + 'T12:00:00').getTime();
+  return diff >= 0 && diff <= 30 * 24 * 60 * 60 * 1000;
 }
 
 // ── CLASSIFICAÇÃO A / B / C ─────────────────────────────────
