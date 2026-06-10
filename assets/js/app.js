@@ -3739,16 +3739,25 @@ function renderCancelFiltrado(filtro, listaBase) {
       <th>Aluno</th><th>Produto</th><th>Contato</th><th>Motivo</th><th>Status</th><th>Atualizado</th><th></th>
     </tr></thead>
     <tbody>
-      ${filtrada.map(c => {
+      ${filtrada.map((c, idx) => {
         const s = CANCEL_STATUS[c.status] || CANCEL_STATUS.em_tratativa;
         const contato = [c.email, c.telefone].filter(Boolean).join(' · ') || '—';
         const dn = c.aluno ? displayName(c.aluno.name) : c.nome || c.normName;
         const genero = c.aluno ? tit(c.aluno.gender) : 'Dr';
+        const motivo = c.motivo || '';
+        const longo = motivo.length > 60;
+        const expandId = `cancel-motivo-${idx}`;
+        const motivoCell = longo
+          ? `<div>
+               <span id="${expandId}-short" style="color:var(--text-2);">${esc(motivo.slice(0,60))}… <button onclick="event.stopPropagation();document.getElementById('${expandId}-short').style.display='none';document.getElementById('${expandId}-full').style.display='block';" style="background:none;border:none;color:var(--acc);font-size:11px;cursor:pointer;padding:0;font-family:'DM Sans',sans-serif;">ver mais</button></span>
+               <span id="${expandId}-full" style="display:none;color:var(--text-2);">${esc(motivo)} <button onclick="event.stopPropagation();document.getElementById('${expandId}-full').style.display='none';document.getElementById('${expandId}-short').style.display='block';" style="background:none;border:none;color:var(--text-3);font-size:11px;cursor:pointer;padding:0;font-family:'DM Sans',sans-serif;">ver menos</button></span>
+             </div>`
+          : `<span style="color:var(--text-2);">${esc(motivo||'—')}</span>`;
         return `<tr onclick="${c.aluno ? `openDrModal('${esc(c.aluno.name)}')` : ''}" style="cursor:pointer;">
           <td>${genero}. ${esc(dn)}</td>
           <td style="color:var(--text-2);">${c.turma||'—'}</td>
           <td style="color:var(--text-3);font-size:11px;">${esc(contato)}</td>
-          <td style="color:var(--text-2);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(c.motivo||'—')}</td>
+          <td style="max-width:220px;">${motivoCell}</td>
           <td><span class="b" style="background:${s.bg};color:${s.cor};border:1px solid ${s.cor}33;border-radius:5px;white-space:nowrap;">${s.label}</span></td>
           <td style="color:var(--text-3);font-size:11px;">${c.dataAtualizacao||'—'}</td>
           <td>${csAuthenticated ? `<button class="dr-act-btn" onclick="event.stopPropagation();editarCancelamento('${c.normName}')">Editar</button>` : ''}</td>
