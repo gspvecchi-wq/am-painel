@@ -3259,7 +3259,9 @@ function calcReceitaMetrics() {
     if (fatIni && fatAtu && fatIni > 0) { fatIniSoma += fatIni; fatAtuSoma += fatAtu; fatCount++; }
   }
 
-  const taxaRenovacao = totalComContrato > 0 ? Math.round(totalRenovaram / totalComContrato * 100) : 0;
+  const totalNaoRenovaram = Object.values(getNaoRenovouMap()).filter(v => v !== null).length;
+  const baseRenovacao = totalRenovaram + totalNaoRenovaram;
+  const taxaRenovacao = baseRenovacao > 0 ? Math.round(totalRenovaram / baseRenovacao * 100) : 0;
   const taxaChurn     = totalComContrato > 0 ? Math.round(totalChurn / totalComContrato * 100) : 0;
   const roiMedio      = fatCount > 0 ? Math.round(((fatAtuSoma - fatIniSoma) / fatIniSoma) * 100) : null;
   const ltvMedio      = totalComContrato > 0 ? ltvRealizado / totalComContrato : 0;
