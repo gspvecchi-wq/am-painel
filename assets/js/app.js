@@ -1374,7 +1374,7 @@ function popularCicloSelector() {
   // Coleta todos os ciclos disponíveis no KV
   const ciclosSet = new Set();
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo)) ciclosSet.add(ciclo);
     }
@@ -1430,7 +1430,7 @@ function toggleModoComparacao() {
 function popularCicloSelectComparacao() {
   const ciclos = [];
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
     }
@@ -2635,6 +2635,7 @@ function openDrModal(name, showMsgs=true) {
   // ── Seção de cancelamento ─────────────────
   _cancelAlunoAtual = aluno;
   renderCancelSection(aluno);
+  renderNaoRenovouSection(aluno);
 
   document.getElementById('drOv').classList.add('open');
 }
@@ -3186,6 +3187,7 @@ function switchView(id,el) {
   if (id==='receita'        && loaded) renderReceita();
   if (id==='aluno'          && loaded) renderAlunoView();
   if (id==='cancelamentos'  && loaded) renderCancelamentos();
+  if (id==='nao-renovou'   && loaded) renderNaoRenovou();
   if (id==='renovacao'     && loaded) renderRenovacao();
   if (id==='chamada'       && loaded) initChamada();
   if (id==='acionamentos')           initAcionamentos();
@@ -3774,13 +3776,154 @@ function editarCancelamento(normName) {
   abrirModalCancelamento();
 }
 
+// ═══════════════════════════════════════════
+// NÃO RENOVOU — KV + View
+// ═══════════════════════════════════════════
+function getNaoRenovouData(normName) {
+  return (kvPresenca['__nao_renovou__'] || {})[normName] || null;
+}
+function getNaoRenovouMap() {
+  return kvPresenca['__nao_renovou__'] || {};
+}
+function isNaoRenovou(aluno) {
+  return !!getNaoRenovouData(norm(aluno.name));
+}
+
+async function salvarNaoRenovou(normName, dados) {
+  if (!kvPresenca['__nao_renovou__']) kvPresenca['__nao_renovou__'] = {};
+  kvPresenca['__nao_renovou__'][normName] = dados;
+  try {
+    await fetch(WORKER_BASE + '/presenca', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': localStorage.getItem('am_cs_pwd')||'', 'X-CS-Nome': localStorage.getItem('am_cs_nome')||'' },
+      body: JSON.stringify({ tab: '__nao_renovou__', semana: 1, registros: { [normName]: dados } })
+    });
+  } catch(e) { console.error('Erro ao salvar não renovou:', e); }
+}
+
+async function marcarNaoRenovou(normName) {
+  const motivo = document.getElementById('nrMotivo')?.value?.trim() || '';
+  const dados = { data: new Date().toISOString().slice(0,10), motivo };
+  await salvarNaoRenovou(normName, dados);
+  closeOv('naoRenovouOv');
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  if (aluno) renderNaoRenovouSection(aluno);
+  if (document.querySelector('.view.active')?.id === 'view-nao-renovou') renderNaoRenovou();
+  showToast('contratosToast', 'Aluno marcado como Não Renovou', 'var(--danger)');
+}
+
+async function desfazerNaoRenovou(normName) {
+  if (!confirm('Remover marcação de Não Renovou?')) return;
+  if (kvPresenca['__nao_renovou__']) delete kvPresenca['__nao_renovou__'][normName];
+  try {
+    await fetch(WORKER_BASE + '/presenca', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': localStorage.getItem('am_cs_pwd')||'', 'X-CS-Nome': localStorage.getItem('am_cs_nome')||'' },
+      body: JSON.stringify({ tab: '__nao_renovou__', semana: 1, registros: { [normName]: null } })
+    });
+  } catch(e) { console.error('Erro ao desfazer não renovou:', e); }
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  if (aluno) renderNaoRenovouSection(aluno);
+  if (document.querySelector('.view.active')?.id === 'view-nao-renovou') renderNaoRenovou();
+}
+
+function renderNaoRenovouSection(aluno) {
+  const sec = document.getElementById('mNaoRenovouSection');
+  if (!sec) return;
+  const normName = norm(aluno.name);
+  const dados = getNaoRenovouData(normName);
+  if (dados) {
+    sec.innerHTML = `
+      <div style="background:var(--danger-dim);border:1px solid rgba(255,59,92,.3);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div>
+          <div style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:.06em;">Não renovou</div>
+          <div style="font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-2);margin-top:2px;">${dados.data}${dados.motivo ? ' · ' + esc(dados.motivo) : ''}</div>
+        </div>
+        ${csAuthenticated ? `<button onclick="desfazerNaoRenovou('${normName}')" style="background:none;border:1px solid var(--border2);color:var(--text-3);padding:4px 10px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:10px;cursor:pointer;">Desfazer</button>` : ''}
+      </div>`;
+  } else {
+    sec.innerHTML = csAuthenticated ? `
+      <button onclick="abrirModalNaoRenovou('${normName}')" style="width:100%;background:transparent;border:1px solid var(--danger);color:var(--danger);padding:8px;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='var(--danger-dim)'" onmouseout="this.style.background='transparent'">
+        Marcar como Não Renovou
+      </button>` : '';
+  }
+}
+
+function abrirModalNaoRenovou(normName) {
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  document.getElementById('nrModalNome').textContent = aluno ? displayName(aluno.name) : normName;
+  document.getElementById('nrNormName').value = normName;
+  document.getElementById('nrMotivo').value = '';
+  document.getElementById('naoRenovouOv').style.display = 'flex';
+}
+
+function renderNaoRenovou() {
+  const map = getNaoRenovouMap();
+  const lista = Object.entries(map)
+    .filter(([, v]) => v !== null)
+    .map(([normName, c]) => {
+      const aluno = allAlunos.find(a => norm(a.name) === normName);
+      return { ...c, normName, aluno };
+    })
+    .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+
+  const container = document.getElementById('nrTabela');
+  if (!container) return;
+
+  const total = lista.length;
+  const comContrato = allAlunos.filter(a => getContratosData(norm(a.name)).length > 0).length;
+  const taxaChurn = comContrato > 0 ? Math.round((total / comContrato) * 100) : 0;
+
+  const summary = document.getElementById('nrSummary');
+  if (summary) {
+    summary.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;">
+        <div class="cs-stat-card">
+          <div class="cs-stat-num" style="color:var(--danger)">${total}</div>
+          <div class="cs-stat-lbl">Não renovaram</div>
+        </div>
+        <div class="cs-stat-card">
+          <div class="cs-stat-num" style="color:var(--warn)">${taxaChurn}%</div>
+          <div class="cs-stat-lbl">Taxa de não renovação</div>
+          <div style="font-size:10px;color:var(--text-3);margin-top:2px;">sobre alunos c/ contrato</div>
+        </div>
+      </div>`;
+  }
+
+  if (!lista.length) {
+    container.innerHTML = `<div style="color:var(--text-3);font-size:13px;padding:24px 0;">Nenhum aluno marcado como não renovou ainda.</div>`;
+    return;
+  }
+
+  container.innerHTML = `<table>
+    <thead><tr>
+      <th>Aluno</th><th>Turma</th><th>Data</th><th>Motivo</th><th>LTV</th><th></th>
+    </tr></thead>
+    <tbody>
+      ${lista.map(c => {
+        const dn = c.aluno ? displayName(c.aluno.name) : c.normName;
+        const gen = c.aluno ? tit(c.aluno.gender) : 'Dr';
+        const ltv = calcTotalInvestido(c.normName);
+        return `<tr onclick="${c.aluno ? `openDrModal('${esc(c.aluno.name)}')` : ''}" style="cursor:pointer;">
+          <td>${gen}. ${esc(dn)}</td>
+          <td style="color:var(--text-2);">${c.aluno?.turma || '—'}</td>
+          <td style="color:var(--text-3);font-size:11px;">${c.data || '—'}</td>
+          <td style="color:var(--text-2);max-width:200px;">${esc(c.motivo || '—')}</td>
+          <td style="color:var(--purple);font-size:11px;font-weight:600;">${ltv ? fmtInvestido(ltv) : '—'}</td>
+          <td>${csAuthenticated ? `<button class="dr-act-btn" style="border-color:var(--danger);color:var(--danger);" onclick="event.stopPropagation();desfazerNaoRenovou('${c.normName}')">Desfazer</button>` : ''}</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+}
+
 // ── Chamada: seletor de ciclo ────────────────
 function popularCicloSelectorChamada() {
   const sel = document.getElementById('chamadaCiclo');
   if (!sel) return;
   const ciclos = [];
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
     }
@@ -3800,7 +3943,7 @@ function popularCicloSelectorCS() {
   if (!sel) return;
   const ciclos = [];
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
     }
@@ -4058,15 +4201,16 @@ async function loadChamada() {
 }
 
 function getChamadaPool(tab) {
+  const ativos = allAlunos.filter(a => !isNaoRenovou(a));
   if (tab==='Mentoria' || tab==='Hotseat' || tab==='Hotseat Simultâneo')
-    return allAlunos;
+    return ativos;
   if (tab==='Master')
-    return allAlunos.filter(a=>a.turma==='Master' || a.turma==='Winners');
+    return ativos.filter(a=>a.turma==='Master' || a.turma==='Winners');
   if (tab==='Winners Encontro')
-    return allAlunos.filter(a=>a.turma==='Winners');
+    return ativos.filter(a=>a.turma==='Winners');
   if (isEspecialidade(tab))
-    return allAlunos.filter(a=>hasEsp(a, tab));
-  return allAlunos;
+    return ativos.filter(a=>hasEsp(a, tab));
+  return ativos;
 }
 
 function renderChamadaTable(pool) {

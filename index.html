@@ -174,6 +174,10 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
       Cancelamentos
     </button>
+    <button class="sidebar-item" data-view="nao-renovou" onclick="switchView('nao-renovou',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>
+      Não Renovaram
+    </button>
   </div>
 </aside>
 <div class="layout-main">
@@ -880,6 +884,32 @@
   <div id="cancelTabela"></div>
 </div>
 
+<div class="view" id="view-nao-renovou">
+  <div class="view-page-header">
+    <div class="view-page-title-group">
+      <div class="view-page-eyebrow">Operações</div>
+      <h1 class="view-page-title">Alunos que <span class="view-page-title-accent">Não Renovaram</span></h1>
+    </div>
+  </div>
+  <div id="nrSummary"></div>
+  <div id="nrTabela"></div>
+</div>
+
+<!-- MODAL NÃO RENOVOU -->
+<div class="ov" id="naoRenovouOv" onclick="ovClick(event,'naoRenovouOv')">
+  <div class="dr-modal" style="max-width:440px;">
+    <button class="modal-x" onclick="closeOv('naoRenovouOv')">✕</button>
+    <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;color:var(--danger);margin-bottom:4px;">Marcar como Não Renovou</div>
+    <div id="nrModalNome" style="font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-2);margin-bottom:20px;"></div>
+    <input type="hidden" id="nrNormName">
+    <div class="field" style="margin-bottom:20px;">
+      <label style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);font-family:'DM Sans',sans-serif;font-weight:700;display:block;margin-bottom:6px;">Motivo (opcional)</label>
+      <textarea id="nrMotivo" rows="3" placeholder="Ex: Não sentiu ROI suficiente, mudança de prioridade..." style="width:100%;background:var(--s2);border:1px solid var(--border2);color:var(--text);border-radius:9px;padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:12px;resize:vertical;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--danger)'" onblur="this.style.borderColor='var(--border2)'"></textarea>
+    </div>
+    <button onclick="marcarNaoRenovou(document.getElementById('nrNormName').value)" style="width:100%;background:var(--danger);color:#fff;border:none;padding:10px;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">Confirmar</button>
+  </div>
+</div>
+
 <!-- MODAL DE CANCELAMENTO -->
 <div class="ov" id="cancelOv" onclick="ovClick(event,'cancelOv')">
   <div class="dr-modal" style="max-width:480px;">
@@ -959,6 +989,7 @@
       </button>
       <div id="mCancelStatus" style="margin-top:8px;"></div>
     </div>
+    <div id="mNaoRenovouSection" style="margin:10px 0 0;"></div>
   </div>
 </div>
 
