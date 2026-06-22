@@ -3856,7 +3856,7 @@ function abrirModalNaoRenovou(normName) {
   document.getElementById('nrModalNome').textContent = aluno ? displayName(aluno.name) : normName;
   document.getElementById('nrNormName').value = normName;
   document.getElementById('nrMotivo').value = '';
-  document.getElementById('naoRenovouOv').style.display = 'flex';
+  document.getElementById('naoRenovouOv').classList.add('open');
 }
 
 function renderNaoRenovou() {
@@ -3873,31 +3873,32 @@ function renderNaoRenovou() {
   if (!container) return;
 
   const total = lista.length;
-  const comContrato = allAlunos.filter(a => getContratosData(norm(a.name)).length > 0).length;
-  const taxaChurn = comContrato > 0 ? Math.round((total / comContrato) * 100) : 0;
+  const totalNaoRenovaram = total;
+  const totalRenovaram = allAlunos.filter(a => getContratosData(norm(a.name)).length >= 2).length;
+  const baseRenovacao = totalRenovaram + totalNaoRenovaram;
+  const taxaNaoRenov = baseRenovacao > 0 ? Math.round((totalNaoRenovaram / baseRenovacao) * 100) : 0;
 
   const summary = document.getElementById('nrSummary');
   if (summary) {
-    summary.innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;">
-        <div class="cs-stat-card">
-          <div class="cs-stat-num" style="color:var(--danger)">${total}</div>
-          <div class="cs-stat-lbl">Não renovaram</div>
-        </div>
-        <div class="cs-stat-card">
-          <div class="cs-stat-num" style="color:var(--warn)">${taxaChurn}%</div>
-          <div class="cs-stat-lbl">Taxa de não renovação</div>
-          <div style="font-size:10px;color:var(--text-3);margin-top:2px;">sobre alunos c/ contrato</div>
-        </div>
-      </div>`;
+    summary.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;width:100%;margin-bottom:20px;">
+      <div class="cs-stat-card" style="border-left:2px solid var(--danger);">
+        <div class="cs-stat-num" style="color:var(--danger)">${total}</div>
+        <div class="cs-stat-lbl">Não renovaram</div>
+      </div>
+      <div class="cs-stat-card" style="border-left:2px solid var(--warn);">
+        <div class="cs-stat-num" style="color:var(--warn)">${taxaNaoRenov}%</div>
+        <div class="cs-stat-lbl">Taxa de não renovação</div>
+        <div class="cs-stat-sub" style="font-size:10px;color:var(--text-3);margin-top:2px;">renovaram + não renovaram</div>
+      </div>
+    </div>`;
   }
 
   if (!lista.length) {
-    container.innerHTML = `<div style="color:var(--text-3);font-size:13px;padding:24px 0;">Nenhum aluno marcado como não renovou ainda.</div>`;
+    container.innerHTML = `<div class="cs-empty-desc" style="padding:24px 0;">Nenhum aluno marcado como não renovou ainda.</div>`;
     return;
   }
 
-  container.innerHTML = `<table>
+  container.innerHTML = `<table style="margin-top:4px;">
     <thead><tr>
       <th>Aluno</th><th>Turma</th><th>Data</th><th>Motivo</th><th>LTV</th><th></th>
     </tr></thead>
@@ -3906,13 +3907,14 @@ function renderNaoRenovou() {
         const dn = c.aluno ? displayName(c.aluno.name) : c.normName;
         const gen = c.aluno ? tit(c.aluno.gender) : 'Dr';
         const ltv = calcTotalInvestido(c.normName);
+        const motivo = c.motivo || '—';
         return `<tr onclick="${c.aluno ? `openDrModal('${esc(c.aluno.name)}')` : ''}" style="cursor:pointer;">
           <td>${gen}. ${esc(dn)}</td>
           <td style="color:var(--text-2);">${c.aluno?.turma || '—'}</td>
           <td style="color:var(--text-3);font-size:11px;">${c.data || '—'}</td>
-          <td style="color:var(--text-2);max-width:200px;">${esc(c.motivo || '—')}</td>
+          <td style="color:var(--text-2);max-width:200px;">${esc(motivo)}</td>
           <td style="color:var(--purple);font-size:11px;font-weight:600;">${ltv ? fmtInvestido(ltv) : '—'}</td>
-          <td>${csAuthenticated ? `<button class="dr-act-btn" style="border-color:var(--danger);color:var(--danger);" onclick="event.stopPropagation();desfazerNaoRenovou('${c.normName}')">Desfazer</button>` : ''}</td>
+          <td>${csAuthenticated ? `<button class="dr-act-btn" onclick="event.stopPropagation();desfazerNaoRenovou('${c.normName}')">Desfazer</button>` : ''}</td>
         </tr>`;
       }).join('')}
     </tbody>
