@@ -2235,6 +2235,126 @@ function renGoPage(tipo, page) {
   else                    { _renPassadoPage = page; }
   renderRenovacao();
 }
+
+function _buildRenovacaoMsg() {
+  const today = Date.now();
+  const rolling = getRollingWindow(5);
+  const futuro = [], passado = [];
+
+  for (const a of allAlunos) {
+    const aCycleEnd = getEffectiveCycleEnd(a);
+    if (!aCycleEnd) continue;
+    const end      = new Date(aCycleEnd + 'T12:00:00').getTime();
+    const daysLeft = Math.round((end - today) / (24 * 60 * 60 * 1000));
+    if (daysLeft >= 0 && daysLeft <= 90)       futuro.push({ ...a, daysLeft, cycleEnd: aCycleEnd });
+    else if (daysLeft < 0 && daysLeft >= -365) passado.push({ ...a, daysLeft, cycleEnd: aCycleEnd });
+  }
+  futuro.sort((a, b)  => a.daysLeft - b.daysLeft);
+  passado.sort((a, b) => b.daysLeft - a.daysLeft);
+
+  const fmtLine = (a) => {
+    const eng    = calcCompositeScoreRolling(a, rolling);
+    const dl     = a.daysLeft;
+    const dStr   = dl >= 0
+      ? (dl === 0 ? 'vence hoje' : `${dl}d restantes`)
+      : `${Math.abs(dl)}d em atraso`;
+    const engStr = eng < 40 ? '🔴' : eng < 70 ? '🟡' : '🟢';
+    const phone  = a.phone ? ` · ${fmtPhone(a.phone)}` : '';
+    const endDt  = fmtCycleDate(a.cycleEnd);
+    return `• *${tit(a.gender)}. ${displayName(a.name)}*\n  Produto: ${a.turma} · Fim: ${endDt}\n  ${dStr} ${engStr}${eng}%${phone}`;
+  };
+
+  const now = new Date().toLocaleDateString('pt-BR');
+  let msg = `📋 *Renovações — ${now}*`;
+
+  if (futuro.length) {
+    msg += `\n\n🔄 *Próximas Renovações (até 90 dias)*\n`;
+    msg += futuro.map(fmtLine).join('\n\n');
+  }
+
+  if (passado.length) {
+    msg += `\n\n⚠️ *Renovações em Atraso*\n`;
+    msg += passado.map(fmtLine).join('\n\n');
+  }
+
+  if (!futuro.length && !passado.length) {
+    msg += '\n\nNenhum aluno nessa janela.';
+  }
+
+  return msg;
+}
+
+function copiarRenovacaoWhatsApp() {
+  const msg = _buildRenovacaoMsg();
+  const btn = document.getElementById('btnCopiarRenovacao');
+
+  const onCopied = () => {
+    if (btn) { btn.textContent = '✓ Copiado!'; setTimeout(() => btn.textContent = 'Copiar para WhatsApp', 2500); }
+  };
+
+  navigator.clipboard.writeText(msg).then(onCopied).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = msg;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    onCopied();
+  });
+}
+
+async function enviarRenovacaoGrupo() {
+  const msg = _buildRenovacaoMsg();
+  const pwd  = localStorage.getItem('am_cs_pwd') || '';
+  const nome = localStorage.getItem('am_cs_nome') || csNomeAtual || 'CS';
+  const btn  = document.getElementById('btnEnviarRenovacaoGrupo');
+  const status = document.getElementById('renEnvioStatus');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Enviando...';
+  if (status) { status.style.display = 'none'; }
+
+  try {
+    const res = await fetch(WORKER_BASE + '/whatsapp/grupo', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CS-Password': pwd,
+        'X-CS-Nome': nome,
+        'X-CS-Email': localStorage.getItem('am_cs_email') || ''
+      },
+      body: JSON.stringify({ mensagem: msg })
+    });
+    const data = await res.json();
+    if (status) {
+      status.style.display = 'block';
+      if (data.ok) {
+        status.style.background = 'var(--safe-dim)';
+        status.style.color      = 'var(--safe)';
+        status.style.border     = '1px solid var(--safe)';
+        status.textContent      = '✓ Enviado para o grupo do CS!';
+      } else {
+        status.style.background = 'var(--danger-dim)';
+        status.style.color      = 'var(--danger)';
+        status.style.border     = '1px solid var(--danger)';
+        status.textContent      = `✗ Erro: ${data.error || 'falha no envio'}`;
+      }
+      setTimeout(() => { if (status) status.style.display = 'none'; }, 5000);
+    }
+  } catch (e) {
+    if (status) {
+      status.style.display    = 'block';
+      status.style.background = 'var(--danger-dim)';
+      status.style.color      = 'var(--danger)';
+      status.style.border     = '1px solid var(--danger)';
+      status.textContent      = `✗ Erro de rede: ${e.message}`;
+    }
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = 'Enviar para Grupo CS';
+  }
+}
 function renderClasseSummary() {
   const summary = document.getElementById('classeSummary');
   if (!summary) return;
