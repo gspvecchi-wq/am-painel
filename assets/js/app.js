@@ -2285,23 +2285,30 @@ function _buildRenovacaoMsg() {
 }
 
 function copiarRenovacaoWhatsApp() {
-  const msg = _buildRenovacaoMsg();
-  const btn = document.getElementById('btnCopiarRenovacao');
+  let msg;
+  try { msg = _buildRenovacaoMsg(); } catch(e) { alert('Erro ao gerar mensagem: ' + e.message); return; }
 
+  const btn = document.getElementById('btnCopiarRenovacao');
   const onCopied = () => {
     if (btn) { btn.textContent = '✓ Copiado!'; setTimeout(() => btn.textContent = 'Copiar para WhatsApp', 2500); }
   };
 
-  navigator.clipboard.writeText(msg).then(onCopied).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = msg;
-    ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    onCopied();
-  });
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(msg).then(onCopied).catch(() => _copyFallback(msg, onCopied));
+  } else {
+    _copyFallback(msg, onCopied);
+  }
+}
+
+function _copyFallback(text, cb) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:0;left:0;width:2em;height:2em;padding:0;border:none;outline:none;background:transparent';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try { document.execCommand('copy'); if (cb) cb(); } catch(e) { alert('Não foi possível copiar automaticamente.\nCopie manualmente:\n\n' + text.slice(0, 200) + '...'); }
+  document.body.removeChild(ta);
 }
 
 async function enviarRenovacaoGrupo() {
