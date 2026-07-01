@@ -3392,22 +3392,26 @@ function calcReceitaMetrics() {
     if (fatIni && fatAtu && fatIni > 0) { fatIniSoma += fatIni; fatAtuSoma += fatAtu; fatCount++; }
   }
 
-  // Saídas totais = manuais (não renovou) + automáticas (churn detectado), sem dupla contagem
+  // Não renovaram = ciclo terminou, não assinou novo (rastreamento manual)
   const totalNaoRenovaram = Object.values(naoRenovouMap).filter(v => v !== null).length;
-  const totalSaidas       = totalNaoRenovaram + totalChurn;
 
-  // Taxa de renovação: só sobre quem efetivamente chegou à decisão de renovar
+  // Cancelamentos finalizados = saiu no meio do ciclo (rescisão ou processo finalizado)
+  const cancelMap = _flattenKvTab('__cancelamentos__');
+  const totalCancelamentosFinalizados = Object.values(cancelMap)
+    .filter(c => c && (c.status === 'finalizado' || c.status === 'rescisao_assinada')).length;
+
+  // Taxa de renovação: só sobre quem chegou ao fim do ciclo e tinha que decidir se renovava
   const baseRenovacao = totalRenovaram + totalNaoRenovaram;
   const taxaRenovacao = baseRenovacao > 0 ? Math.round(totalRenovaram / baseRenovacao * 100) : 0;
 
-  // Churn rate: saídas totais / base com contrato
-  const taxaChurn = totalComContrato > 0 ? Math.round(totalSaidas / totalComContrato * 100) : 0;
+  // Churn auto = contratos vencidos detectados automaticamente (não categorizados manualmente)
+  // totalChurn já exclui os que estão em naoRenovouMap (calculado no loop)
 
   const roiMedio = fatCount > 0 ? Math.round(((fatAtuSoma - fatIniSoma) / fatIniSoma) * 100) : null;
   const ltvMedio = totalComContrato > 0 ? ltvRealizado / totalComContrato : 0;
   const mrr      = arrTotal / 12;
 
-  return { arrTotal, mrr, ltvRealizado, ltvProjetado, ltvMedio, taxaRenovacao, taxaChurn, roiMedio, totalComContrato, totalRenovaram, totalChurn, totalNaoRenovaram, totalSaidas, baseRenovacao, porTurma, fatCount };
+  return { arrTotal, mrr, ltvRealizado, ltvProjetado, ltvMedio, taxaRenovacao, roiMedio, totalComContrato, totalRenovaram, totalNaoRenovaram, totalCancelamentosFinalizados, totalChurn, baseRenovacao, porTurma, fatCount };
 }
 
 function renderReceita() {
@@ -3443,7 +3447,8 @@ function renderReceita() {
     <div style="margin-bottom:8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);font-family:'DM Sans',sans-serif;font-weight:700;">Retenção</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px;">
       ${kpiCard('Taxa de Renovação', m.taxaRenovacao + '%', `${m.totalRenovaram} de ${m.baseRenovacao} que chegaram à renovação`, '--safe')}
-      ${kpiCard('Churn', m.taxaChurn + '%', `${m.totalSaidas} saídas (${m.totalNaoRenovaram} manuais + ${m.totalChurn} auto)`, m.taxaChurn > 20 ? '--danger' : m.taxaChurn > 10 ? '--warn' : '--text-2')}
+      ${kpiCard('Não Renovaram', String(m.totalNaoRenovaram), 'Ciclo encerrado sem renovação', m.totalNaoRenovaram > 0 ? '--warn' : '--text-2')}
+      ${kpiCard('Cancelamentos', String(m.totalCancelamentosFinalizados), 'Rescisão no meio do ciclo', m.totalCancelamentosFinalizados > 0 ? '--danger' : '--text-2')}
       ${kpiCard('Alunos c/ contrato', String(m.totalComContrato), `de ${allAlunos.length} alunos totais`, '--text-2')}
     </div>`;
 
