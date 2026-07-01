@@ -3735,11 +3735,16 @@ const CANCEL_STATUS = {
 let _cancelAlunoAtual = null;
 
 function getCancelamentoData(normName) {
-  return (kvPresenca['__cancelamentos__'] || {})[normName] || null;
+  return _flattenKvTab('__cancelamentos__')[normName] || null;
 }
 
 function getCancelamentos() {
-  return kvPresenca['__cancelamentos__'] || {};
+  return _flattenKvTab('__cancelamentos__');
+}
+
+function isCancelamentoFinalizado(aluno) {
+  const d = getCancelamentoData(norm(aluno.name));
+  return d && (d.status === 'finalizado' || d.status === 'rescisao_assinada');
 }
 
 async function saveCancelamento(normName, dados) {
@@ -3908,21 +3913,26 @@ function editarCancelamento(normName) {
 // ═══════════════════════════════════════════
 // NÃO RENOVOU — KV + View
 // ═══════════════════════════════════════════
-function getNaoRenovouData(normName) {
-  const tabData = kvPresenca['__nao_renovou__'] || {};
-  // Achatar todos os ciclos — estrutura real: { ciclo: { normName: dados } }
-  for (const ciclo of Object.values(tabData)) {
-    if (ciclo && typeof ciclo === 'object' && ciclo[normName]) return ciclo[normName];
-  }
-  return null;
-}
-function getNaoRenovouMap() {
-  const tabData = kvPresenca['__nao_renovou__'] || {};
+function _flattenKvTab(tab) {
+  // Suporta estrutura local flat { normName: dados }
+  // e estrutura do servidor { 'YYYY-MM': { normName: dados } }
+  const tabData = kvPresenca[tab] || {};
   const flat = {};
-  for (const ciclo of Object.values(tabData)) {
-    if (ciclo && typeof ciclo === 'object') Object.assign(flat, ciclo);
+  for (const [key, val] of Object.entries(tabData)) {
+    if (!val || typeof val !== 'object') continue;
+    if (/^\d{4}-\d{2}$/.test(key)) {
+      Object.assign(flat, val);   // ciclo → achata
+    } else {
+      flat[key] = val;            // já flat
+    }
   }
   return flat;
+}
+function getNaoRenovouData(normName) {
+  return _flattenKvTab('__nao_renovou__')[normName] || null;
+}
+function getNaoRenovouMap() {
+  return _flattenKvTab('__nao_renovou__');
 }
 function isNaoRenovou(aluno) {
   return !!getNaoRenovouData(norm(aluno.name));
@@ -4342,7 +4352,7 @@ async function loadChamada() {
 }
 
 function getChamadaPool(tab) {
-  const ativos = allAlunos.filter(a => !isNaoRenovou(a));
+  const ativos = allAlunos.filter(a => !isNaoRenovou(a) && !isCancelamentoFinalizado(a));
   if (tab==='Mentoria' || tab==='Hotseat' || tab==='Hotseat Simultâneo')
     return ativos;
   if (tab==='Master')
