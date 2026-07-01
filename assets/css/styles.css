@@ -1012,6 +1012,9 @@ body {
 .ov.open {
   display: flex;
 }
+.ov.ov-top {
+  z-index: 400;
+}
 
 @keyframes su {
   from { transform: translateY(16px); opacity: 0; }

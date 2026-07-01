@@ -909,17 +909,17 @@
 </div>
 
 <!-- MODAL NÃO RENOVOU -->
-<div class="ov" id="naoRenovouOv" onclick="ovClick(event,'naoRenovouOv')">
+<div class="ov ov-top" id="naoRenovouOv" onclick="ovClick(event,'naoRenovouOv')">
   <div class="dr-modal" style="max-width:440px;">
     <button class="modal-x" onclick="closeOv('naoRenovouOv')">✕</button>
     <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;color:var(--danger);margin-bottom:4px;">Marcar como Não Renovou</div>
     <div id="nrModalNome" style="font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-2);margin-bottom:20px;"></div>
     <input type="hidden" id="nrNormName">
-    <div class="field" style="margin-bottom:20px;">
+    <div style="margin-bottom:14px;">
       <label style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);font-family:'DM Sans',sans-serif;font-weight:700;display:block;margin-bottom:6px;">Motivo (opcional)</label>
-      <textarea id="nrMotivo" rows="3" placeholder="Ex: Não sentiu ROI suficiente, mudança de prioridade..." style="width:100%;background:var(--s2);border:1px solid var(--border2);color:var(--text);border-radius:9px;padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:12px;resize:vertical;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--danger)'" onblur="this.style.borderColor='var(--border2)'"></textarea>
+      <textarea id="nrMotivo" rows="3" placeholder="Ex: Não sentiu ROI suficiente, mudança de prioridade..." style="width:100%;background:var(--s3);border:1px solid var(--border2);color:var(--text);border-radius:9px;padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;resize:vertical;box-sizing:border-box;" onfocus="this.style.borderColor='var(--danger)'" onblur="this.style.borderColor='var(--border2)'"></textarea>
     </div>
-    <button onclick="marcarNaoRenovou(document.getElementById('nrNormName').value)" style="width:100%;background:var(--danger);color:#fff;border:none;padding:10px;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">Confirmar</button>
+    <button onclick="marcarNaoRenovou(document.getElementById('nrNormName').value)" class="btn-primary" style="width:100%;background:var(--danger);color:#fff;font-size:13px;font-weight:700;cursor:pointer;border:none;height:40px;border-radius:9px;">Confirmar</button>
   </div>
 </div>
 
