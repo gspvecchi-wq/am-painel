@@ -3338,44 +3338,50 @@ function calcReceitaMetrics() {
 
   const porTurma = { Master: { arr: 0, alunos: 0 }, Mentoria: { arr: 0, alunos: 0 }, Winners: { arr: 0, alunos: 0 } };
 
+  const naoRenovouMap = getNaoRenovouMap();
+
   for (const aluno of allAlunos) {
     const contratos = getContratosData(norm(aluno.name));
     if (!contratos.length) continue;
     totalComContrato++;
 
-    // LTV realizado — soma de todos os contratos
+    // LTV realizado — soma de todos os contratos (inclui quem saiu)
     let ltvAluno = 0;
     for (const c of contratos) {
       const v = parseFloat(String(c.valor || '').replace(/[^0-9.,]/g, '').replace(',', '.'));
       if (!isNaN(v) && v > 0) { ltvRealizado += v; ltvAluno += v; }
     }
 
-    // Renovação
-    if (contratos.length >= 2) totalRenovaram++;
+    // Renovação — tem >= 2 contratos e NÃO está marcado como não renovou
+    if (contratos.length >= 2 && !naoRenovouMap[norm(aluno.name)]) totalRenovaram++;
 
-    // ARR — contratos ativos (término no futuro ou sem término definido)
-    const ultimo = contratos[contratos.length - 1];
+    const ultimo  = contratos[contratos.length - 1];
     const cycleEnd = calcCycleEndFromContratos(contratos);
-    const ativo = !cycleEnd || new Date(cycleEnd + 'T12:00:00').getTime() > hoje;
-    if (ativo && ultimo.valor) {
+    const ativo   = !cycleEnd || new Date(cycleEnd + 'T12:00:00').getTime() > hoje;
+
+    // Cancelamento finalizado — exclui de ARR e Receita em Jogo
+    const cancelFinalizado = isCancelamentoFinalizado(aluno);
+
+    // ARR — apenas contratos ativos e não cancelados
+    if (ativo && !cancelFinalizado && ultimo.valor) {
       const v = parseFloat(String(ultimo.valor).replace(/[^0-9.,]/g, '').replace(',', '.'));
       if (!isNaN(v) && v > 0) {
         const meses = parseInt(ultimo.duracao) || duracaoPadrao(ultimo.turma);
-        const arrContrib = (v / meses) * 12; // anualiza
+        const arrContrib = (v / meses) * 12;
         arrTotal += arrContrib;
         const turma = ultimo.turma || 'Master';
         if (porTurma[turma]) { porTurma[turma].arr += arrContrib; porTurma[turma].alunos++; }
       }
     }
 
-    // Churn — contrato vencido há mais de 30 dias e sem renovação
+    // Churn automático — vencido > 30 dias, 1 contrato, sem marcação manual de não renovou
     if (cycleEnd) {
       const endMs = new Date(cycleEnd + 'T12:00:00').getTime();
-      if (endMs < hoje - msMes && contratos.length === 1) totalChurn++;
+      if (endMs < hoje - msMes && contratos.length === 1 && !naoRenovouMap[norm(aluno.name)]) totalChurn++;
     }
 
-    // LTV projetado — soma do último contrato de cada aluno ativo (próxima renovação estimada)
-    if (ativo && ultimo.valor) {
+    // Receita em Jogo — último contrato de cada aluno ativo e não cancelado
+    if (ativo && !cancelFinalizado && ultimo.valor) {
       const v = parseFloat(String(ultimo.valor).replace(/[^0-9.,]/g, '').replace(',', '.'));
       if (!isNaN(v) && v > 0) ltvProjetado += v;
     }
@@ -3386,15 +3392,22 @@ function calcReceitaMetrics() {
     if (fatIni && fatAtu && fatIni > 0) { fatIniSoma += fatIni; fatAtuSoma += fatAtu; fatCount++; }
   }
 
-  const totalNaoRenovaram = Object.values(getNaoRenovouMap()).filter(v => v !== null).length;
+  // Saídas totais = manuais (não renovou) + automáticas (churn detectado), sem dupla contagem
+  const totalNaoRenovaram = Object.values(naoRenovouMap).filter(v => v !== null).length;
+  const totalSaidas       = totalNaoRenovaram + totalChurn;
+
+  // Taxa de renovação: só sobre quem efetivamente chegou à decisão de renovar
   const baseRenovacao = totalRenovaram + totalNaoRenovaram;
   const taxaRenovacao = baseRenovacao > 0 ? Math.round(totalRenovaram / baseRenovacao * 100) : 0;
-  const taxaChurn     = totalComContrato > 0 ? Math.round(totalChurn / totalComContrato * 100) : 0;
-  const roiMedio      = fatCount > 0 ? Math.round(((fatAtuSoma - fatIniSoma) / fatIniSoma) * 100) : null;
-  const ltvMedio      = totalComContrato > 0 ? ltvRealizado / totalComContrato : 0;
-  const mrr           = arrTotal / 12;
 
-  return { arrTotal, mrr, ltvRealizado, ltvProjetado, ltvMedio, taxaRenovacao, taxaChurn, roiMedio, totalComContrato, totalRenovaram, totalChurn, porTurma, fatCount };
+  // Churn rate: saídas totais / base com contrato
+  const taxaChurn = totalComContrato > 0 ? Math.round(totalSaidas / totalComContrato * 100) : 0;
+
+  const roiMedio = fatCount > 0 ? Math.round(((fatAtuSoma - fatIniSoma) / fatIniSoma) * 100) : null;
+  const ltvMedio = totalComContrato > 0 ? ltvRealizado / totalComContrato : 0;
+  const mrr      = arrTotal / 12;
+
+  return { arrTotal, mrr, ltvRealizado, ltvProjetado, ltvMedio, taxaRenovacao, taxaChurn, roiMedio, totalComContrato, totalRenovaram, totalChurn, totalNaoRenovaram, totalSaidas, baseRenovacao, porTurma, fatCount };
 }
 
 function renderReceita() {
@@ -3429,8 +3442,8 @@ function renderReceita() {
   const cardsRetencao = `
     <div style="margin-bottom:8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);font-family:'DM Sans',sans-serif;font-weight:700;">Retenção</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px;">
-      ${kpiCard('Taxa de Renovação', m.taxaRenovacao + '%', `${m.totalRenovaram} de ${m.totalComContrato} alunos renovaram`, '--safe')}
-      ${kpiCard('Churn', m.taxaChurn + '%', `${m.totalChurn} contratos vencidos sem renovação`, m.taxaChurn > 20 ? '--danger' : m.taxaChurn > 10 ? '--warn' : '--text-2')}
+      ${kpiCard('Taxa de Renovação', m.taxaRenovacao + '%', `${m.totalRenovaram} de ${m.baseRenovacao} que chegaram à renovação`, '--safe')}
+      ${kpiCard('Churn', m.taxaChurn + '%', `${m.totalSaidas} saídas (${m.totalNaoRenovaram} manuais + ${m.totalChurn} auto)`, m.taxaChurn > 20 ? '--danger' : m.taxaChurn > 10 ? '--warn' : '--text-2')}
       ${kpiCard('Alunos c/ contrato', String(m.totalComContrato), `de ${allAlunos.length} alunos totais`, '--text-2')}
     </div>`;
 
