@@ -3909,10 +3909,20 @@ function editarCancelamento(normName) {
 // NÃO RENOVOU — KV + View
 // ═══════════════════════════════════════════
 function getNaoRenovouData(normName) {
-  return (kvPresenca['__nao_renovou__'] || {})[normName] || null;
+  const tabData = kvPresenca['__nao_renovou__'] || {};
+  // Achatar todos os ciclos — estrutura real: { ciclo: { normName: dados } }
+  for (const ciclo of Object.values(tabData)) {
+    if (ciclo && typeof ciclo === 'object' && ciclo[normName]) return ciclo[normName];
+  }
+  return null;
 }
 function getNaoRenovouMap() {
-  return kvPresenca['__nao_renovou__'] || {};
+  const tabData = kvPresenca['__nao_renovou__'] || {};
+  const flat = {};
+  for (const ciclo of Object.values(tabData)) {
+    if (ciclo && typeof ciclo === 'object') Object.assign(flat, ciclo);
+  }
+  return flat;
 }
 function isNaoRenovou(aluno) {
   return !!getNaoRenovouData(norm(aluno.name));
