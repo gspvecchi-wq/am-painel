@@ -3411,7 +3411,9 @@ function calcReceitaMetrics() {
   const ltvMedio = totalComContrato > 0 ? ltvRealizado / totalComContrato : 0;
   const mrr      = arrTotal / 12;
 
-  return { arrTotal, mrr, ltvRealizado, ltvProjetado, ltvMedio, taxaRenovacao, roiMedio, totalComContrato, totalRenovaram, totalNaoRenovaram, totalCancelamentosFinalizados, totalChurn, baseRenovacao, porTurma, fatCount };
+  const taxaChurn = totalComContrato > 0 ? Math.round((totalNaoRenovaram + totalCancelamentosFinalizados) / totalComContrato * 100) : 0;
+
+  return { arrTotal, mrr, ltvRealizado, ltvProjetado, ltvMedio, taxaRenovacao, taxaChurn, roiMedio, totalComContrato, totalRenovaram, totalNaoRenovaram, totalCancelamentosFinalizados, totalChurn, baseRenovacao, porTurma, fatCount };
 }
 
 function renderReceita() {
@@ -3447,6 +3449,7 @@ function renderReceita() {
     <div style="margin-bottom:8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);font-family:'DM Sans',sans-serif;font-weight:700;">Retenção</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px;">
       ${kpiCard('Taxa de Renovação', m.taxaRenovacao + '%', `${m.totalRenovaram} de ${m.baseRenovacao} que chegaram à renovação`, '--safe')}
+      ${kpiCard('Churn', m.taxaChurn + '%', `${m.totalNaoRenovaram} não renovaram + ${m.totalCancelamentosFinalizados} cancelamentos`, m.taxaChurn > 20 ? '--danger' : m.taxaChurn > 10 ? '--warn' : '--text-2')}
       ${kpiCard('Não Renovaram', String(m.totalNaoRenovaram), 'Ciclo encerrado sem renovação', m.totalNaoRenovaram > 0 ? '--warn' : '--text-2')}
       ${kpiCard('Cancelamentos', String(m.totalCancelamentosFinalizados), 'Rescisão no meio do ciclo', m.totalCancelamentosFinalizados > 0 ? '--danger' : '--text-2')}
       ${kpiCard('Alunos c/ contrato', String(m.totalComContrato), `de ${allAlunos.length} alunos totais`, '--text-2')}
