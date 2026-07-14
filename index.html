@@ -642,11 +642,12 @@
 <!-- ALUNO VIEW -->
 <div class="view" id="view-aluno">
   <div id="alunoContent" style="display:none">
-    <div class="view-page-header">
+    <div class="view-page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
       <div class="view-page-title-group">
         <div class="view-page-eyebrow">Jornada do Cliente</div>
         <h1 class="view-page-title">Jornada <span class="view-page-title-accent">do Cliente</span></h1>
       </div>
+      <button id="btnAddManual" onclick="abrirModalManual()" style="display:none;align-items:center;gap:6px;background:var(--acc);color:#000;border:none;height:38px;padding:0 16px;border-radius:9px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">+ Incluir aluno</button>
     </div>
     <div id="classeSummary" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;"></div>
     <div class="profile-search">
@@ -944,6 +945,7 @@
         <option value="sem_retorno">Sem retorno após envio do cálculo</option>
         <option value="rescisao_assinada">Contrato de rescisão assinado</option>
         <option value="finalizado">Processo finalizado</option>
+        <option value="cancelamento_revertido">Cancelamento Revertido - Em tratativa com o Jurídico</option>
       </select>
     </div>
 
@@ -952,6 +954,49 @@
       <button class="contratos-btn-cancel" onclick="closeOv('cancelOv')">Cancelar</button>
     </div>
     <div id="cancelFeedback" style="display:none;margin-top:10px;font-size:11px;font-weight:600;padding:6px 12px;border-radius:7px;font-family:'DM Sans',sans-serif;"></div>
+  </div>
+</div>
+
+<!-- MODAL INCLUIR ALUNO MANUAL -->
+<div class="ov" id="manualOv" onclick="ovClick(event,'manualOv')">
+  <div class="dr-modal" style="max-width:420px;">
+    <button class="modal-x" onclick="closeOv('manualOv')">✕</button>
+    <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;color:var(--acc);margin-bottom:4px;">Incluir aluno</div>
+    <div style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text-2);margin-bottom:20px;">Adiciona um aluno à Jornada antes de aparecer no Monday (ex.: onboarding e objetivo).</div>
+
+    <div class="field" style="margin-bottom:14px;">
+      <label style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);font-family:'DM Sans',sans-serif;font-weight:700;display:block;margin-bottom:6px;">Nome completo</label>
+      <input type="text" id="manualNome" placeholder="Ex.: Maria Silva" style="width:100%;background:var(--s3);border:1px solid var(--border2);color:var(--text);border-radius:9px;padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--acc)'" onblur="this.style.borderColor='var(--border2)'">
+    </div>
+
+    <div style="display:flex;gap:10px;margin-bottom:14px;">
+      <div class="field" style="flex:1;">
+        <label style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);font-family:'DM Sans',sans-serif;font-weight:700;display:block;margin-bottom:6px;">Turma</label>
+        <select id="manualTurma" style="width:100%;background:var(--s3);border:1px solid var(--border2);color:var(--text);padding:10px 12px;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;">
+          <option value="Mentoria">Mentoria</option>
+          <option value="Master">Master</option>
+          <option value="Winners">Winners</option>
+        </select>
+      </div>
+      <div class="field" style="flex:1;">
+        <label style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);font-family:'DM Sans',sans-serif;font-weight:700;display:block;margin-bottom:6px;">Gênero</label>
+        <select id="manualGenero" style="width:100%;background:var(--s3);border:1px solid var(--border2);color:var(--text);padding:10px 12px;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;">
+          <option value="M">Masculino</option>
+          <option value="F">Feminino</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:20px;">
+      <label style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);font-family:'DM Sans',sans-serif;font-weight:700;display:block;margin-bottom:6px;">Telefone (WhatsApp)</label>
+      <input type="text" id="manualTelefone" placeholder="Ex.: (11) 91234-5678" style="width:100%;background:var(--s3);border:1px solid var(--border2);color:var(--text);border-radius:9px;padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--acc)'" onblur="this.style.borderColor='var(--border2)'">
+    </div>
+
+    <div style="display:flex;gap:8px;">
+      <button class="contratos-btn-save" style="flex:1;" onclick="confirmarManual()">Incluir</button>
+      <button class="contratos-btn-cancel" onclick="closeOv('manualOv')">Cancelar</button>
+    </div>
+    <div id="manualFeedback" style="display:none;margin-top:10px;font-size:11px;font-weight:600;padding:6px 12px;border-radius:7px;font-family:'DM Sans',sans-serif;"></div>
   </div>
 </div>
 
@@ -964,6 +1009,7 @@
       <div id="mClassBadge"></div>
     </div>
     <div class="modal-meta" id="mMeta"></div>
+    <div id="mObjetivoSection" style="margin:12px 0 0;"></div>
     <div class="hist-row" id="mHist"></div>
     <div class="mstats" id="mStats"></div>
     <div id="mSinalDeRisco" style="display:none;margin:16px 0 0;"></div>

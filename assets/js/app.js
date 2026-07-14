@@ -317,6 +317,7 @@ async function reloadAll() {
     try {
       const kvRes = await fetch(WORKER_URL.replace('/dados','/presenca/all'));
       kvPresenca = kvRes.ok ? await kvRes.json() : {};
+      mergeAlunosManuais();
       popularCicloSelector();
       popularCicloSelectorCS();
       popularCicloSelectorChamada();
@@ -1374,7 +1375,7 @@ function popularCicloSelector() {
   // Coleta todos os ciclos disponíveis no KV
   const ciclosSet = new Set();
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__' || tab === '__manuais__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo)) ciclosSet.add(ciclo);
     }
@@ -1430,7 +1431,7 @@ function toggleModoComparacao() {
 function popularCicloSelectComparacao() {
   const ciclos = [];
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__' || tab === '__manuais__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
     }
@@ -2410,6 +2411,8 @@ function jornadaGoPage(page) {
 
 function renderProfiles() {
   renderClasseSummary();
+  const _btnAdd = document.getElementById('btnAddManual');
+  if (_btnAdd) _btnAdd.style.display = csAuthenticated ? 'inline-flex' : 'none';
   const q=(document.getElementById('searchInput').value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   let list=allAlunos.filter(a=>!q||norm(a.name).includes(q));
   if (classeFiltro) list = list.filter(a => calcClassificacao(a) === classeFiltro);
@@ -2754,6 +2757,9 @@ function openDrModal(name, showMsgs=true) {
       mOnb.style.display = 'none';
     }
   }
+
+  // ── Objetivo do mentorado (sempre visível) ───
+  renderObjetivoSection(name);
 
   // ── Badge de classificação no nome ───────
   const mClassBadge = document.getElementById('mClassBadge');
@@ -3133,6 +3139,126 @@ function setOnboardingDate(normName, key, val) {
   saveOnboarding(normName);
 }
 
+// ── Objetivo do mentorado ─────────────────────────────────
+// Coletado pela CS no onboarding (entrada na mentoria/mastermind).
+// Armazenado junto do onboarding no KV (tab='__onboarding__', chave 'objetivo').
+function getObjetivoData(normName) {
+  return getOnboardingData(normName).objetivo || '';
+}
+
+function renderObjetivoSection(name) {
+  const section = document.getElementById('mObjetivoSection');
+  if (!section) return;
+  const normName = norm(name);
+  const objetivo = getObjetivoData(normName);
+  const canEdit  = csAuthenticated;
+
+  const header = `<div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);margin-bottom:6px;font-weight:700;">🎯 Objetivo do mentorado</div>`;
+
+  if (canEdit) {
+    section.innerHTML = header + `
+      <textarea id="mObjetivoInput" rows="2" placeholder="O que o mentorado quer alcançar na mentoria/mastermind..."
+        style="width:100%;background:var(--s3);border:1px solid var(--border2);color:var(--text);border-radius:9px;padding:9px 11px;font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.5;outline:none;resize:vertical;box-sizing:border-box;"
+        onfocus="this.style.borderColor='var(--acc)'" onblur="this.style.borderColor='var(--border2)';setObjetivo('${normName}',this.value)">${escHtml(objetivo).replace(/<br>/g,'\n')}</textarea>`;
+  } else {
+    section.innerHTML = header + `
+      <div style="background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.5;color:${objetivo ? 'var(--text)' : 'var(--text-3)'};">${objetivo ? escHtml(objetivo) : 'Não informado'}</div>`;
+  }
+}
+
+function setObjetivo(normName, val) {
+  if (!kvPresenca['__onboarding__']) kvPresenca['__onboarding__'] = {};
+  if (!kvPresenca['__onboarding__'][normName]) kvPresenca['__onboarding__'][normName] = {};
+  const novo = (val || '').trim();
+  if ((kvPresenca['__onboarding__'][normName].objetivo || '') === novo) return; // sem mudança
+  kvPresenca['__onboarding__'][normName].objetivo = novo;
+  saveOnboarding(normName);
+}
+
+// ── Inclusão manual de alunos na Jornada ──────────────────
+// Alunos adicionados pela CS antes de aparecerem no Monday.
+// Armazenados no KV (tab='__manuais__') e mesclados em allAlunos no load.
+function getManuaisData() {
+  return kvPresenca['__manuais__'] || {};
+}
+
+function mergeAlunosManuais() {
+  const manuais = getManuaisData();
+  const existentes = new Set(allAlunos.map(a => norm(a.name)));
+  for (const [normName, m] of Object.entries(manuais)) {
+    if (!m || !m.nome) continue;
+    if (existentes.has(normName)) continue; // já veio do Monday — não duplica
+    existentes.add(normName);
+    allAlunos.push({
+      name: m.nome,
+      phone: m.telefone || '',
+      entryDate: m.dataEntrada || '',
+      turma: m.turma || 'Mentoria',
+      especialidades: [],
+      cycleStart: '', cycleEnd: '', cycleStatus: '', birthday: '',
+      fatInicial: '', fatAtual: '',
+      gender: m.gender || inferGender(m.nome),
+      _manual: true
+    });
+  }
+}
+
+function abrirModalManual() {
+  if (!csAuthenticated) { alert('Faça login como CS para incluir alunos.'); return; }
+  document.getElementById('manualNome').value = '';
+  document.getElementById('manualTurma').value = 'Mentoria';
+  document.getElementById('manualGenero').value = 'M';
+  document.getElementById('manualTelefone').value = '';
+  const fb = document.getElementById('manualFeedback');
+  if (fb) fb.style.display = 'none';
+  document.getElementById('manualOv').classList.add('open');
+}
+
+async function confirmarManual() {
+  const nome     = document.getElementById('manualNome').value.trim();
+  const turma    = document.getElementById('manualTurma').value;
+  const gender   = document.getElementById('manualGenero').value;
+  const telefone = document.getElementById('manualTelefone').value.trim();
+  const fb = document.getElementById('manualFeedback');
+  const showFb = (txt, ok) => {
+    fb.style.display  = 'block';
+    fb.textContent    = txt;
+    fb.style.background = ok ? 'var(--safe-dim)' : 'var(--danger-dim)';
+    fb.style.color      = ok ? 'var(--safe)' : 'var(--danger)';
+    fb.style.border     = '1px solid ' + (ok ? 'var(--safe)' : 'var(--danger)');
+  };
+
+  if (!nome) { showFb('Informe o nome do aluno', false); return; }
+  const normName = norm(nome);
+  if (allAlunos.some(a => norm(a.name) === normName)) { showFb('Já existe um aluno com esse nome', false); return; }
+
+  const dados = { nome, turma, gender, telefone, dataEntrada: new Date().toISOString().slice(0,10) };
+  const ok = await saveManual(normName, dados);
+  if (ok) {
+    if (!kvPresenca['__manuais__']) kvPresenca['__manuais__'] = {};
+    kvPresenca['__manuais__'][normName] = dados;
+    mergeAlunosManuais();
+    updateBadge();
+    renderProfiles();
+    showFb('✓ Aluno incluído na Jornada', true);
+    setTimeout(() => closeOv('manualOv'), 1200);
+  } else {
+    showFb('✗ Erro ao salvar', false);
+  }
+}
+
+async function saveManual(normName, dados) {
+  const pwd = localStorage.getItem('am_cs_pwd');
+  try {
+    const res = await fetch(`${WORKER_BASE}/presenca`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd || '', 'X-CS-Nome': localStorage.getItem('am_cs_nome') || csNomeAtual || 'CS', 'X-CS-Email': localStorage.getItem('am_cs_email') || '' },
+      body: JSON.stringify({ tab: '__manuais__', semana: 1, registros: { [normName]: dados } })
+    });
+    return res.ok;
+  } catch(e) { console.error('Erro ao salvar aluno manual:', e); return false; }
+}
+
 function renderCallsSection(name) {
   const section  = document.getElementById('mCallsSection');
   const content  = document.getElementById('mCallsContent');
@@ -3492,7 +3618,8 @@ const PLAYBOOKS = [
     acao: 'Reunião de retenção em até 24h. Calcular ROI real e apresentar proposta de permanência.',
     trigger: (aluno) => {
       const c = getCancelamentoData(norm(aluno.name));
-      return c && c.status !== 'finalizado';
+      // Revertido não é pipeline de saída — aluno voltou ao normal
+      return c && c.status !== 'finalizado' && c.status !== 'cancelamento_revertido';
     },
   },
   {
@@ -3672,8 +3799,9 @@ function renderPlaybooks() {
       const daysColor = days === null ? '' : days <= 30 ? 'var(--danger)' : days <= 60 ? 'var(--warn)' : 'var(--text-3)';
       const daysLabel = days === null ? '' : days >= 0 ? `${days}d restantes` : `${Math.abs(days)}d vencido`;
       const cancelData = getCancelamentoData(norm(a.name));
+      const _cs = cancelData ? (CANCEL_STATUS[cancelData.status] || CANCEL_STATUS.em_tratativa) : null;
       const cancelBadge = cancelData
-        ? `<span class="b" style="background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,59,92,.3);border-radius:5px;">${CANCEL_STATUS[cancelData.status]?.label || cancelData.status}</span>`
+        ? `<span class="b" style="background:${_cs.bg};color:${_cs.cor};border:1px solid ${_cs.cor}33;border-radius:5px;">${_cs.label}</span>`
         : '';
 
       return `<div class="pb-aluno-row" onclick="openDrModal('${esc(a.name)}')">
@@ -3751,7 +3879,15 @@ const CANCEL_STATUS = {
   sem_retorno:       { label: 'Sem retorno após envio do cálculo',  cor: 'var(--text-3)', bg: 'rgba(90,90,114,.15)'},
   rescisao_assinada: { label: 'Contrato de rescisão assinado',      cor: 'var(--danger)', bg: 'var(--danger-dim)' },
   finalizado:        { label: 'Processo finalizado',                cor: 'var(--text-3)', bg: 'rgba(90,90,114,.15)'},
+  cancelamento_revertido: { label: 'Cancelamento Revertido - Em tratativa com o Jurídico', cor: 'var(--safe)', bg: 'var(--safe-dim)' },
 };
+
+// Aluno com cancelamento revertido volta a ter acesso pleno (aulas, acompanhamento,
+// ARR, chamada). Não é tratado como saída — só permanece registrado para o jurídico.
+function isCancelamentoRevertido(aluno) {
+  const d = getCancelamentoData(norm(aluno.name));
+  return !!(d && d.status === 'cancelamento_revertido');
+}
 
 let _cancelAlunoAtual = null;
 
@@ -4095,7 +4231,7 @@ function popularCicloSelectorChamada() {
   if (!sel) return;
   const ciclos = [];
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__' || tab === '__manuais__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
     }
@@ -4115,7 +4251,7 @@ function popularCicloSelectorCS() {
   if (!sel) return;
   const ciclos = [];
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__' || tab === '__manuais__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
     }
