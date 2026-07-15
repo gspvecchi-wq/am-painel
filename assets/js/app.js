@@ -1179,7 +1179,7 @@ function updateFilterCounts() {
     'rf-vitoria':  all.filter(d=>d.motivos.includes('vitoria')).length,
     'rf-urgente':  all.filter(d=>calcAlertLevel(d,currentWeek)?.icon==='🔴').length,
     'rf-queda':    all.filter(d=>isQuedaAcelerada(d,currentWeek)).length,
-    'rf-renovacao':all.filter(d=>{const r=calcRenewalScore(d,currentWeek);return r&&r.daysLeft>=0&&r.daysLeft<=60;}).length,
+    'rf-renovacao':all.filter(d=>{const r=calcRenewalScore(d,currentWeek);return r&&r.daysLeft>=0&&r.daysLeft<=60&&!isForaDeRenovacao(d);}).length,
     'rf-master':   all.filter(d=>calcAscensaoScore(d,currentWeek)>0).length,
   };
   const labels = {
@@ -1222,7 +1222,7 @@ function renderCsTable() {
   if      (csFilter === 'todos')    list = all;
   else if (csFilter === 'urgente')  list = all.filter(d => calcAlertLevel(d, currentWeek)?.icon === '🔴');
   else if (csFilter === 'queda')    list = all.filter(d => isQuedaAcelerada(d, currentWeek));
-  else if (csFilter === 'renovacao') list = all.filter(d => { const r=calcRenewalScore(d,currentWeek); return r && r.daysLeft>=0 && r.daysLeft<=60; });
+  else if (csFilter === 'renovacao') list = all.filter(d => { const r=calcRenewalScore(d,currentWeek); return r && r.daysLeft>=0 && r.daysLeft<=60 && !isForaDeRenovacao(d); });
   else if (csFilter === 'master')   list = all.filter(d => calcAscensaoScore(d, currentWeek) > 0);
   else                              list = all.filter(d => d.motivos.includes(csFilter));
 
@@ -1315,7 +1315,7 @@ function renderCsMobileCards() {
   if      (csFilter === 'todos')    list = all;
   else if (csFilter === 'urgente')  list = all.filter(d => calcAlertLevel(d, currentWeek)?.icon === '🔴');
   else if (csFilter === 'queda')    list = all.filter(d => isQuedaAcelerada(d, currentWeek));
-  else if (csFilter === 'renovacao') list = all.filter(d => { const r=calcRenewalScore(d,currentWeek); return r && r.daysLeft>=0 && r.daysLeft<=60; });
+  else if (csFilter === 'renovacao') list = all.filter(d => { const r=calcRenewalScore(d,currentWeek); return r && r.daysLeft>=0 && r.daysLeft<=60 && !isForaDeRenovacao(d); });
   else if (csFilter === 'master')   list = all.filter(d => calcAscensaoScore(d, currentWeek) > 0);
   else                              list = all.filter(d => d.motivos.includes(csFilter));
 
@@ -1823,7 +1823,7 @@ function renderGest() {
   // ── RENOVAÇÃO RANKING ─────────────────────────────────────
   const renovacaoCandidates = allAlunos
     .map(a => ({ ...a, renScore: calcRenewalScore(a, refW) }))
-    .filter(a => a.renScore && a.renScore.daysLeft >= 0 && a.renScore.daysLeft <= 90)
+    .filter(a => a.renScore && a.renScore.daysLeft >= 0 && a.renScore.daysLeft <= 90 && !isForaDeRenovacao(a))
     .sort((a, b) => a.renScore.daysLeft - b.renScore.daysLeft);
 
   const renovEl = document.getElementById('gestRenovacao');
@@ -2156,6 +2156,7 @@ function renderRenovacao() {
   const passado = []; // venceu nos últimos 365 dias (daysLeft -365..−1)
 
   for (const a of allAlunos) {
+    if (isForaDeRenovacao(a)) continue; // já saiu (não renovou / cancelamento não-em-tratativa)
     const aCycleEnd = getEffectiveCycleEnd(a);
     if (!aCycleEnd) continue;
     const end      = new Date(aCycleEnd + 'T12:00:00').getTime();
@@ -2243,6 +2244,7 @@ function _buildRenovacaoMsg() {
   const futuro = [], passado = [];
 
   for (const a of allAlunos) {
+    if (isForaDeRenovacao(a)) continue; // já saiu (não renovou / cancelamento não-em-tratativa)
     const aCycleEnd = getEffectiveCycleEnd(a);
     if (!aCycleEnd) continue;
     const end      = new Date(aCycleEnd + 'T12:00:00').getTime();
@@ -3400,7 +3402,7 @@ function syncMobileFilterUI(f) {
     if      (f === 'todos')    list = all;
     else if (f === 'urgente')  list = all.filter(d => calcAlertLevel(d, currentWeek)?.icon === '🔴');
     else if (f === 'queda')    list = all.filter(d => isQuedaAcelerada(d, currentWeek));
-    else if (f === 'renovacao') list = all.filter(d => { const r=calcRenewalScore(d,currentWeek); return r && r.daysLeft>=0 && r.daysLeft<=60; });
+    else if (f === 'renovacao') list = all.filter(d => { const r=calcRenewalScore(d,currentWeek); return r && r.daysLeft>=0 && r.daysLeft<=60 && !isForaDeRenovacao(d); });
     else if (f === 'master')   list = all.filter(d => calcAscensaoScore(d, currentWeek) > 0);
     else                       list = all.filter(d => d.motivos.includes(f));
     countEl.textContent = list.length + ' resultado' + (list.length !== 1 ? 's' : '');
@@ -3887,6 +3889,18 @@ const CANCEL_STATUS = {
 function isCancelamentoRevertido(aluno) {
   const d = getCancelamentoData(norm(aluno.name));
   return !!(d && d.status === 'cancelamento_revertido');
+}
+
+// Aluno que NÃO deve mais aparecer nas listas/mensagens de renovação:
+// - marcado em "Não Renovaram", OU
+// - com cancelamento em qualquer status que não seja "em tratativa" (retenção em andamento)
+//   nem "revertido" (voltou). Ou seja, saem: aguardando cálculo, cálculo enviado, sem retorno,
+//   rescisão assinada e finalizado.
+function isForaDeRenovacao(aluno) {
+  if (isNaoRenovou(aluno)) return true;
+  const c = getCancelamentoData(norm(aluno.name));
+  if (c && c.status !== 'em_tratativa' && c.status !== 'cancelamento_revertido') return true;
+  return false;
 }
 
 let _cancelAlunoAtual = null;
