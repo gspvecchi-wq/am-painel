@@ -560,8 +560,8 @@ function calcCompositeScore(aluno, upToWeek) {
   }
 
   // Calls bonus: +5 per call with specialist, max +10
-  const callsData = (kvPresenca['__calls__']||{})[norm(aluno.name)] || { leonardo: 0, bruno: 0 };
-  const totalCalls = (callsData.leonardo||0) + (callsData.bruno||0);
+  const callsData = (kvPresenca['__calls__']||{})[norm(aluno.name)] || {};
+  const totalCalls = totalCallsAluno(callsData);
   const callsBonus = Math.min(totalCalls * 5, 10); // max +10pts
 
   // Grupo bonus: últimas 4 semanas, já vem com cap de 15 do worker
@@ -648,8 +648,8 @@ function calcScoreComponentes(aluno, upToWeek) {
     activeW += wNorm;
   }
 
-  const callsData = (kvPresenca['__calls__']||{})[norm(aluno.name)] || { leonardo:0, bruno:0 };
-  const callsBonus = Math.min(((callsData.leonardo||0)+(callsData.bruno||0))*5, 10);
+  const callsData = (kvPresenca['__calls__']||{})[norm(aluno.name)] || {};
+  const callsBonus = Math.min(totalCallsAluno(callsData) * 5, 10);
   const grupoData  = kvGrupoScores[norm(aluno.name)] || null;
   const grupoBonus = grupoData ? Math.min(grupoData.total||0, 15) : 0;
 
@@ -2778,13 +2778,21 @@ function openDrModal(name, showMsgs=true) {
 // ── CALLS COM ESPECIALISTAS ──────────────────────────────
 const ESPECIALISTAS = [
   { key: 'leonardo', nome: 'Leonardo Nunes', total: 12 },
-  { key: 'bruno',    nome: 'Bruno Guimarães', total: 1  }
+  { key: 'bruno',    nome: 'Bruno Guimarães', total: 1  },
+  { key: 'netto',    nome: 'Dr. Netto',      total: 5  },
+  { key: 'nara',     nome: 'Nara Menezes',   total: 5  }
 ];
+
+// Soma total de calls registradas com qualquer especialista (para bônus de engajamento)
+function totalCallsAluno(callsData) {
+  if (!callsData) return 0;
+  return ESPECIALISTAS.reduce((s, e) => s + (callsData[e.key] || 0), 0);
+}
 
 function getCallsData(normName) {
   // Lê do kvPresenca sob a chave especial 'calls'
   const callsKv = kvPresenca['__calls__'] || {};
-  return callsKv[normName] || { leonardo: 0, bruno: 0 };
+  return callsKv[normName] || Object.fromEntries(ESPECIALISTAS.map(e => [e.key, 0]));
 }
 
 // ── CONTRATOS ────────────────────────────────────────────────
@@ -3298,7 +3306,7 @@ async function registerCall(normName, espKey, delta) {
 
   // Atualiza local imediatamente
   if (!kvPresenca['__calls__']) kvPresenca['__calls__'] = {};
-  if (!kvPresenca['__calls__'][normName]) kvPresenca['__calls__'][normName] = { leonardo: 0, bruno: 0 };
+  if (!kvPresenca['__calls__'][normName]) kvPresenca['__calls__'][normName] = Object.fromEntries(ESPECIALISTAS.map(e => [e.key, 0]));
   const cur = kvPresenca['__calls__'][normName][espKey] || 0;
   const esp = ESPECIALISTAS.find(e => e.key === espKey);
   kvPresenca['__calls__'][normName][espKey] = Math.max(0, Math.min(esp.total, cur + delta));
