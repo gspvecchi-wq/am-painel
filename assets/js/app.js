@@ -1375,7 +1375,7 @@ function popularCicloSelector() {
   // Coleta todos os ciclos disponíveis no KV
   const ciclosSet = new Set();
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__' || tab === '__manuais__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__' || tab === '__manuais__' || tab === '__eventos__' || tab === '__eventos_catalogo__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo)) ciclosSet.add(ciclo);
     }
@@ -1431,7 +1431,7 @@ function toggleModoComparacao() {
 function popularCicloSelectComparacao() {
   const ciclos = [];
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__' || tab === '__manuais__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__' || tab === '__manuais__' || tab === '__eventos__' || tab === '__eventos_catalogo__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
     }
@@ -2763,6 +2763,9 @@ function openDrModal(name, showMsgs=true) {
   // ── Objetivo do mentorado (sempre visível) ───
   renderObjetivoSection(name);
 
+  // ── Eventos (acesso do aluno + catálogo) ───
+  renderEventosSection(name);
+
   // ── Badge de classificação no nome ───────
   const mClassBadge = document.getElementById('mClassBadge');
   if (mClassBadge) mClassBadge.innerHTML = classeBadgeHtml(aluno);
@@ -3267,6 +3270,143 @@ async function saveManual(normName, dados) {
     });
     return res.ok;
   } catch(e) { console.error('Erro ao salvar aluno manual:', e); return false; }
+}
+
+// ── Eventos ───────────────────────────────────────────────
+// Catálogo global (CS gerencia) + acesso por aluno.
+// KV: __eventos_catalogo__ = { eventos: [{id, nome}] }  (objeto único global, como __calls__)
+//     __eventos__[normName]  = { eventoId: true }        (por aluno, como __onboarding__)
+function getEventosCatalogo() {
+  const c = kvPresenca['__eventos_catalogo__'];
+  return (c && Array.isArray(c.eventos)) ? c.eventos : [];
+}
+
+function getEventosAluno(normName) {
+  return (kvPresenca['__eventos__'] || {})[normName] || {};
+}
+
+function renderEventosSection(name) {
+  const section = document.getElementById('mEventosSection');
+  if (!section) return;
+  const normName = norm(name);
+  const catalogo = getEventosCatalogo();
+  const acesso   = getEventosAluno(normName);
+  const canEdit  = csAuthenticated;
+
+  section.style.display = 'block';
+
+  const header = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);font-weight:700;">🎟️ Eventos</div>
+    ${canEdit ? `<button onclick="abrirModalEventos()" style="background:transparent;border:1px solid var(--border2);color:var(--text-2);padding:4px 10px;border-radius:7px;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.03em;">⚙ Gerenciar eventos</button>` : ''}
+  </div>`;
+
+  if (!catalogo.length) {
+    section.innerHTML = header + `<div style="font-size:12px;color:var(--text-3);font-family:'DM Sans',sans-serif;padding:4px 0;">${canEdit ? 'Nenhum evento cadastrado. Clique em "Gerenciar eventos".' : 'Nenhum evento cadastrado.'}</div>`;
+    return;
+  }
+
+  if (canEdit) {
+    const rows = catalogo.map(ev => {
+      const on = !!acesso[ev.id];
+      return `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer;">
+        <input type="checkbox" style="accent-color:var(--acc);width:14px;height:14px;cursor:pointer;" ${on ? 'checked' : ''} onchange="toggleEventoAluno('${normName}','${ev.id}',this.checked)">
+        <span style="font-family:'DM Sans',sans-serif;font-size:12px;color:${on ? 'var(--text)' : 'var(--text-3)'};">${escHtml(ev.nome)}</span>
+      </label>`;
+    }).join('');
+    section.innerHTML = header + rows;
+  } else {
+    const acessados = catalogo.filter(ev => acesso[ev.id]);
+    section.innerHTML = header + (acessados.length
+      ? acessados.map(ev => `<span style="display:inline-block;background:var(--acc-dim);color:var(--acc);border:1px solid var(--border-acc);border-radius:6px;padding:3px 9px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;margin:0 6px 6px 0;">${escHtml(ev.nome)}</span>`).join('')
+      : `<div style="font-size:12px;color:var(--text-3);font-family:'DM Sans',sans-serif;">Nenhum evento marcado.</div>`);
+  }
+}
+
+function toggleEventoAluno(normName, eventoId, checked) {
+  if (!kvPresenca['__eventos__']) kvPresenca['__eventos__'] = {};
+  if (!kvPresenca['__eventos__'][normName]) kvPresenca['__eventos__'][normName] = {};
+  if (checked) kvPresenca['__eventos__'][normName][eventoId] = true;
+  else delete kvPresenca['__eventos__'][normName][eventoId];
+  saveEventosAluno(normName);
+  const aluno = allAlunos.find(a => norm(a.name) === normName);
+  if (aluno) renderEventosSection(aluno.name);
+}
+
+async function saveEventosAluno(normName) {
+  const pwd = localStorage.getItem('am_cs_pwd');
+  try {
+    await fetch(`${WORKER_BASE}/presenca`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd || '', 'X-CS-Nome': localStorage.getItem('am_cs_nome') || csNomeAtual || 'CS', 'X-CS-Email': localStorage.getItem('am_cs_email') || '' },
+      body: JSON.stringify({ tab: '__eventos__', semana: 1, registros: { [normName]: kvPresenca['__eventos__'][normName] } })
+    });
+  } catch(e) { console.error('Erro ao salvar eventos do aluno:', e); }
+}
+
+// ── Catálogo de eventos (modal) ──
+function abrirModalEventos() {
+  if (!csAuthenticated) return;
+  document.getElementById('novoEventoNome').value = '';
+  renderEventosCatalogo();
+  document.getElementById('eventosOv').classList.add('open');
+}
+
+function renderEventosCatalogo() {
+  const list = document.getElementById('eventosCatalogoList');
+  if (!list) return;
+  const catalogo = getEventosCatalogo();
+  if (!catalogo.length) {
+    list.innerHTML = `<div style="font-size:12px;color:var(--text-3);font-family:'DM Sans',sans-serif;padding:6px 0;">Nenhum evento ainda. Adicione acima.</div>`;
+    return;
+  }
+  list.innerHTML = catalogo.map(ev => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <input type="text" value="${escHtml(ev.nome).replace(/"/g,'&quot;')}" onchange="renomearEvento('${ev.id}',this.value)" style="flex:1;background:var(--s3);border:1px solid var(--border2);color:var(--text);border-radius:7px;padding:7px 10px;font-family:'DM Sans',sans-serif;font-size:12px;outline:none;box-sizing:border-box;">
+      <button onclick="removerEvento('${ev.id}')" title="Remover" style="background:var(--danger-dim);border:1px solid var(--danger);color:var(--danger);border-radius:7px;padding:6px 10px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">✕</button>
+    </div>`).join('');
+}
+
+function _genEventoId() { return 'ev' + Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
+
+function addEvento() {
+  const input = document.getElementById('novoEventoNome');
+  const nome  = (input.value || '').trim();
+  if (!nome) return;
+  const catalogo = getEventosCatalogo().slice();
+  catalogo.push({ id: _genEventoId(), nome });
+  _setCatalogo(catalogo);
+  input.value = '';
+  input.focus();
+  renderEventosCatalogo();
+}
+
+function renomearEvento(id, novoNome) {
+  const nome = (novoNome || '').trim();
+  if (!nome) { renderEventosCatalogo(); return; }
+  _setCatalogo(getEventosCatalogo().map(ev => ev.id === id ? { ...ev, nome } : ev));
+}
+
+function removerEvento(id) {
+  _setCatalogo(getEventosCatalogo().filter(ev => ev.id !== id));
+  renderEventosCatalogo();
+}
+
+function _setCatalogo(catalogo) {
+  if (!kvPresenca['__eventos_catalogo__']) kvPresenca['__eventos_catalogo__'] = {};
+  kvPresenca['__eventos_catalogo__'].eventos = catalogo;
+  saveEventosCatalogo();
+  if (_cancelAlunoAtual) renderEventosSection(_cancelAlunoAtual.name); // atualiza o perfil aberto
+}
+
+async function saveEventosCatalogo() {
+  const pwd = localStorage.getItem('am_cs_pwd');
+  try {
+    await fetch(`${WORKER_BASE}/presenca`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CS-Password': pwd || '', 'X-CS-Nome': localStorage.getItem('am_cs_nome') || csNomeAtual || 'CS', 'X-CS-Email': localStorage.getItem('am_cs_email') || '' },
+      body: JSON.stringify({ tab: '__eventos_catalogo__', semana: 1, registros: { eventos: kvPresenca['__eventos_catalogo__'].eventos } })
+    });
+  } catch(e) { console.error('Erro ao salvar catálogo de eventos:', e); }
 }
 
 function renderCallsSection(name) {
@@ -4253,7 +4393,7 @@ function popularCicloSelectorChamada() {
   if (!sel) return;
   const ciclos = [];
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__' || tab === '__manuais__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__' || tab === '__manuais__' || tab === '__eventos__' || tab === '__eventos_catalogo__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
     }
@@ -4273,7 +4413,7 @@ function popularCicloSelectorCS() {
   if (!sel) return;
   const ciclos = [];
   for (const tab of Object.keys(kvPresenca)) {
-    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__' || tab === '__manuais__') continue;
+    if (tab === '__calls__' || tab === '__dates__' || tab === '__contratos__' || tab === '__onboarding__' || tab === '__cancelamentos__' || tab === '__nao_renovou__' || tab === '__manuais__' || tab === '__eventos__' || tab === '__eventos_catalogo__') continue;
     for (const ciclo of Object.keys(kvPresenca[tab] || {})) {
       if (/^\d{4}-\d{2}$/.test(ciclo) && !ciclos.includes(ciclo)) ciclos.push(ciclo);
     }

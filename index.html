@@ -1000,6 +1000,22 @@
   </div>
 </div>
 
+<!-- MODAL GERENCIAR EVENTOS (catálogo global) -->
+<div class="ov" id="eventosOv" onclick="ovClick(event,'eventosOv')">
+  <div class="dr-modal" style="max-width:440px;">
+    <button class="modal-x" onclick="closeOv('eventosOv')">✕</button>
+    <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;color:var(--acc);margin-bottom:4px;">Gerenciar eventos</div>
+    <div style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text-2);margin-bottom:18px;">Catálogo de eventos do ano. O que estiver aqui aparece como opção para marcar em cada aluno.</div>
+
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <input type="text" id="novoEventoNome" placeholder="Nome do evento" onkeydown="if(event.key==='Enter')addEvento()" style="flex:1;background:var(--s3);border:1px solid var(--border2);color:var(--text);border-radius:9px;padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='var(--acc)'" onblur="this.style.borderColor='var(--border2)'">
+      <button class="contratos-btn-save" style="white-space:nowrap;" onclick="addEvento()">+ Adicionar</button>
+    </div>
+
+    <div id="eventosCatalogoList"></div>
+  </div>
+</div>
+
 <!-- DR MODAL -->
 <div class="ov" id="drOv" onclick="ovClick(event,'drOv')">
   <div class="dr-modal">
@@ -1021,6 +1037,7 @@
       <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);margin-bottom:10px;font-weight:700;">Calls com Especialistas</div>
       <div id="mCallsContent"></div>
     </div>
+    <div id="mEventosSection" style="display:none;margin:16px 0 0;"></div>
     <div id="mAISection" style="display:none;margin-bottom:20px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
         <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--sub);font-weight:700;">🤖 Inteligência Artificial</div>
