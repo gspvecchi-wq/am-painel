@@ -4582,22 +4582,25 @@ async function doCadastro() {
 function initAuth() {
   const savedEmail = localStorage.getItem('am_cs_email');
   const savedSenha = localStorage.getItem('am_cs_senha');
-  if (!savedEmail || !savedSenha) return;
+  if (!savedEmail || !savedSenha) {
+    document.getElementById('loginOverlay').classList.remove('hidden');
+    return;
+  }
   fetch(WORKER_BASE + '/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: savedEmail, senha: savedSenha })
   }).then(async r => {
-    if (!r.ok) return;
+    if (!r.ok) { document.getElementById('loginOverlay').classList.remove('hidden'); return; }
     const data = await r.json();
-    if (!data.ok) return;
+    if (!data.ok) { document.getElementById('loginOverlay').classList.remove('hidden'); return; }
     csAuthenticated = true;
     csNomeAtual = data.nome;
     localStorage.setItem('am_cs_pwd',  savedSenha);
     localStorage.setItem('am_cs_nome', data.nome);
     const chip = document.getElementById('userChip');
     if (chip) { chip.style.display = 'flex'; document.getElementById('userChipNome').textContent = data.nome; }
-  }).catch(() => {});
+  }).catch(() => { document.getElementById('loginOverlay').classList.remove('hidden'); });
 }
 
 // Legado — mantido para compatibilidade com aba Chamada
