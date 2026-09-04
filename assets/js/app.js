@@ -193,6 +193,7 @@ function espLabel(aluno) {
 window.addEventListener('DOMContentLoaded', () => {
   updateBadge();
   reloadAll();
+  initAuth();
 
 
   // Glass scroll effect on topbar
@@ -4576,6 +4577,27 @@ async function doCadastro() {
     errEl.textContent = data.error || 'Erro ao criar conta.';
     errEl.style.display = 'block';
   }
+}
+
+function initAuth() {
+  const savedEmail = localStorage.getItem('am_cs_email');
+  const savedSenha = localStorage.getItem('am_cs_senha');
+  if (!savedEmail || !savedSenha) return;
+  fetch(WORKER_BASE + '/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: savedEmail, senha: savedSenha })
+  }).then(async r => {
+    if (!r.ok) return;
+    const data = await r.json();
+    if (!data.ok) return;
+    csAuthenticated = true;
+    csNomeAtual = data.nome;
+    localStorage.setItem('am_cs_pwd',  savedSenha);
+    localStorage.setItem('am_cs_nome', data.nome);
+    const chip = document.getElementById('userChip');
+    if (chip) { chip.style.display = 'flex'; document.getElementById('userChipNome').textContent = data.nome; }
+  }).catch(() => {});
 }
 
 // Legado — mantido para compatibilidade com aba Chamada
