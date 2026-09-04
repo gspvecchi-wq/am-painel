@@ -4458,8 +4458,8 @@ function checkSemanaAtual() {
 // CHAMADA — Registration
 // ═══════════════════════════════════════════
 const WORKER_BASE = WORKER_URL.replace('/dados','');
-let csAuthenticated = true; // TEMP: login desabilitado para visualização
-let csNomeAtual = 'Preview'; // nome do CS logado
+let csAuthenticated = false;
+let csNomeAtual = ''; // nome do CS logado
 let chamadaRegistros = {}; // normName → {P,C,F,V,name}
 
 // ── LOGIN OVERLAY ────────────────────────────────────────────
@@ -4512,7 +4512,21 @@ function dismissOverlay(nome, email, funcao) {
   document.getElementById('loginOverlay').classList.add('hidden');
   document.getElementById('chamadaLogin').style.display = 'none';
   document.getElementById('chamadaForm').style.display  = 'block';
+  const chip = document.getElementById('userChip');
+  if (chip) { chip.style.display = 'flex'; document.getElementById('userChipNome').textContent = nome; }
   loadChamada();
+}
+
+function doLogout() {
+  if (!confirm('Sair da sua conta?')) return;
+  ['am_cs_pwd','am_cs_nome','am_cs_email','am_cs_funcao','am_cs_senha'].forEach(k => localStorage.removeItem(k));
+  csAuthenticated = false;
+  csNomeAtual = '';
+  const chip = document.getElementById('userChip');
+  if (chip) chip.style.display = 'none';
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  document.getElementById('chamadaLogin').style.display = 'block';
+  document.getElementById('chamadaForm').style.display  = 'none';
 }
 
 function doLogin() {
@@ -4585,6 +4599,8 @@ function initChamada() {
           localStorage.setItem('am_cs_pwd', savedSenha);
           localStorage.setItem('am_cs_nome', data.nome);
           document.getElementById('loginOverlay')?.classList.add('hidden');
+          const chip = document.getElementById('userChip');
+          if (chip) { chip.style.display = 'flex'; document.getElementById('userChipNome').textContent = data.nome; }
           document.getElementById('chamadaLogin').style.display='none';
           document.getElementById('chamadaForm').style.display='block';
           const dataEl = document.getElementById('chamadaData');
