@@ -17,7 +17,7 @@ const BOARDS = {
   Master:   { id:'18365478944', tagCol:'tag_mm1cqsgs' },
   Mentoria: { id:'18391780128', tagCol:'tag_mm1cs0hm' }
 };
-const ESPECIALIDADES        = ['Gestores','Ortopedia/Dor','Estética&Oftalmo','Emagrecimento/Integrativa','Cirurgiões','Psiquiatras/Clínicos','Mentores'];
+const ESPECIALIDADES        = ['Gestores','Ortopedia/Dor','Estética&Oftalmo','Emagrecimento/Integrativa','Cirurgiões','Psiquiatras/Clínicos','Mentores','Ginecologistas'];
 const ESPECIALIDADES_LEGADO = ['Dermato','Oftalmo','Retomada','Dermato&Oftalmo','Ortoped','Psiquiatras','Emagrecimento'];
 const AULAS_GERAIS          = ['Mentoria','Hotseat','Hotseat Simultâneo','Master'];
 const AULAS_WINNERS         = ['Winners Encontro'];
